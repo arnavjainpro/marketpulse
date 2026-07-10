@@ -1,0 +1,251 @@
+import { config, loadPortfolio, allTickers, marketPhase, etNow } from "./config";
+import { db, aiLive } from "./db";
+import { runScan, loadUniverse } from "./engine/screener";
+import { sweepIndex, activeDynamicTickers } from "./engine/sweep";
+import { loadCikMap } from "./ingest/edgar";
+import { refreshDailyStats, startTradeStream } from "./ingest/finnhub";
+import { detectPriceVolume, detectNews, detectFilings, detectEarnings, type RawEvent } from "./engine/detectors";
+import { triageEvent } from "./ai/triage";
+import { analyzeEvent } from "./ai/analyst";
+import { generateBriefing } from "./ai/briefing";
+import { setTripHandler } from "./ai/breaker";
+import { startCacheHeartbeat } from "./ai/heartbeat";
+import { notifyMac } from "./notify/macos";
+import { notifyTelegram, telegramEnabled } from "./notify/telegram";
+import { startServer, broadcast, setTestEventHandler, setBriefingHandler } from "./server/server";
+
+if (!config.finnhubKey) {
+  console.error("FINNHUB_API_KEY is not set. Get a free key at https://finnhub.io and put it in .env");
+  process.exit(1);
+}
+
+const portfolio = loadPortfolio();
+const tickers = allTickers(portfolio);
+console.log(`[marketpulse] monitoring ${tickers.length} tickers: ${tickers.join(", ")}`);
+
+// Circuit breaker trips fire an immediate CRITICAL alert on every channel.
+setTripHandler(async (name, count, windowSec) => {
+  const msg = `Circuit Breaker Tripped — ${name} hit ${count} calls in ${windowSec}s. AI halted to prevent spend. Monitoring continues; reset from the dashboard.`;
+  broadcast("health", { breakerTripped: name });
+  await notifyMac("🚨 MarketPulse: AI HALTED", msg);
+  if (telegramEnabled()) await notifyTelegram(`🚨 *MarketPulse: AI HALTED*\n\n${msg}`);
+});
+
+// ── Pipeline: event → triage → (analysis) → notify → broadcast ──────────────
+
+// No-token severity heuristic used when live AI updates are paused.
+function heuristicSeverity(event: RawEvent): { severity: "critical" | "high" | "info"; rationale: string } {
+  const held = portfolio.holdings.some((h) => h.ticker === event.ticker);
+  const kind = event.kind;
+  if (kind === "death_cross") return { severity: "high", rationale: "AI paused — death cross on held position (rule-based)." };
+  if (kind === "market_mover") return { severity: "info", rationale: "AI paused — abnormal mover promoted to monitoring (rule-based)." };
+  if (kind === "golden_cross" || kind === "screener_pick") return { severity: "high", rationale: "AI paused — screener setup (rule-based)." };
+  if ((kind === "filing" || kind === "earnings" || kind === "price_move") && held)
+    return { severity: "high", rationale: "AI paused — material event on held position (rule-based)." };
+  return { severity: "info", rationale: "AI paused — rule-based severity." };
+}
+
+async function processEvent(event: RawEvent) {
+  let triage;
+  let signal = null;
+
+  if (!aiLive()) {
+    // Live updates paused: no tokens spent — rule-based severity, no analysis.
+    triage = heuristicSeverity(event);
+    const { setTriage } = await import("./db");
+    setTriage(event.id, triage.severity, triage.rationale);
+  } else {
+    triage = await triageEvent(event, portfolio);
+    if (triage.severity === "critical" || triage.severity === "high") {
+      signal = await analyzeEvent(event, portfolio);
+    }
+  }
+  console.log(`[pipeline] ${event.ticker} ${event.kind} → ${triage.severity}: ${event.title}`);
+
+  broadcast("event", {
+    id: event.id, ts: event.ts, ticker: event.ticker, kind: event.kind,
+    title: event.title, severity: triage.severity, triage_rationale: triage.rationale,
+    ...(signal ?? {}),
+  });
+
+  // Notifications fire ONLY for actionable buy/sell advice — plain language.
+  const isBuy = signal && (signal.action === "buy" || signal.action === "add");
+  const isSell = signal && (signal.action === "sell" || signal.action === "trim");
+  if (signal && (isBuy || isSell)) {
+    const headline = signal.plain_headline || `${isBuy ? "Consider buying" : "Consider selling"} ${event.ticker}.`;
+    await notifyMac(isBuy ? `Buy idea: ${event.ticker}` : `Sell alert: ${event.ticker}`, headline);
+    if (telegramEnabled()) {
+      await notifyTelegram(`*${isBuy ? "Buy idea" : "Sell alert"}: ${event.ticker}*\n\n${headline}\n\n_${signal.thesis}_`);
+    }
+  }
+}
+
+async function runDetectors() {
+  const phase = marketPhase();
+  for (const t of tickers) {
+    try {
+      const events: RawEvent[] = [];
+      if (phase !== "closed") events.push(...(await detectPriceVolume(t)));
+      events.push(...(await detectNews(t)));
+      events.push(...(await detectFilings(t)));
+      for (const e of events) await processEvent(e);
+      await Bun.sleep(1100); // respect Finnhub 60 req/min free tier
+    } catch (err) {
+      console.error(`[detectors] ${t}:`, err);
+    }
+  }
+  // Dynamically-promoted market movers (from the index sweep): news + filings
+  // only — they have no local bar history for price detectors, and their move
+  // was already captured by the sweep event itself.
+  for (const t of activeDynamicTickers()) {
+    try {
+      const events: RawEvent[] = [];
+      events.push(...(await detectNews(t)));
+      events.push(...(await detectFilings(t)));
+      for (const e of events) await processEvent(e);
+      await Bun.sleep(1100);
+    } catch (err) {
+      console.error(`[detectors:dynamic] ${t}:`, err);
+    }
+  }
+  try {
+    for (const e of await detectEarnings(tickers)) await processEvent(e);
+  } catch (err) {
+    console.error("[detectors] earnings:", err);
+  }
+}
+
+// ── Scheduling ───────────────────────────────────────────────────────────────
+
+let detectorRunning = false;
+async function detectorLoop() {
+  if (detectorRunning) return;
+  detectorRunning = true;
+  try {
+    await runDetectors();
+  } finally {
+    detectorRunning = false;
+  }
+}
+
+function scheduleDetectors() {
+  const tick = async () => {
+    const phase = marketPhase();
+    await detectorLoop();
+    // market open: ~90s cycles; extended: 5 min; closed: 30 min (filings still land off-hours)
+    const delay = phase === "open" ? 90_000 : phase === "extended" ? 300_000 : 1_800_000;
+    setTimeout(tick, delay);
+  };
+  tick();
+}
+
+let lastBriefingDay = { open: "", close: "" };
+function scheduleBriefings() {
+  setInterval(async () => {
+    const { mins, day } = etNow();
+    if (day === 0 || day === 6) return;
+    const today = new Date().toISOString().slice(0, 10);
+    // 9:00 ET pre-market, 16:15 ET post-close
+    const kind = mins >= 9 * 60 && mins < 9 * 60 + 10 ? "open"
+               : mins >= 16 * 60 + 15 && mins < 16 * 60 + 25 ? "close" : null;
+    if (!kind || lastBriefingDay[kind] === today) return;
+    if (!aiLive()) return; // live updates paused — skip scheduled briefings
+    lastBriefingDay[kind] = today;
+    try {
+      console.log(`[briefing] generating ${kind} briefing`);
+      const content = await generateBriefing(kind, portfolio);
+      broadcast("briefing", { kind, content });
+      // no notification — briefings live on the dashboard; alerts are reserved for buy/sell advice
+    } catch (err) {
+      console.error("[briefing]", err);
+    }
+  }, 5 * 60_000);
+}
+
+// Index sweep: every 15 min during market hours, batch-quote the whole
+// universe and promote abnormal movers into live news/filing monitoring.
+let universeCache: string[] = [];
+function scheduleSweep() {
+  const sweep = async () => {
+    if (marketPhase() === "closed") return;
+    try {
+      if (!universeCache.length) universeCache = await loadUniverse(portfolio);
+      const watched = new Set(tickers);
+      const events = await sweepIndex(universeCache, watched);
+      for (const e of events) await processEvent(e);
+    } catch (err) {
+      console.error("[sweep]", err);
+    }
+  };
+  setTimeout(sweep, 60_000); // first sweep 1 min after boot
+  setInterval(sweep, 15 * 60_000);
+}
+
+// Screener: full scan at boot, then every 6 hours. Pure math — no AI cost;
+// any setups it finds flow through processEvent (which respects the AI toggle).
+function scheduleScreener() {
+  const scan = async () => {
+    try {
+      const events = await runScan(portfolio);
+      for (const e of events) await processEvent(e);
+    } catch (err) {
+      console.error("[screener]", err);
+    }
+  };
+  scan();
+  setInterval(scan, 6 * 3600_000);
+}
+
+function scheduleDailyStats() {
+  const refresh = async () => {
+    for (const t of tickers) {
+      try {
+        await refreshDailyStats(t);
+        await Bun.sleep(1100);
+      } catch (err) {
+        console.error(`[stats] ${t}:`, err);
+      }
+    }
+    console.log("[stats] daily stats refreshed");
+  };
+  refresh();
+  setInterval(refresh, 6 * 3600_000);
+}
+
+// Dev-only synthetic event injection: POST /api/test-event
+setTestEventHandler(async (body) => {
+  const ticker = (body.ticker ?? tickers[0]).toUpperCase();
+  const event: RawEvent = {
+    id: 0, ts: Math.floor(Date.now() / 1000), ticker,
+    kind: body.kind ?? "news",
+    title: body.title ?? `${ticker} test event: surprise CEO resignation announced`,
+    detail: body.detail ?? { source: "test", summary: "Synthetic event for pipeline verification." },
+  };
+  const { insertEvent } = await import("./db");
+  const id = insertEvent({ ...event, dedupeKey: `test:${Date.now()}` });
+  if (id) await processEvent({ ...event, id });
+});
+
+// On-demand briefing from the dashboard button: "open"-style before 1pm ET, else "close"-style.
+setBriefingHandler(async () => {
+  const kind = etNow().mins < 13 * 60 ? "open" : "close";
+  console.log(`[briefing] on-demand ${kind} briefing requested`);
+  const content = await generateBriefing(kind, portfolio);
+  broadcast("briefing", { kind, content });
+  return content;
+});
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+
+// CIK map covers the full universe so EDGAR lookups work for any promoted mover.
+universeCache = await loadUniverse(portfolio);
+await loadCikMap(universeCache);
+startServer();
+startTradeStream(tickers);
+scheduleDailyStats();
+scheduleDetectors();
+scheduleBriefings();
+scheduleScreener();
+scheduleSweep();
+startCacheHeartbeat(portfolio);
+console.log(`[marketpulse] running — market is currently ${marketPhase()}`);

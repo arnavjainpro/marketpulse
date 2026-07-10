@@ -1,0 +1,26 @@
+# Your holdings. Edit anytime — reloaded on restart.
+# cost_basis is per-share average cost in USD.
+# thesis (optional but recommended): why you own it. The AI advisor uses this to
+# judge whether new events break your thesis or are just noise. One sentence each.
+#
+# Copy this file to portfolio.yaml and fill in your own holdings.
+# portfolio.yaml is gitignored so your personal data stays local.
+holdings:
+  - ticker: AAPL
+    shares: 10
+    cost_basis: 180.00
+    # thesis: ...
+  - ticker: MSFT
+    shares: 5
+    cost_basis: 300.00
+    # thesis: ...
+  - ticker: GOOG
+    shares: 8
+    cost_basis: 130.00
+    # thesis: ...
+
+# Tickers you want monitored but don't own.
+watchlist:
+  - AMZN
+  - TSLA
+  - NVDA
