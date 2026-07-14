@@ -1,30 +1,47 @@
-// Market screener: scans a configurable universe for buy setups using daily
-// candles. Pure math — no AI tokens. Emits events into the pipeline only when
-// a meaningful setup forms (golden cross formed/approaching, strong composite).
-import { parse } from "yaml";
-import { readFileSync } from "fs";
-import { join } from "path";
+// Market screener: scans the full liquid US universe (large/mid/small cap,
+// sector-tagged) for BOTH long and short setups using daily candles. Pure math —
+// no AI tokens. Every ticker gets a long score and a short score built from
+// confluence across trend structure, momentum quality, volume, volatility
+// context, support/resistance, and relative strength vs sector and market.
+// Momentum alone is capped so it can never dominate a score, and shorts require
+// genuine structural breakdown — negative price action by itself is not enough.
 import { db, insertEvent } from "../db";
 import { fetchDailyCandles } from "../ingest/yahoo";
-import { rsi, macd } from "./technicals";
+import { scanUniverse, sectorMap, sectorEtf } from "../ingest/universe";
+import { benchmarkCandles, refreshMarketContext, getMarketSnapshot } from "./market";
+import { rsi, macd, sma, atr, slopePctPerBar, pivotLevels, rangeBreak, betaVs } from "./technicals";
 import type { Portfolio } from "../config";
-import { allTickers } from "../config";
 import type { RawEvent } from "./detectors";
 
 export interface Indicators {
   price: number;
+  sma20: number;
   sma50: number;
   sma200: number;
-  pctVs200: number;      // % above/below SMA200
+  pctVs200: number;        // % above/below SMA200
+  slope20: number | null;  // 20-day least-squares slope, %/bar
   crossStatus: "golden_formed" | "golden_soon" | "death_formed" | "none";
   crossDetail: string;
   rsi14: number | null;
   macdHist: number | null;
-  mom3m: number;         // % return over ~63 trading days
-  mom6m: number;         // % return over ~126 trading days
-  pct52w: number;        // 0 = at 52wk low, 100 = at 52wk high
-  volTrend: number;      // 20d avg volume / 60d avg volume
-  spark: number[];       // ~30 downsampled closes from the last 90 sessions (for UI line charts)
+  mom1m: number;           // % return over ~21 trading days
+  mom3m: number;
+  mom6m: number;
+  pct52w: number;          // 0 = at 52wk low, 100 = at 52wk high
+  volTrend: number;        // 20d avg volume / 60d avg volume
+  atrPct: number | null;   // ATR14 as % of price (volatility context)
+  extension: number | null;// (price - SMA20) / ATR — how stretched vs its mean
+  support: number | null;  // nearest swing support below
+  resistance: number | null;
+  rangeState: "breakout" | "breakdown" | "none";
+  rangeLevel: number | null;
+  rangeVolConfirmed: boolean;
+  structure: "higher_lows" | "lower_highs" | "mixed"; // swing structure read
+  rsSpy1m: number | null;  // 1m return minus SPY 1m return
+  rsSpy3m: number | null;
+  rsSector1m: number | null;
+  beta: number | null;     // 60d beta vs SPY (stress-test input)
+  spark: number[];         // ~30 downsampled closes from the last 90 sessions
 }
 
 function downsample(values: number[], points: number): number[] {
@@ -47,14 +64,26 @@ function smaSeries(values: number[], period: number): (number | null)[] {
   return out;
 }
 
-function computeIndicators(closes: number[], volumes: number[]): Indicators | null {
+const pctBack = (closes: number[], bars: number) => {
+  const n = closes.length;
+  if (n <= bars) return 0;
+  return ((closes[n - 1] - closes[n - 1 - bars]) / closes[n - 1 - bars]) * 100;
+};
+
+export function computeIndicators(
+  candles: { opens: number[]; highs: number[]; lows: number[]; closes: number[]; volumes: number[] },
+  spyCloses: number[] | null,
+  sectorCloses: number[] | null
+): Indicators | null {
+  const { highs, lows, closes, volumes } = candles;
   const n = closes.length;
   if (n < 210) return null;
   const s50 = smaSeries(closes, 50);
   const s200 = smaSeries(closes, 200);
   const price = closes[n - 1];
-  const sma50 = s50[n - 1]!;
-  const sma200 = s200[n - 1]!;
+  const sma50v = s50[n - 1]!;
+  const sma200v = s200[n - 1]!;
+  const sma20v = sma(closes, 20)!;
 
   // Cross detection over the last 10 sessions
   let crossStatus: Indicators["crossStatus"] = "none";
@@ -69,10 +98,9 @@ function computeIndicators(closes: number[], volumes: number[]): Indicators | nu
       crossDetail = `SMA50 crossed below SMA200 ${n - 1 - i} sessions ago`;
     }
   }
-  // Approaching golden cross: SMA50 below but within 2% of SMA200 AND the gap
-  // has been shrinking — linear extrapolation gives an ETA.
-  if (crossStatus === "none" && sma50 < sma200) {
-    const gapNow = (sma200 - sma50) / sma200;
+  // Approaching golden cross: SMA50 below but within 2% of SMA200 AND converging.
+  if (crossStatus === "none" && sma50v < sma200v) {
+    const gapNow = (sma200v - sma50v) / sma200v;
     const gapPrev = (s200[n - 11]! - s50[n - 11]!) / s200[n - 11]!;
     if (gapNow > 0 && gapNow < 0.02 && gapPrev > gapNow) {
       const closingPerDay = (gapPrev - gapNow) / 10;
@@ -89,83 +117,170 @@ function computeIndicators(closes: number[], volumes: number[]): Indicators | nu
   const vol20 = volumes.slice(-20).reduce((a, b) => a + b, 0) / 20;
   const vol60 = volumes.slice(-60).reduce((a, b) => a + b, 0) / 60;
   const m = macd(closes);
+  const atr14 = atr(highs, lows, closes, 14);
+  const piv = pivotLevels(highs, lows, price);
+  const rb = rangeBreak(highs, lows, closes, volumes, 20);
+  const beta = spyCloses ? betaVs(closes, spyCloses, 60) : null;
+
+  // Swing structure: compare the last two confirmed swing highs/lows.
+  let structure: Indicators["structure"] = "mixed";
+  if (piv.lastSwingHigh != null && piv.priorSwingHigh != null && piv.lastSwingLow != null && piv.priorSwingLow != null) {
+    const hh = piv.lastSwingHigh > piv.priorSwingHigh;
+    const hl = piv.lastSwingLow > piv.priorSwingLow;
+    if (hl && hh) structure = "higher_lows";
+    else if (!hh && !hl) structure = "lower_highs";
+  }
 
   return {
     price,
-    sma50,
-    sma200,
-    pctVs200: ((price - sma200) / sma200) * 100,
+    sma20: sma20v,
+    sma50: sma50v,
+    sma200: sma200v,
+    pctVs200: ((price - sma200v) / sma200v) * 100,
+    slope20: slopePctPerBar(closes, 20),
     crossStatus,
     crossDetail,
     rsi14: rsi(closes),
     macdHist: m?.histogram ?? null,
-    mom3m: ((price - closes[n - 64]) / closes[n - 64]) * 100,
-    mom6m: ((price - closes[n - 127]) / closes[n - 127]) * 100,
+    mom1m: pctBack(closes, 21),
+    mom3m: pctBack(closes, 63),
+    mom6m: pctBack(closes, 126),
     pct52w: hi52 > lo52 ? ((price - lo52) / (hi52 - lo52)) * 100 : 50,
     volTrend: vol60 > 0 ? vol20 / vol60 : 1,
+    atrPct: atr14 != null ? (atr14 / price) * 100 : null,
+    extension: atr14 != null && atr14 > 0 ? (price - sma20v) / atr14 : null,
+    support: piv.supports[0] ?? null,
+    resistance: piv.resistances[0] ?? null,
+    rangeState: rb.state,
+    rangeLevel: rb.level,
+    rangeVolConfirmed: rb.volumeConfirmed,
+    structure,
+    rsSpy1m: spyCloses ? pctBack(closes, 21) - pctBack(spyCloses, 21) : null,
+    rsSpy3m: spyCloses ? pctBack(closes, 63) - pctBack(spyCloses, 63) : null,
+    rsSector1m: sectorCloses ? pctBack(closes, 21) - pctBack(sectorCloses, 21) : null,
+    beta: beta?.beta ?? null,
     spark: downsample(closes.slice(-90), 30),
   };
 }
 
-// Composite 0–100: trend + cross + momentum + RSI regime + MACD + volume + 52wk position.
-export function scoreIndicators(ind: Indicators): number {
+// ── Directional confluence scores ────────────────────────────────────────────
+// Both scores are 0–100. Design targets: neutral tape ≈ 30–45; ≥60 = real setup;
+// ≥80 = strong multi-factor confluence. Momentum contributes at most ~20 points,
+// so a stock cannot score "strong" on price movement alone.
+
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+export function scoreLong(ind: Indicators): number {
   let s = 0;
-  if (ind.price > ind.sma200) s += 15;
-  if (ind.sma50 > ind.sma200) s += 12;
-  if (ind.crossStatus === "golden_formed") s += 15;
-  else if (ind.crossStatus === "golden_soon") s += 10;
-  else if (ind.crossStatus === "death_formed") s -= 15;
-  s += Math.max(-8, Math.min(12, ind.mom3m * 0.4));
-  s += Math.max(-5, Math.min(8, ind.mom6m * 0.15));
+  // Trend structure (max 30)
+  if (ind.price > ind.sma200) s += 10;
+  if (ind.sma50 > ind.sma200) s += 8;
+  if ((ind.slope20 ?? 0) > 0.05) s += 6;
+  if (ind.structure === "higher_lows") s += 6;
+  else if (ind.structure === "lower_highs") s -= 6;
+  // Cross context (max 10)
+  if (ind.crossStatus === "golden_formed") s += 10;
+  else if (ind.crossStatus === "golden_soon") s += 6;
+  else if (ind.crossStatus === "death_formed") s -= 12;
+  // Momentum quality (capped ~20 total so it cannot dominate)
+  s += clamp(ind.mom3m * 0.35, -8, 10);
+  s += clamp(ind.mom6m * 0.1, -4, 5);
   if (ind.rsi14 != null) {
-    if (ind.rsi14 >= 45 && ind.rsi14 <= 65) s += 10;       // healthy uptrend regime
-    else if (ind.rsi14 > 75) s -= 8;                        // overbought
-    else if (ind.rsi14 < 30) s += 3;                        // washed out, mild contrarian credit
+    if (ind.rsi14 >= 45 && ind.rsi14 <= 65) s += 5;       // healthy regime
+    else if (ind.rsi14 > 75) s -= 8;                       // overbought chase
+    else if (ind.rsi14 < 30) s += 2;                       // washed out, mild credit
   }
-  if (ind.macdHist != null && ind.macdHist > 0) s += 8;
-  if (ind.volTrend > 1.15) s += 8;                          // volume expanding
-  if (ind.pct52w > 85) s += 7;                              // strength near highs
+  // Trend confirmation (max 6)
+  if (ind.macdHist != null && ind.macdHist > 0) s += 6;
+  // Volume confirmation (max 8)
+  if (ind.volTrend > 1.15) s += 5;
+  if (ind.rangeState === "breakout" && ind.rangeVolConfirmed) s += 3;
+  // Structure/levels (max 14)
+  if (ind.rangeState === "breakout") s += ind.rangeVolConfirmed ? 8 : 4;
+  else if (ind.rangeState === "breakdown") s -= 8;
+  if (ind.support != null && ind.atrPct != null && ind.atrPct > 0) {
+    const distToSupportAtr = ((ind.price - ind.support) / ind.price) * 100 / ind.atrPct;
+    if (distToSupportAtr <= 1.5) s += 3;                   // defined risk near support
+  }
+  if (ind.extension != null) {
+    if (Math.abs(ind.extension) < 2.5) s += 3;             // not chasing an extended move
+    else if (ind.extension > 3.5) s -= 6;                  // parabolic — poor entry
+  }
+  // Relative strength (max 12)
+  if (ind.rsSpy1m != null) s += clamp(ind.rsSpy1m * 0.6, -6, 6);
+  if (ind.rsSector1m != null) s += clamp(ind.rsSector1m * 0.6, -6, 6);
+  // 52-week position (max 4)
+  if (ind.pct52w > 85) s += 4;
   else if (ind.pct52w < 15) s -= 4;
-  return Math.max(0, Math.min(100, Math.round(s + 25)));    // rebased so neutral ≈ 25-40
+  return clamp(Math.round(s + 18), 0, 100); // rebased: neutral ≈ 25-40
 }
 
-// Current S&P 500 constituents from a maintained public dataset. Yahoo uses
-// dashes where the index uses dots (BRK.B → BRK-B).
-async function fetchSP500(): Promise<string[]> {
-  try {
-    const res = await fetch(
-      "https://raw.githubusercontent.com/datasets/s-and-p-500-companies/main/data/constituents.csv"
-    );
-    if (!res.ok) return [];
-    const csv = await res.text();
-    return csv
-      .split("\n")
-      .slice(1)
-      .map((l) => l.split(",")[0]?.trim().toUpperCase() ?? "")
-      .filter((t) => /^[A-Z.\-]{1,6}$/.test(t))
-      .map((t) => t.replace(/\./g, "-"));
-  } catch {
-    return [];
+// Shorts must be validated by structure, not just negative price action:
+// without breakdown evidence (below long-term trend / death cross / range
+// breakdown / lower-high sequence) the score is hard-capped below setup grade.
+export function scoreShort(ind: Indicators): number {
+  const structureGate =
+    (ind.price < ind.sma200 || ind.crossStatus === "death_formed") &&
+    (ind.rangeState === "breakdown" || ind.structure === "lower_highs" ||
+      (ind.price < ind.sma50 && (ind.slope20 ?? 0) < -0.05));
+
+  let s = 0;
+  // Trend structure (max 30)
+  if (ind.price < ind.sma200) s += 10;
+  if (ind.sma50 < ind.sma200) s += 8;
+  if ((ind.slope20 ?? 0) < -0.05) s += 6;
+  if (ind.structure === "lower_highs") s += 6;
+  else if (ind.structure === "higher_lows") s -= 6;
+  // Cross context (max 10)
+  if (ind.crossStatus === "death_formed") s += 10;
+  else if (ind.crossStatus === "golden_formed") s -= 12;
+  // Momentum quality (capped ~20; crowded oversold is penalized, not rewarded)
+  s += clamp(-ind.mom3m * 0.35, -8, 10);
+  s += clamp(-ind.mom6m * 0.1, -4, 5);
+  if (ind.rsi14 != null) {
+    if (ind.rsi14 >= 35 && ind.rsi14 <= 55) s += 5;        // fading rallies, room below
+    else if (ind.rsi14 < 25) s -= 8;                        // capitulation — bounce risk
+    else if (ind.rsi14 > 65) s -= 3;                        // shorting strength
   }
+  // Trend confirmation (max 6)
+  if (ind.macdHist != null && ind.macdHist < 0) s += 6;
+  // Volume confirmation (max 8)
+  if (ind.rangeState === "breakdown" && ind.rangeVolConfirmed) s += 5;
+  if (ind.volTrend > 1.15 && ind.mom1m < 0) s += 3;        // distribution volume
+  // Structure/levels (max 14)
+  if (ind.rangeState === "breakdown") s += ind.rangeVolConfirmed ? 8 : 4;
+  else if (ind.rangeState === "breakout") s -= 8;
+  if (ind.resistance != null && ind.atrPct != null && ind.atrPct > 0) {
+    const distToResAtr = ((ind.resistance - ind.price) / ind.price) * 100 / ind.atrPct;
+    if (distToResAtr <= 1.5) s += 3;                       // defined risk below resistance
+  }
+  if (ind.extension != null) {
+    if (Math.abs(ind.extension) < 2.5) s += 3;
+    else if (ind.extension < -3.5) s -= 6;                 // chasing a waterfall
+  }
+  // Relative weakness (max 12)
+  if (ind.rsSpy1m != null) s += clamp(-ind.rsSpy1m * 0.6, -6, 6);
+  if (ind.rsSector1m != null) s += clamp(-ind.rsSector1m * 0.6, -6, 6);
+  // 52-week position (max 4)
+  if (ind.pct52w < 15) s += 4;
+  else if (ind.pct52w > 85) s -= 4;
+  const raw = clamp(Math.round(s + 18), 0, 100);
+  return structureGate ? raw : Math.min(raw, 35); // no structure → never setup-grade
 }
 
-export async function loadUniverse(portfolio: Portfolio): Promise<string[]> {
-  let extras: string[] = [];
-  try {
-    const raw = parse(readFileSync(join(import.meta.dir, "../../config/screener.yaml"), "utf-8"));
-    extras = (raw.universe ?? []).map((t: any) => String(t).toUpperCase());
-  } catch (err) {
-    console.error("[screener] failed to load config/screener.yaml:", err);
-  }
-  const sp500 = await fetchSP500();
-  if (sp500.length) console.log(`[screener] S&P 500 constituents loaded: ${sp500.length}`);
-  else console.warn("[screener] S&P 500 fetch failed — falling back to config universe only");
-  return [...new Set([...sp500, ...extras, ...allTickers(portfolio)])];
+export function directionOf(longScore: number, shortScore: number): "long" | "short" | "none" {
+  if (longScore >= 60 && longScore >= shortScore) return "long";
+  if (shortScore >= 60 && shortScore > longScore) return "short";
+  return "none";
 }
 
 export interface ScreenRow {
   ticker: string;
-  score: number;
+  score: number;        // = long score (back-compat)
+  long_score: number;
+  short_score: number;
+  direction: string;
+  sector: string;
   cross_status: string;
   indicators: Indicators;
   updated_at: number;
@@ -178,6 +293,10 @@ export function getScreenerRows(portfolio: Portfolio): ScreenRow[] {
   return rows.map((r) => ({
     ticker: r.ticker,
     score: r.score,
+    long_score: r.long_score ?? r.score,
+    short_score: r.short_score ?? 0,
+    direction: r.direction ?? "none",
+    sector: r.sector ?? "Unknown",
     cross_status: r.cross_status,
     indicators: JSON.parse(r.indicators),
     updated_at: r.updated_at,
@@ -185,49 +304,131 @@ export function getScreenerRows(portfolio: Portfolio): ScreenRow[] {
   }));
 }
 
+// Per-sector board: rotation state + breadth + the strongest long and short
+// setups inside each sector, so ideas are presented by sector rather than as
+// one undifferentiated market-wide list.
+export interface SectorBoard {
+  sector: string;
+  etf: string;
+  rotation: { ret1w: number; ret1m: number; rel1m: number; state: string } | null;
+  scanned: number;
+  breadthPct: number | null;
+  longs: { ticker: string; long_score: number; price: number; held: boolean }[];
+  shorts: { ticker: string; short_score: number; price: number; held: boolean }[];
+}
+
+export function sectorBoards(portfolio: Portfolio): SectorBoard[] {
+  const rows = getScreenerRows(portfolio);
+  const rotation = new Map((getMarketSnapshot()?.sectors ?? []).map((s) => [s.sector, s]));
+  const bySector = new Map<string, ScreenRow[]>();
+  for (const r of rows) {
+    if (!bySector.has(r.sector)) bySector.set(r.sector, []);
+    bySector.get(r.sector)!.push(r);
+  }
+  const boards: SectorBoard[] = [];
+  for (const [sector, rs] of bySector) {
+    if (sector === "Unknown" && rs.length < 3) continue;
+    const rot = rotation.get(sector) ?? null;
+    const above200 = rs.filter((r) => r.indicators.pctVs200 > 0).length;
+    boards.push({
+      sector,
+      etf: sectorEtf(sector),
+      rotation: rot ? { ret1w: rot.ret1w, ret1m: rot.ret1m, rel1m: rot.rel1m, state: rot.state } : null,
+      scanned: rs.length,
+      breadthPct: rs.length ? (100 * above200) / rs.length : null,
+      longs: rs
+        .filter((r) => r.direction === "long")
+        .sort((a, b) => b.long_score - a.long_score)
+        .slice(0, 4)
+        .map((r) => ({ ticker: r.ticker, long_score: r.long_score, price: r.indicators.price, held: r.held })),
+      shorts: rs
+        .filter((r) => r.direction === "short")
+        .sort((a, b) => b.short_score - a.short_score)
+        .slice(0, 4)
+        .map((r) => ({ ticker: r.ticker, short_score: r.short_score, price: r.indicators.price, held: r.held })),
+    });
+  }
+  // Leading sectors first (by 1m relative strength), unknown-rotation last.
+  boards.sort((a, b) => (b.rotation?.rel1m ?? -999) - (a.rotation?.rel1m ?? -999));
+  return boards;
+}
+
 // Full universe scan. Returns pipeline events for newly-formed setups.
 export async function runScan(portfolio: Portfolio): Promise<RawEvent[]> {
-  const tickers = await loadUniverse(portfolio);
+  // Benchmarks must be loaded for RS/beta math — refresh if the cache is cold.
+  if (!benchmarkCandles("SPY")) await refreshMarketContext();
+  const spyCloses = benchmarkCandles("SPY")?.closes ?? null;
+
+  const tickers = scanUniverse();
+  const sectors = sectorMap();
   const heldSet = new Set(portfolio.holdings.map((h) => h.ticker));
+  const regime = getMarketSnapshot()?.regime;
   console.log(`[screener] scanning ${tickers.length} tickers (~${Math.round((tickers.length * 0.4) / 60)} min)`);
   const events: RawEvent[] = [];
   let scanned = 0;
 
+  const upsert = db.query(
+    `INSERT INTO screener (ticker, score, long_score, short_score, direction, sector, cross_status, indicators, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, unixepoch())
+     ON CONFLICT(ticker) DO UPDATE SET score=excluded.score, long_score=excluded.long_score,
+       short_score=excluded.short_score, direction=excluded.direction, sector=excluded.sector,
+       cross_status=excluded.cross_status, indicators=excluded.indicators, updated_at=excluded.updated_at`
+  );
+
+  const week = new Date().toISOString().slice(0, 10).slice(0, 8) + String(Math.ceil(new Date().getDate() / 7));
+  const emit = (t: string, ind: Indicators, extra: object, kind: string, title: string, key: string) => {
+    const now = Math.floor(Date.now() / 1000);
+    const id = insertEvent({ ts: now, ticker: t, kind, title, detail: { ...ind, ...extra }, dedupeKey: key });
+    if (id) events.push({ id, ts: now, ticker: t, kind, title, detail: { ...ind, ...extra } });
+  };
+  // Pick/short events are emitted top-N AFTER the full pass, so a broad rally
+  // can't flood triage — the event budget per scan is bounded by construction.
+  const pickCands: { t: string; ind: Indicators; score: number; sector: string }[] = [];
+  const shortCands: { t: string; ind: Indicators; score: number; sector: string }[] = [];
+
   for (const t of tickers) {
     const candles = await fetchDailyCandles(t);
     await Bun.sleep(180); // be polite to Yahoo
-    if (scanned > 0 && scanned % 100 === 0) console.log(`[screener] progress: ${scanned}/${tickers.length}`);
+    if (scanned > 0 && scanned % 200 === 0) console.log(`[screener] progress: ${scanned}/${tickers.length}`);
     if (!candles) continue;
-    const ind = computeIndicators(candles.closes, candles.volumes);
+    const sector = sectors.get(t) ?? "Unknown";
+    const sectorCloses = benchmarkCandles(sectorEtf(sector))?.closes ?? null;
+    const ind = computeIndicators(candles, spyCloses, sectorCloses);
     if (!ind) continue;
-    const score = scoreIndicators(ind);
+    const longScore = scoreLong(ind);
+    const shortScore = scoreShort(ind);
+    const direction = directionOf(longScore, shortScore);
     scanned++;
 
-    db.query(
-      `INSERT INTO screener (ticker, score, cross_status, indicators, updated_at)
-       VALUES (?, ?, ?, ?, unixepoch())
-       ON CONFLICT(ticker) DO UPDATE SET score=excluded.score, cross_status=excluded.cross_status,
-         indicators=excluded.indicators, updated_at=excluded.updated_at`
-    ).run(t, score, ind.crossStatus, JSON.stringify(ind));
+    upsert.run(t, longScore, longScore, shortScore, direction, sector, ind.crossStatus, JSON.stringify(ind));
 
-    // Emit pipeline events for actionable setups (dedupe = one alert per state per week)
-    const week = new Date().toISOString().slice(0, 10).slice(0, 8) + String(Math.ceil(new Date().getDate() / 7));
-    const now = Math.floor(Date.now() / 1000);
-    const emit = (kind: string, title: string, key: string) => {
-      const id = insertEvent({ ts: now, ticker: t, kind, title, detail: { ...ind, score }, dedupeKey: key });
-      if (id) events.push({ id, ts: now, ticker: t, kind, title, detail: { ...ind, score } });
-    };
-    if (ind.crossStatus === "golden_formed" && score >= 55) {
-      emit("golden_cross", `${t} golden cross formed — ${ind.crossDetail} (score ${score})`, `gx:${t}:${week}`);
-    } else if (ind.crossStatus === "golden_soon" && score >= 60) {
-      emit("golden_cross", `${t} golden cross approaching — ${ind.crossDetail} (score ${score})`, `gxsoon:${t}:${week}`);
+    // Cross events are self-rate-limited by the 10-session formation window.
+    const extra = { longScore, shortScore, sector };
+    if (ind.crossStatus === "golden_formed" && longScore >= 65) {
+      emit(t, ind, extra, "golden_cross", `${t} golden cross formed — ${ind.crossDetail} (long score ${longScore})`, `gx:${t}:${week}`);
+    } else if (ind.crossStatus === "golden_soon" && longScore >= 68) {
+      emit(t, ind, extra, "golden_cross", `${t} golden cross approaching — ${ind.crossDetail} (long score ${longScore})`, `gxsoon:${t}:${week}`);
     } else if (ind.crossStatus === "death_formed" && heldSet.has(t)) {
-      emit("death_cross", `${t} DEATH CROSS on a held position — ${ind.crossDetail}`, `dx:${t}:${week}`);
+      emit(t, ind, extra, "death_cross", `${t} DEATH CROSS on a held position — ${ind.crossDetail}`, `dx:${t}:${week}`);
     }
-    // With a ~500-stock universe, only the strongest composites become events.
-    if (score >= 88) {
-      emit("screener_pick", `${t} strong multi-factor buy setup (score ${score}/100)`, `pick:${t}:${week}`);
-    }
+    if (longScore >= 84 && !regime?.riskOff) pickCands.push({ t, ind, score: longScore, sector });
+    if (shortScore >= 84) shortCands.push({ t, ind, score: shortScore, sector });
+  }
+
+  // Only the strongest confluences in the whole universe become events.
+  for (const c of pickCands.sort((a, b) => b.score - a.score).slice(0, 12)) {
+    emit(c.t, c.ind, { longScore: c.score, sector: c.sector }, "screener_pick",
+      `${c.t} strong multi-factor LONG setup (${c.sector}, long score ${c.score}/100)`, `pick:${c.t}:${week}`);
+  }
+  for (const c of shortCands.sort((a, b) => b.score - a.score).slice(0, 8)) {
+    emit(c.t, c.ind, { shortScore: c.score, sector: c.sector }, "screener_short",
+      `${c.t} strong multi-factor SHORT setup (${c.sector}, short score ${c.score}/100 — structural breakdown confirmed)`, `short:${c.t}:${week}`);
+  }
+  // Prune rows for tickers that left the universe (delistings, filter changes) —
+  // but only after a substantially complete pass, never after an aborted one.
+  if (scanned > tickers.length * 0.5) {
+    const pruned = db.query(`DELETE FROM screener WHERE updated_at < unixepoch() - 172800 RETURNING ticker`).all().length;
+    if (pruned) console.log(`[screener] pruned ${pruned} stale rows (out of universe >48h)`);
   }
   console.log(`[screener] scan complete: ${scanned}/${tickers.length} scored, ${events.length} new setups`);
   return events;

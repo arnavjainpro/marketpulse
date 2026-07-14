@@ -1,9 +1,9 @@
-// Market-open and market-close portfolio briefings (Opus 4.8).
+// Market-open and market-close portfolio briefings (deep model).
 import Anthropic from "@anthropic-ai/sdk";
-import type { Portfolio } from "../config";
+import { config, allTickers, type Portfolio } from "../config";
 import { db } from "../db";
 import { fetchQuote } from "../ingest/finnhub";
-import { allTickers } from "../config";
+import { marketContextText, getMarketSnapshot } from "../engine/market";
 import { claudeQueue } from "./queue";
 
 const client = new Anthropic();
@@ -31,14 +31,22 @@ export async function generateBriefing(kind: "open" | "close", portfolio: Portfo
     .map((h) => `- ${h.ticker}: ${h.shares} shares @ $${h.cost_basis}`)
     .join("\n");
 
+  const sectorLine = (() => {
+    const snap = getMarketSnapshot();
+    if (!snap) return "";
+    const leading = snap.sectors.filter((s) => s.state === "leading").map((s) => s.sector);
+    const lagging = snap.sectors.filter((s) => s.state === "lagging").map((s) => s.sector);
+    return `Sector rotation: leading — ${leading.join(", ") || "none"}; lagging — ${lagging.join(", ") || "none"}.`;
+  })();
+
   const response = await claudeQueue(() => client.messages.create({
-    model: "claude-opus-4-8",
+    model: config.modelDeep,
     max_tokens: 4096,
     thinking: { type: "adaptive" },
     system: [
       {
         type: "text",
-        text: `You write a concise ${kind === "open" ? "pre-market" : "end-of-day"} briefing for one self-directed investor. Lead with what matters most to their actual positions. Format as short markdown: a 2-3 sentence overview, then per-ticker bullets only where there is something worth saying, then "What to watch ${kind === "open" ? "today" : "tomorrow"}". No filler, no generic market commentary without a position link. This is decision support, not licensed financial advice.`,
+        text: `You write a concise ${kind === "open" ? "pre-market" : "end-of-day"} briefing for one self-directed investor. Lead with what matters most to their actual positions. Format as short markdown: a 2-3 sentence overview that includes the market regime and any sector-rotation shift that affects their money, then per-ticker bullets only where there is something worth saying, then "What to watch ${kind === "open" ? "today" : "tomorrow"}". No filler, no generic market commentary without a position link. This is decision support, not licensed financial advice.`,
         cache_control: { type: "ephemeral" },
       },
     ],
@@ -48,6 +56,9 @@ export async function generateBriefing(kind: "open" | "close", portfolio: Portfo
         content: [
           `Portfolio:\n${positions || "(none)"}`,
           `Watchlist: ${portfolio.watchlist.join(", ") || "none"}`,
+          ``,
+          marketContextText(),
+          sectorLine,
           ``,
           `Live quotes:\n${quotes.join("\n") || "unavailable"}`,
           ``,

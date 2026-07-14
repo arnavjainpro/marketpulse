@@ -24,3 +24,11 @@ watchlist:
   - AMZN
   - TSLA
   - NVDA
+
+# Risk management — drives position-sizing guidance on every validated idea.
+# account_equity is only a fallback: if a brokerage is linked (Robinhood) or
+# positions were imported with an account block, real equity is used.
+risk:
+  account_equity: 25000       # USD; remove if a broker link provides it
+  max_risk_per_trade_pct: 1   # % of equity risked between entry and stop
+  max_position_pct: 20        # % of equity in any single position

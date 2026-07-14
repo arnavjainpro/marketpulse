@@ -1,7 +1,7 @@
-// Tier 1: cheap, fast severity triage of every detected event (Haiku 4.5).
+// Tier 1: cheap, fast severity triage of every detected event (fast model).
 import Anthropic from "@anthropic-ai/sdk";
 import type { RawEvent } from "../engine/detectors";
-import type { Portfolio } from "../config";
+import { config, type Portfolio } from "../config";
 import { setTriage } from "../db";
 import { claudeQueue } from "./queue";
 import { haikuBreaker } from "./breaker";
@@ -30,10 +30,10 @@ Severity levels:
 - "high": meaningful and worth reading today, but not decision-forcing — notable analyst-grade news, unusual volume with a plausible cause, routine 10-Q from a held position, moderate earnings surprise.
 - "info": routine noise — minor PR, listicle press coverage, small moves, insider Form 4s of modest size, events on watchlist names with no position impact.
 
-Screener events (kinds: golden_cross, death_cross, screener_pick) are technical setups computed from real daily price history, not news:
+Screener events (kinds: golden_cross, death_cross, screener_pick, screener_short) are technical setups computed from real daily price history, not news:
 - death_cross on a held position → "critical"; on anything else → "high".
-- golden_cross formed, or screener_pick with score ≥ 85 → "high".
-- golden_cross approaching (not yet formed) or screener_pick below 85 → "info" unless on a held position (then "high").
+- golden_cross formed, screener_pick (strong long confluence), or screener_short (strong short confluence with confirmed structural breakdown) → "high"; screener_short on a HELD position → "critical" (the investor is long a breaking-down stock).
+- golden_cross approaching (not yet formed) → "info" unless on a held position (then "high").
 
 "market_mover" events mean an S&P 500 stock outside the portfolio made an abnormal single-day move and was auto-promoted to live monitoring: rate "high" if the move is ≥7% or clearly catalyst-driven, else "info" (its news/filings will arrive as separate events).
 
@@ -62,7 +62,7 @@ export async function triageEvent(event: RawEvent, portfolio: Portfolio): Promis
   }
   try {
     const response = await claudeQueue(() => client.messages.create({
-      model: "claude-haiku-4-5",
+      model: config.modelFast,
       max_tokens: 256,
       system: [
         {

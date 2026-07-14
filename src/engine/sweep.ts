@@ -10,9 +10,10 @@
 import { insertEvent } from "../db";
 import type { RawEvent } from "./detectors";
 
-const PROMOTE_PCT = 4;        // |day move| ≥ 4% = abnormal for an S&P large-cap
+const PROMOTE_PCT = 5;        // |day move| ≥ 5% = abnormal enough across a mixed-cap universe
 const PROMOTE_TTL_MS = 60 * 60_000;
 const MAX_PROMOTIONS_PER_SWEEP = 8; // protect the Finnhub budget
+const MAX_SWEEP_SYMBOLS = 2500;     // keep a full sweep under ~2 minutes
 
 // ticker -> expiry epoch-ms
 const dynamicWatch = new Map<string, number>();
@@ -61,9 +62,10 @@ export async function sweepIndex(universe: string[], alreadyWatched: Set<string>
     promotedToday.clear();
   }
 
+  const symbols = universe.slice(0, MAX_SWEEP_SYMBOLS);
   const movers: Mover[] = [];
-  for (let i = 0; i < universe.length; i += 20) {
-    movers.push(...(await fetchBatchChanges(universe.slice(i, i + 20))));
+  for (let i = 0; i < symbols.length; i += 20) {
+    movers.push(...(await fetchBatchChanges(symbols.slice(i, i + 20))));
     await Bun.sleep(400);
   }
 
@@ -82,7 +84,7 @@ export async function sweepIndex(universe: string[], alreadyWatched: Set<string>
       ts: now,
       ticker: m.ticker,
       kind: "market_mover",
-      title: `${m.ticker} is ${m.changePct > 0 ? "up" : "down"} ${Math.abs(m.changePct).toFixed(1)}% today ($${m.price.toFixed(2)}) — unusual for an S&P name, now checking its news and filings`,
+      title: `${m.ticker} is ${m.changePct > 0 ? "up" : "down"} ${Math.abs(m.changePct).toFixed(1)}% today ($${m.price.toFixed(2)}) — abnormal move, now checking its news and filings`,
       detail: { changePct: m.changePct, price: m.price, promotedFor: "60min" },
       dedupeKey: `mover:${m.ticker}:${today}`,
     });

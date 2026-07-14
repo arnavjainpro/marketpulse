@@ -64,14 +64,53 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS universe (
+  ticker TEXT PRIMARY KEY,
+  name TEXT,
+  sector TEXT,                   -- NASDAQ sector taxonomy (Technology, Finance, ...)
+  industry TEXT,
+  market_cap REAL,               -- USD
+  last_price REAL,
+  day_volume REAL,               -- most recent session share volume
+  sp500 INTEGER DEFAULT 0,       -- 1 = current S&P 500 constituent
+  in_scan INTEGER DEFAULT 0,     -- 1 = inside the active screener universe
+  updated_at INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS market_snapshot (
+  id INTEGER PRIMARY KEY CHECK (id = 1),  -- single-row current snapshot
+  ts INTEGER NOT NULL,
+  regime TEXT NOT NULL,          -- JSON: trend/volatility/breadth/riskOff/label
+  sectors TEXT NOT NULL,         -- JSON: per-sector rotation stats
+  benchmarks TEXT NOT NULL       -- JSON: SPY/QQQ/IWM/VIX quick stats
+);
+
+CREATE TABLE IF NOT EXISTS ideas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts INTEGER NOT NULL,
+  ticker TEXT NOT NULL,
+  direction TEXT NOT NULL,       -- long | short
+  rating TEXT NOT NULL,          -- strong | moderate | weak | reject
+  confidence TEXT NOT NULL,      -- high | medium | low
+  source TEXT NOT NULL,          -- validate | generate | intraday
+  report TEXT NOT NULL           -- full JSON IdeaReport
+);
+
 CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts DESC);
 CREATE INDEX IF NOT EXISTS idx_bars_ticker_ts ON bars(ticker, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_ideas_ts ON ideas(ts DESC);
 `);
 
 // Migration: plain-language headline on signals (added after initial schema).
 try {
   db.exec(`ALTER TABLE signals ADD COLUMN plain_headline TEXT`);
 } catch {}
+// Migration: directional scores + sector on screener rows (long/short framework).
+for (const col of ["long_score REAL", "short_score REAL", "direction TEXT", "sector TEXT"]) {
+  try {
+    db.exec(`ALTER TABLE screener ADD COLUMN ${col}`);
+  } catch {}
+}
 
 export function getSetting(key: string, fallback: string): string {
   const row = db.query(`SELECT value FROM settings WHERE key = ?`).get(key) as { value: string } | null;

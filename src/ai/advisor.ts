@@ -2,10 +2,11 @@
 // "what's my biggest risk right now?") grounded in the live system state —
 // portfolio, technicals, recent events, and its own past signals.
 import Anthropic from "@anthropic-ai/sdk";
-import type { Portfolio } from "../config";
+import { config, allTickers, type Portfolio } from "../config";
 import { db, recentBars } from "../db";
 import { snapshot } from "../engine/technicals";
-import { allTickers } from "../config";
+import { marketContextText } from "../engine/market";
+import { accountContextText } from "../broker";
 import { fetchQuote, fetchCompanyNews } from "../ingest/finnhub";
 import { claudeQueue } from "./queue";
 import { opusBreaker } from "./breaker";
@@ -51,6 +52,7 @@ function tickersInQuestion(question: string, portfolio: Portfolio): string[] {
 async function buildMarketContext(portfolio: Portfolio, question: string): Promise<string> {
   const lines: string[] = [];
 
+  lines.push(marketContextText(), "", accountContextText(), "");
   lines.push("CURRENT PRICES & TECHNICALS:");
   for (const t of allTickers(portfolio)) {
     const stats = db.query(`SELECT prev_close FROM daily_stats WHERE ticker = ?`).get(t) as { prev_close: number } | null;
@@ -126,7 +128,7 @@ export async function askAdvisor(
   const marketContext = await buildMarketContext(portfolio, question);
   const response = await claudeQueue(() =>
     client.messages.create({
-      model: "claude-opus-4-8",
+      model: config.modelDeep,
       max_tokens: 2048,
       thinking: { type: "adaptive" },
       system: [

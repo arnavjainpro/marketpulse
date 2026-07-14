@@ -1,9 +1,10 @@
-// Tier 2: deep analysis of high/critical events (Opus 4.8, adaptive thinking).
+// Tier 2: deep analysis of high/critical events (deep model, adaptive thinking).
 import Anthropic from "@anthropic-ai/sdk";
 import type { RawEvent } from "../engine/detectors";
-import type { Portfolio } from "../config";
+import { config, type Portfolio } from "../config";
 import { recentBars, insertSignal, db } from "../db";
 import { snapshot } from "../engine/technicals";
+import { marketContextText } from "../engine/market";
 import { claudeQueue } from "./queue";
 import { opusBreaker } from "./breaker";
 
@@ -98,7 +99,7 @@ export async function analyzeEvent(event: RawEvent, portfolio: Portfolio): Promi
 
   try {
     const response = await claudeQueue(() => client.messages.create({
-      model: "claude-opus-4-8",
+      model: config.modelDeep,
       max_tokens: 2048,
       thinking: { type: "adaptive" },
       system: [
@@ -121,6 +122,8 @@ export async function analyzeEvent(event: RawEvent, portfolio: Portfolio): Promi
             ``,
             `TECHNICAL SNAPSHOT for ${event.ticker}:`,
             `price=$${tech.price ?? "n/a"}  sessionChange=${tech.sessionChangePct?.toFixed(2) ?? "n/a"}%  RSI14=${tech.rsi14?.toFixed(0) ?? "n/a"}  MACD-hist=${tech.macdHistogram?.toFixed(3) ?? "n/a"}  VWAP=$${tech.vwap?.toFixed(2) ?? "n/a"}  SMA20=$${tech.sma20?.toFixed(2) ?? "n/a"}`,
+            ``,
+            marketContextText(),
             ``,
             `RECENT HISTORY for ${event.ticker} (prior significant events + your own past signals — analyze the new event as a delta against these, not in isolation):`,
             recentHistory(event.ticker, event.id),

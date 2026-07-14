@@ -44,12 +44,31 @@ export interface EarningsEntry {
   hour: string;
 }
 
-export async function fetchEarningsCalendar(fromISO: string, toISO: string) {
+export async function fetchEarningsCalendar(fromISO: string, toISO: string, symbol?: string) {
   const res = await get<{ earningsCalendar: EarningsEntry[] }>("/calendar/earnings", {
     from: fromISO,
     to: toISO,
+    ...(symbol ? { symbol } : {}),
   });
   return res.earningsCalendar ?? [];
+}
+
+// Next scheduled earnings for one ticker (within ~70 days), or null.
+// Critical risk input: holding a swing trade through earnings is a different bet.
+export async function fetchNextEarnings(ticker: string): Promise<{ date: string; daysAway: number; hour: string } | null> {
+  try {
+    const from = new Date().toISOString().slice(0, 10);
+    const to = new Date(Date.now() + 70 * 86400_000).toISOString().slice(0, 10);
+    const entries = await fetchEarningsCalendar(from, to, ticker);
+    const next = entries
+      .filter((e) => e.symbol === ticker && e.date >= from)
+      .sort((a, b) => a.date.localeCompare(b.date))[0];
+    if (!next) return null;
+    const daysAway = Math.round((new Date(next.date).getTime() - Date.now()) / 86400_000);
+    return { date: next.date, daysAway, hour: next.hour ?? "" };
+  } catch {
+    return null;
+  }
 }
 
 // Refresh per-ticker daily stats (prev close, 20d avg volume, 52wk range) from quote + stored bars.

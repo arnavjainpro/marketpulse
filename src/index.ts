@@ -1,6 +1,8 @@
-import { config, loadPortfolio, allTickers, marketPhase, etNow } from "./config";
-import { db, aiLive } from "./db";
-import { runScan, loadUniverse } from "./engine/screener";
+import { config, allTickers, marketPhase, etNow } from "./config";
+import { aiLive } from "./db";
+import { runScan } from "./engine/screener";
+import { refreshUniverse, scanUniverse } from "./ingest/universe";
+import { refreshMarketContext } from "./engine/market";
 import { sweepIndex, activeDynamicTickers } from "./engine/sweep";
 import { loadCikMap } from "./ingest/edgar";
 import { refreshDailyStats, startTradeStream } from "./ingest/finnhub";
@@ -10,6 +12,7 @@ import { analyzeEvent } from "./ai/analyst";
 import { generateBriefing } from "./ai/briefing";
 import { setTripHandler } from "./ai/breaker";
 import { startCacheHeartbeat } from "./ai/heartbeat";
+import { refreshBroker, currentPortfolio } from "./broker";
 import { notifyMac } from "./notify/macos";
 import { notifyTelegram, telegramEnabled } from "./notify/telegram";
 import { startServer, broadcast, setTestEventHandler, setBriefingHandler } from "./server/server";
@@ -19,9 +22,12 @@ if (!config.finnhubKey) {
   process.exit(1);
 }
 
-const portfolio = loadPortfolio();
-const tickers = allTickers(portfolio);
-console.log(`[marketpulse] monitoring ${tickers.length} tickers: ${tickers.join(", ")}`);
+// Broker snapshot first: positions/watchlist may come from a linked account
+// (Robinhood), a prior JSON import, or portfolio.yaml — everything downstream
+// reads currentPortfolio() so it always sees the freshest view.
+await refreshBroker();
+const bootTickers = allTickers(currentPortfolio());
+console.log(`[marketpulse] monitoring ${bootTickers.length} tickers: ${bootTickers.join(", ")}`);
 
 // Circuit breaker trips fire an immediate CRITICAL alert on every channel.
 setTripHandler(async (name, count, windowSec) => {
@@ -35,17 +41,20 @@ setTripHandler(async (name, count, windowSec) => {
 
 // No-token severity heuristic used when live AI updates are paused.
 function heuristicSeverity(event: RawEvent): { severity: "critical" | "high" | "info"; rationale: string } {
-  const held = portfolio.holdings.some((h) => h.ticker === event.ticker);
+  const held = currentPortfolio().holdings.some((h) => h.ticker === event.ticker);
   const kind = event.kind;
   if (kind === "death_cross") return { severity: "high", rationale: "AI paused — death cross on held position (rule-based)." };
   if (kind === "market_mover") return { severity: "info", rationale: "AI paused — abnormal mover promoted to monitoring (rule-based)." };
-  if (kind === "golden_cross" || kind === "screener_pick") return { severity: "high", rationale: "AI paused — screener setup (rule-based)." };
+  if (kind === "screener_short" && held) return { severity: "critical", rationale: "AI paused — strong short setup on a HELD position (rule-based)." };
+  if (kind === "golden_cross" || kind === "screener_pick" || kind === "screener_short")
+    return { severity: "high", rationale: "AI paused — screener setup (rule-based)." };
   if ((kind === "filing" || kind === "earnings" || kind === "price_move") && held)
     return { severity: "high", rationale: "AI paused — material event on held position (rule-based)." };
   return { severity: "info", rationale: "AI paused — rule-based severity." };
 }
 
 async function processEvent(event: RawEvent) {
+  const portfolio = currentPortfolio();
   let triage;
   let signal = null;
 
@@ -82,6 +91,7 @@ async function processEvent(event: RawEvent) {
 
 async function runDetectors() {
   const phase = marketPhase();
+  const tickers = allTickers(currentPortfolio());
   for (const t of tickers) {
     try {
       const events: RawEvent[] = [];
@@ -153,7 +163,7 @@ function scheduleBriefings() {
     lastBriefingDay[kind] = today;
     try {
       console.log(`[briefing] generating ${kind} briefing`);
-      const content = await generateBriefing(kind, portfolio);
+      const content = await generateBriefing(kind, currentPortfolio());
       broadcast("briefing", { kind, content });
       // no notification — briefings live on the dashboard; alerts are reserved for buy/sell advice
     } catch (err) {
@@ -162,16 +172,16 @@ function scheduleBriefings() {
   }, 5 * 60_000);
 }
 
-// Index sweep: every 15 min during market hours, batch-quote the whole
-// universe and promote abnormal movers into live news/filing monitoring.
-let universeCache: string[] = [];
+// Index sweep: every 15 min during market hours, batch-quote the scan universe
+// and promote abnormal movers into live news/filing monitoring.
 function scheduleSweep() {
   const sweep = async () => {
     if (marketPhase() === "closed") return;
     try {
-      if (!universeCache.length) universeCache = await loadUniverse(portfolio);
-      const watched = new Set(tickers);
-      const events = await sweepIndex(universeCache, watched);
+      const universe = scanUniverse();
+      if (!universe.length) return;
+      const watched = new Set(allTickers(currentPortfolio()));
+      const events = await sweepIndex(universe, watched);
       for (const e of events) await processEvent(e);
     } catch (err) {
       console.error("[sweep]", err);
@@ -183,11 +193,16 @@ function scheduleSweep() {
 
 // Screener: full scan at boot, then every 6 hours. Pure math — no AI cost;
 // any setups it finds flow through processEvent (which respects the AI toggle).
+// Market context (regime/sectors) refreshes right before each scan so scores
+// and idea validation always reference the current tape.
 function scheduleScreener() {
   const scan = async () => {
     try {
-      const events = await runScan(portfolio);
+      await refreshMarketContext();
+      broadcast("market", {});
+      const events = await runScan(currentPortfolio());
       for (const e of events) await processEvent(e);
+      broadcast("market", {}); // breadth updates after the scan completes
     } catch (err) {
       console.error("[screener]", err);
     }
@@ -196,9 +211,54 @@ function scheduleScreener() {
   setInterval(scan, 6 * 3600_000);
 }
 
+// Market context alone is cheap (~16 chart fetches) — keep the regime fresh
+// between scans during trading hours.
+function scheduleMarketContext() {
+  setInterval(async () => {
+    if (marketPhase() === "closed") return;
+    try {
+      await refreshMarketContext();
+      broadcast("market", {});
+    } catch (err) {
+      console.error("[market]", err);
+    }
+  }, 90 * 60_000);
+}
+
+// Universe: rebuild daily (constituents/market caps drift slowly).
+function scheduleUniverse() {
+  setInterval(async () => {
+    try {
+      const scan = await refreshUniverse(currentPortfolio());
+      await loadCikMap(scan);
+    } catch (err) {
+      console.error("[universe]", err);
+    }
+  }, 24 * 3600_000);
+}
+
+// Broker: re-pull positions/orders/equity and push to the dashboard. A live
+// linked broker (Robinhood) refreshes every 60s while the market is open
+// for near-live position updates; otherwise every 15 minutes.
+function scheduleBroker() {
+  const tick = async () => {
+    let source = "manual";
+    try {
+      const snap = await refreshBroker();
+      source = snap.source;
+      broadcast("broker", { source });
+    } catch (err) {
+      console.error("[broker]", err);
+    }
+    const live = source === "robinhood";
+    setTimeout(tick, live && marketPhase() === "open" ? 60_000 : 15 * 60_000);
+  };
+  setTimeout(tick, 60_000);
+}
+
 function scheduleDailyStats() {
   const refresh = async () => {
-    for (const t of tickers) {
+    for (const t of allTickers(currentPortfolio())) {
       try {
         await refreshDailyStats(t);
         await Bun.sleep(1100);
@@ -214,7 +274,7 @@ function scheduleDailyStats() {
 
 // Dev-only synthetic event injection: POST /api/test-event
 setTestEventHandler(async (body) => {
-  const ticker = (body.ticker ?? tickers[0]).toUpperCase();
+  const ticker = (body.ticker ?? bootTickers[0]).toUpperCase();
   const event: RawEvent = {
     id: 0, ts: Math.floor(Date.now() / 1000), ticker,
     kind: body.kind ?? "news",
@@ -230,22 +290,26 @@ setTestEventHandler(async (body) => {
 setBriefingHandler(async () => {
   const kind = etNow().mins < 13 * 60 ? "open" : "close";
   console.log(`[briefing] on-demand ${kind} briefing requested`);
-  const content = await generateBriefing(kind, portfolio);
+  const content = await generateBriefing(kind, currentPortfolio());
   broadcast("briefing", { kind, content });
   return content;
 });
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
 
-// CIK map covers the full universe so EDGAR lookups work for any promoted mover.
-universeCache = await loadUniverse(portfolio);
-await loadCikMap(universeCache);
+// Universe first (sector metadata + scan list), then CIK map so EDGAR lookups
+// work for any promoted mover across the whole universe.
+const universeList = await refreshUniverse(currentPortfolio());
+await loadCikMap(universeList);
 startServer();
-startTradeStream(tickers);
+startTradeStream(bootTickers);
 scheduleDailyStats();
 scheduleDetectors();
 scheduleBriefings();
 scheduleScreener();
 scheduleSweep();
-startCacheHeartbeat(portfolio);
+scheduleMarketContext();
+scheduleUniverse();
+scheduleBroker();
+startCacheHeartbeat(currentPortfolio());
 console.log(`[marketpulse] running — market is currently ${marketPhase()}`);

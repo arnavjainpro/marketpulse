@@ -1,92 +1,22 @@
-# Screener universe — the stocks scanned for buy setups (golden crosses, trend,
-# momentum, RSI, MACD, volume, 52-week position). Your holdings and watchlist
-# are always included automatically on top of this list. Edit freely.
+# Screener configuration.
+#
+# The scan universe is built automatically from the FULL US market (~7000
+# listed stocks via NASDAQ's screener feed), filtered by the liquidity rules
+# below, ranked by dollar volume, and capped at max_stocks. S&P 500 names and
+# your holdings/watchlist are always included regardless of filters.
+# Every stock is tagged with its sector/industry for sector rotation views.
+filters:
+  min_market_cap: 300000000   # $300M — includes real small-caps, skips micro-caps
+  min_price: 3                # avoid penny-stock data quality / borrow problems
+  min_volume: 300000          # shares/day — enough liquidity to actually trade
+  max_stocks: 1500            # scan size cap (full scan ≈ 10-12 min, every 6h)
+
+# Extra tickers to force into the scan even if they fail the filters above
+# (your holdings and watchlist are always included automatically).
 universe:
-  # mega-cap tech
-  - AAPL
-  - MSFT
-  - GOOG
-  - AMZN
-  - META
-  - NVDA
-  - TSLA
-  - AVGO
-  - ORCL
-  - CRM
-  - ADBE
-  - AMD
-  - QCOM
-  - TXN
-  - INTC
-  - IBM
-  - CSCO
-  - NFLX
-  - NOW
   - PLTR
-  - UBER
   - SHOP
   - SNOW
-  - MU
   - ARM
   - SMCI
-  - DELL
-  - ANET
-  - PANW
-  - CRWD
-  # financials
-  - JPM
-  - V
-  - MA
-  - BAC
-  - GS
-  - MS
-  - BLK
-  - AXP
-  - C
-  - WFC
   - COIN
-  # healthcare
-  - LLY
-  - UNH
-  - JNJ
-  - MRK
-  - ABBV
-  - PFE
-  - TMO
-  - ABT
-  - AMGN
-  - ISRG
-  # consumer
-  - WMT
-  - COST
-  - HD
-  - PG
-  - KO
-  - PEP
-  - MCD
-  - NKE
-  - SBUX
-  - LOW
-  - DIS
-  - TGT
-  # industrials & energy
-  - XOM
-  - CVX
-  - CAT
-  - DE
-  - BA
-  - GE
-  - HON
-  - UNP
-  - RTX
-  - UPS
-  - LMT
-  # telecom & misc
-  - T
-  - VZ
-  - CMCSA
-  - AMAT
-  - LRCX
-  - KLAC
-  - ADI
-  - MRVL

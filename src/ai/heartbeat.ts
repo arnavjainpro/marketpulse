@@ -9,8 +9,7 @@
 // pure spend. Flip this on if/when the prompts grow past the threshold
 // (verify with usage.cache_read_input_tokens > 0 on a second call).
 import Anthropic from "@anthropic-ai/sdk";
-import type { Portfolio } from "../config";
-import { marketPhase } from "../config";
+import { config, marketPhase, type Portfolio } from "../config";
 import { triageSystemPrompt } from "./triage";
 import { claudeQueue } from "./queue";
 
@@ -26,7 +25,7 @@ export function startCacheHeartbeat(portfolio: Portfolio) {
     try {
       const r = await claudeQueue(() =>
         client.messages.create({
-          model: "claude-haiku-4-5",
+          model: config.modelFast,
           max_tokens: 1,
           system: [
             { type: "text", text: triageSystemPrompt(portfolio), cache_control: { type: "ephemeral" } },

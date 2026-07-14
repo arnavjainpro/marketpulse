@@ -22,6 +22,8 @@
     --gray-soft: #f4f5f6;
     --amber-soft: #fdf6e3;
     --amber: #b8860b;
+    --blue: #1a66cc;
+    --blue-soft: #e8f1fd;
     --radius: 14px;
     --sans: "Inter", -apple-system, sans-serif;
   }
@@ -36,7 +38,7 @@
     border-bottom: 1px solid var(--line);
   }
   .header-inner {
-    max-width: 720px; margin: 0 auto; padding: 14px 20px;
+    max-width: 760px; margin: 0 auto; padding: 14px 20px;
     display: flex; align-items: center; gap: 14px;
   }
   .wordmark { font-weight: 800; font-size: 17px; letter-spacing: -.02em; }
@@ -51,16 +53,24 @@
   .switch i { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left .2s; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
   .switch.on i { left: 18px; }
 
+  /* main tab nav (second row of the sticky header) */
+  #tabs { border-top: 1px solid var(--line); }
+  #tabs .tabs-inner { max-width: 760px; margin: 0 auto; padding: 0 10px; display: flex; gap: 2px; overflow-x: auto; }
+  #tabs button { background: none; border: none; padding: 11px 12px; font: 600 13.5px var(--sans); color: var(--dim); white-space: nowrap; border-bottom: 2px solid transparent; }
+  #tabs button.active { color: var(--text); border-bottom-color: var(--green-bright); }
+  #tabs button .badge { display: none; margin-left: 5px; background: var(--green-bright); color: #fff; font-size: 10px; font-weight: 700; border-radius: 999px; padding: 1px 6px; }
+  #tabs button .badge.show { display: inline-block; }
+
   #banner {
     display: none; background: var(--red-soft); color: var(--red); font-size: 13px; font-weight: 600;
     padding: 10px 20px; text-align: center;
   }
   #banner button { margin-left: 10px; border: 1px solid var(--red); background: none; color: var(--red); border-radius: 8px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
 
-  main { max-width: 720px; margin: 0 auto; padding: 24px 20px 80px; display: flex; flex-direction: column; gap: 28px; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 20px 80px; display: flex; flex-direction: column; gap: 28px; }
 
   h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin-bottom: 12px; }
-  .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 10px; flex-wrap: wrap; }
   .section-head h2 { margin-bottom: 0; }
 
   /* portfolio hero */
@@ -69,6 +79,11 @@
   #portfolio-total { font-size: 13px; color: var(--dim); margin-top: 2px; }
   .up { color: var(--green); } .down { color: var(--red); }
   #portfolio-spark { margin-top: 14px; width: 100%; height: 72px; }
+  #broker-line { font-size: 12.5px; color: var(--dim); margin-top: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  #broker-line .linkish { background: none; border: none; color: var(--blue); font-size: 12.5px; font-weight: 600; padding: 0; text-decoration: underline; }
+  #import-panel { display: none; margin-top: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  #import-panel textarea { width: 100%; min-height: 110px; border: 1px solid var(--line); border-radius: 8px; font: 12px/1.5 ui-monospace, monospace; padding: 8px; resize: vertical; }
+  #import-panel .hint { font-size: 11.5px; color: var(--faint); margin: 6px 0; }
 
   /* cards & rows */
   .card { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
@@ -98,12 +113,13 @@
   .chip.sell { background: var(--red-soft); color: var(--red); }
   .chip.warn { background: var(--amber-soft); color: var(--amber); }
   .chip.calm { background: var(--gray-soft); color: var(--dim); }
+  .chip.info { background: var(--blue-soft); color: var(--blue); }
+  .chip.sm { font-size: 11px; padding: 2px 8px; }
 
   /* advice cards */
   .advice { border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 12px; overflow: hidden; }
   .advice > .rowbtn { border-bottom: none; align-items: flex-start; }
   .advice .headline { font-size: 15px; font-weight: 600; line-height: 1.45; }
-  .advice .meta { font-size: 12.5px; color: var(--dim); margin-top: 3px; }
   .advice .detail { border-bottom: none; }
 
   .klabel { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin: 12px 0 3px; }
@@ -122,8 +138,113 @@
   }
   .advise-btn:hover { opacity: .85; }
   .advise-btn:disabled { opacity: .5; cursor: wait; }
+  .advise-btn.ghost { background: none; color: var(--text); border: 1px solid var(--line); }
 
   .empty { color: var(--faint); font-size: 14px; padding: 18px 16px; }
+
+  /* market pulse */
+  #regime-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+  #regime-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  #regime-desc { font-size: 13.5px; color: var(--dim); margin-top: 8px; }
+  .bench-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin-top: 12px; }
+
+  /* sector table */
+  table.sectors { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.sectors th { text-align: right; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); padding: 8px 10px 6px; border-bottom: 1px solid var(--line); }
+  table.sectors th:first-child { text-align: left; }
+  table.sectors td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
+  table.sectors td:first-child { text-align: left; font-weight: 600; }
+  table.sectors tr:last-child td { border-bottom: none; }
+  table.sectors tbody tr { cursor: pointer; }
+  table.sectors tbody tr:hover { background: #fafbfb; }
+  .sector-detail td { background: #fcfcfd; cursor: default !important; }
+  .setup-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .setup-chip { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
+  .setup-chip:hover { border-color: var(--green-bright); }
+  .setup-chip.s:hover { border-color: var(--red); }
+
+  /* ideas */
+  .tabbar { display: flex; gap: 6px; }
+  .tabbar button { border: 1px solid var(--line); background: none; border-radius: 999px; font-size: 12.5px; font-weight: 600; padding: 5px 14px; color: var(--dim); }
+  .tabbar button.active { background: var(--text); border-color: var(--text); color: #fff; }
+  .sector-group-head { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); padding: 10px 16px 4px; display: flex; gap: 8px; align-items: center; }
+  #gen-btn { border: 1px solid var(--line); background: none; border-radius: 999px; font-size: 12px; font-weight: 600; padding: 4px 12px; color: var(--dim); }
+  #gen-btn:hover { border-color: var(--green-bright); color: var(--green); }
+  #gen-btn:disabled { opacity: .5; cursor: wait; }
+
+  /* report cards */
+  .report { border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-top: 12px; background: #fff; }
+  .report .rhead { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .report .rheadline { font-size: 15px; font-weight: 600; margin-top: 8px; line-height: 1.45; }
+  .rbadge { font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; }
+  .rbadge.strong { background: var(--green-soft); color: var(--green); }
+  .rbadge.moderate { background: var(--blue-soft); color: var(--blue); }
+  .rbadge.weak { background: var(--amber-soft); color: var(--amber); }
+  .rbadge.reject, .rbadge.no_trade { background: var(--red-soft); color: var(--red); }
+  .scorebars { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px 14px; margin-top: 12px; }
+  .scorebar .lbl { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); font-weight: 600; }
+  .scorebar .track { height: 5px; border-radius: 3px; background: var(--gray-soft); margin-top: 3px; overflow: hidden; }
+  .scorebar .fill { height: 100%; border-radius: 3px; background: var(--green-bright); }
+  .scorebar .fill.mid { background: var(--amber); }
+  .scorebar .fill.low { background: var(--red); }
+  .report ul { padding-left: 18px; font-size: 13.5px; margin: 4px 0; }
+  .report li { margin: 3px 0; }
+  .report .warn-list li { color: var(--amber); }
+  .stress { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+  .stress .case { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 12.5px; }
+  .stress .case b { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); margin-bottom: 2px; }
+  @media (max-width: 560px) { .stress { grid-template-columns: 1fr; } }
+  .report .kv { font-size: 13.5px; margin-top: 2px; }
+  .report .close-report { float: right; border: none; background: none; color: var(--faint); font-size: 18px; line-height: 1; }
+
+  /* intraday */
+  #intraday-form { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .intraday-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .intraday-row input[type=text], .intraday-row select {
+    border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; font: 13.5px var(--sans); background: var(--gray-soft);
+  }
+  .intraday-row input[type=text]:focus, .intraday-row select:focus { outline: none; border-color: var(--green-bright); background: #fff; }
+  #intraday-ticker { width: 110px; text-transform: uppercase; }
+  #intraday-notes { flex: 1; min-width: 180px; }
+  .checkline { font-size: 13px; color: var(--dim); display: flex; align-items: center; gap: 6px; }
+  #drop-zone {
+    border: 1.5px dashed var(--line); border-radius: 10px; padding: 14px; text-align: center;
+    font-size: 13px; color: var(--dim); cursor: pointer; transition: border-color .15s;
+  }
+  #drop-zone:hover, #drop-zone.drag { border-color: var(--green-bright); color: var(--green); }
+  #img-preview-wrap { display: none; position: relative; }
+  #img-preview { max-width: 100%; max-height: 220px; border-radius: 10px; border: 1px solid var(--line); }
+  #img-clear { position: absolute; top: 6px; left: 6px; border: none; background: rgba(0,0,0,.6); color: #fff; border-radius: 999px; width: 24px; height: 24px; font-size: 13px; }
+  #intraday-go { align-self: flex-start; }
+
+  /* swing multi-timeframe slots */
+  .swing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  @media (max-width: 480px) { .swing-grid { grid-template-columns: 1fr; } }
+  .swing-slot { position: relative; border: 1.5px dashed var(--line); border-radius: 10px; min-height: 78px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 12px; color: var(--dim); cursor: pointer; background-size: cover; background-position: center; overflow: hidden; transition: border-color .15s; }
+  .swing-slot:hover, .swing-slot.drag { border-color: var(--green-bright); color: var(--green); }
+  .swing-slot.filled { border-style: solid; color: transparent; }
+  .swing-slot.filled span { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.6); color: #fff; font-size: 10.5px; padding: 2px; }
+
+  /* backtest */
+  #backtest-form { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  #backtest-form #bt-ticker { border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; font: 13.5px var(--sans); background: var(--gray-soft); width: 110px; text-transform: uppercase; }
+  #bt-ticker:focus { outline: none; border-color: var(--green-bright); background: #fff; }
+  #bt-desc { width: 100%; min-height: 90px; border: 1px solid var(--line); border-radius: 10px; font: 13.5px/1.5 var(--sans); padding: 10px 12px; resize: vertical; }
+  #bt-desc:focus { outline: none; border-color: var(--green-bright); }
+  .dropzone { border: 1.5px dashed var(--line); border-radius: 10px; padding: 14px; text-align: center; font-size: 13px; color: var(--dim); cursor: pointer; transition: border-color .15s; }
+  .dropzone:hover, .dropzone.drag { border-color: var(--green-bright); color: var(--green); }
+  #bt-img-wrap { display: none; position: relative; }
+  #bt-img { max-width: 100%; max-height: 220px; border-radius: 10px; border: 1px solid var(--line); }
+  #bt-img-clear { position: absolute; top: 6px; left: 6px; border: none; background: rgba(0,0,0,.6); color: #fff; border-radius: 999px; width: 24px; height: 24px; font-size: 13px; }
+  #bt-go { align-self: flex-start; }
+  .eqcurve { width: 100%; height: 120px; margin-top: 10px; }
+  .wf-table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; margin-top: 8px; }
+  .wf-table th { text-align: right; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  .wf-table th:first-child { text-align: left; }
+  .wf-table td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  .wf-table td:first-child { text-align: left; }
+  .heatgrid { display: grid; gap: 3px; margin-top: 8px; font-size: 11px; font-variant-numeric: tabular-nums; }
+  .heatcell { padding: 6px 4px; border-radius: 5px; text-align: center; font-weight: 600; }
 
   /* chat */
   #chat-card { border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-direction: column; }
@@ -175,6 +296,19 @@
   .md code { background: var(--gray-soft); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
 
   .disclaimer { text-align: center; font-size: 11.5px; color: var(--faint); }
+
+  /* in-trade follow-up chat on a plan card */
+  .followup { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .fu-log { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+  .fu-log:empty { display: none; }
+  .fu-thumbs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .fu-thumb { width: 46px; height: 46px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+  .fu-row { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+  .fu-input { flex: 1; border: 1px solid var(--line); border-radius: 999px; padding: 9px 14px; font: 13.5px var(--sans); background: var(--gray-soft); }
+  .fu-input:focus { outline: none; border-color: var(--green-bright); background: #fff; }
+  .fu-img { border: 1px solid var(--line); background: none; border-radius: 999px; width: 36px; height: 36px; font-size: 15px; flex-shrink: 0; }
+  .fu-img:hover { border-color: var(--green-bright); }
+  .followup .advise-btn { flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -190,38 +324,130 @@
       <button class="switch" id="ai-toggle" role="switch" aria-checked="true" aria-label="Toggle live AI updates"><i></i></button>
     </span>
   </div>
+  <nav id="tabs">
+    <div class="tabs-inner">
+      <button data-tab="portfolio" class="active">Portfolio</button>
+      <button data-tab="market">Market</button>
+      <button data-tab="ideas">Ideas</button>
+      <button data-tab="analyze">Analyze<span class="badge"></span></button>
+      <button data-tab="backtest">Backtest</button>
+      <button data-tab="chat">Chat</button>
+      <button data-tab="activity">Activity<span class="badge"></span></button>
+    </div>
+  </nav>
 </header>
 <div id="banner">AI was halted after unusually high activity to protect your API spend.<button id="breaker-reset">Resume</button></div>
 
 <main>
-  <section id="portfolio">
+  <section id="portfolio" data-pane="portfolio">
     <h2>Your portfolio</h2>
     <div id="portfolio-value">$—</div>
     <div id="portfolio-day"></div>
     <div id="portfolio-total"></div>
     <svg id="portfolio-spark" preserveAspectRatio="none"></svg>
+    <div id="broker-line"></div>
+    <div id="import-panel">
+      <div class="hint">Link Robinhood (read-only) for live positions — run <code>bun run link:robinhood</code> once. It takes priority over this manual paste, which is the universal fallback for any broker's export.</div>
+      <textarea id="import-json" spellcheck="false" placeholder='{"positions":[{"ticker":"AAPL","shares":10,"cost_basis":180}],"watchlist":["NVDA"],"account":{"equity":25000}}'></textarea>
+      <div class="hint" id="import-msg"></div>
+      <button class="advise-btn" id="import-go" style="margin-top:6px">Import</button>
+      <button class="advise-btn ghost" id="import-clear" style="margin-top:6px">Clear import (back to YAML)</button>
+    </div>
   </section>
 
-  <section id="advice-section" style="display:none">
+  <section id="advice-section" data-pane="portfolio" style="display:none">
     <h2>Advice for you</h2>
     <div id="advice-list"></div>
   </section>
 
-  <section>
+  <section data-pane="portfolio">
     <h2>Your stocks</h2>
     <div class="card" id="holdings"></div>
   </section>
 
-  <section>
-    <div class="section-head"><h2>Buying ideas</h2><span id="scan-meta" style="font-size:12px;color:var(--faint)"></span></div>
-    <div class="card" id="ideas"><div class="empty">Scanning the S&amp;P 500… the first scan takes a few minutes after startup.</div></div>
+  <section id="market-section" data-pane="market">
+    <h2>Market pulse</h2>
+    <div id="regime-card"><div class="empty">Loading market context…</div></div>
   </section>
 
-  <section>
+  <section id="sectors-section" data-pane="market">
+    <div class="section-head"><h2>Sectors — rotation &amp; setups</h2><span id="sector-meta" style="font-size:12px;color:var(--faint)"></span></div>
+    <div class="card"><table class="sectors" id="sector-table"><tbody><tr><td class="empty">Waiting for the first scan…</td></tr></tbody></table></div>
+  </section>
+
+  <section id="ideas-section" data-pane="ideas">
+    <div class="section-head">
+      <h2>Trade ideas</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="tabbar" id="ideas-tabs">
+          <button data-tab="long" class="active">Long</button>
+          <button data-tab="short">Short</button>
+        </div>
+        <button id="gen-btn" title="Validate the strongest setups with AI (a few cents, takes a minute or two)">✦ Generate &amp; validate</button>
+      </div>
+    </div>
+    <div class="card" id="ideas"><div class="empty">Scanning the market… the first full scan takes several minutes after startup.</div></div>
+    <div id="report-area"></div>
+  </section>
+
+  <section id="intraday-section" data-pane="analyze">
+    <h2>Intraday analyzer</h2>
+    <div id="intraday-form">
+      <div class="tabbar" id="mode-tabs">
+        <button data-mode="intraday" class="active">Intraday</button>
+        <button data-mode="swing">Swing / Options</button>
+      </div>
+      <div class="intraday-row">
+        <input type="text" id="intraday-ticker" placeholder="Ticker" autocomplete="off">
+        <select id="intraday-tf">
+          <option value="1m">1-minute</option>
+          <option value="5m" selected>5-minute</option>
+          <option value="15m">15-minute</option>
+          <option value="60m">1-hour</option>
+        </select>
+      </div>
+      <div id="drop-zone" tabindex="0">Paste (Ctrl+V), drag &amp; drop, or click to add a chart screenshot — optional but the analysis always cross-checks it against live data</div>
+      <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" hidden>
+      <div id="img-preview-wrap"><button id="img-clear" title="remove screenshot">×</button><img id="img-preview" alt="chart screenshot preview"></div>
+      <div id="swing-slots" style="display:none">
+        <div class="swing-grid">
+          <div class="swing-slot" data-label="1D"><span>1-Day chart</span></div>
+          <div class="swing-slot" data-label="1W"><span>1-Week chart</span></div>
+          <div class="swing-slot" data-label="1M"><span>1-Month chart</span></div>
+          <div class="swing-slot" data-label="OPTIONS-CHAIN"><span>Options chain (optional)</span></div>
+        </div>
+        <div class="hint" style="font-size:11.5px;color:var(--faint);margin-top:6px">Upload any subset of daily/weekly/monthly candlestick charts. Swing mode pulls the live options chain automatically — upload a screenshot of your broker's chain only if you want it to price against those exact quotes. It proposes a concrete contract or spread with stress-tested max loss/gain.</div>
+      </div>
+      <div class="intraday-row">
+        <input type="text" id="intraday-notes" placeholder="Notes (optional): what you're seeing / planning…" autocomplete="off">
+        <button class="advise-btn" id="intraday-go" style="margin-top:0">Analyze setup</button>
+      </div>
+    </div>
+    <div id="intraday-result"></div>
+  </section>
+
+  <section data-pane="backtest">
+    <h2>Backtest &amp; walk-forward</h2>
+    <div id="backtest-form">
+      <div class="intraday-row">
+        <input type="text" id="bt-ticker" placeholder="Ticker" autocomplete="off">
+        <span style="font-size:12px;color:var(--faint)">Walk-forward validated (out-of-sample) automatically when ≥5y of history exists.</span>
+      </div>
+      <textarea id="bt-desc" spellcheck="false" placeholder="Describe the strategy in plain English — e.g. &quot;buy when the 50-day average crosses above the 200-day, sell on the cross back down, 2xATR stop&quot;. Or upload a chart below and I'll infer the setup."></textarea>
+      <div id="bt-drop" tabindex="0" class="dropzone">Optional: paste, drop, or click to add a chart — the setup will be read off it</div>
+      <input type="file" id="bt-file" accept="image/png,image/jpeg,image/webp" hidden>
+      <div id="bt-img-wrap"><button id="bt-img-clear" title="remove">×</button><img id="bt-img" alt="strategy chart"></div>
+      <button class="advise-btn" id="bt-go" style="margin-top:0">Run backtest</button>
+    </div>
+    <div id="bt-result"></div>
+    <p class="disclaimer" style="margin-top:14px">Backtests are in-sample by nature; walk-forward shows out-of-sample results but past performance never guarantees future results. Options backtests are model-priced (Black-Scholes), not real historical option quotes.</p>
+  </section>
+
+  <section data-pane="chat">
     <h2>Ask MarketPulse</h2>
     <div id="chat-card">
       <div id="chat-log">
-        <div class="msg ai">Ask me anything about your money — “should I sell HPE?”, “what looks worth buying today?”, “explain what happened to META this week.”</div>
+        <div class="msg ai">Ask me anything about your money — “should I sell HPE?”, “what looks worth buying today?”, “which sectors are leading right now?”</div>
       </div>
       <form id="chat-form">
         <input id="chat-input" placeholder="Ask a question…" autocomplete="off" aria-label="Ask MarketPulse">
@@ -230,13 +456,13 @@
     </div>
   </section>
 
-  <details class="block" id="brief-block">
+  <details class="block" id="brief-block" data-pane="activity">
     <summary><svg class="chev2" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 6 6 6-6 6"/></svg>
       Today’s brief <button id="brief-gen" type="button">Generate</button></summary>
     <div class="inner"><div id="briefing"><div class="empty">No brief yet today. It’s written automatically before the market opens and after it closes — or tap Generate.</div></div></div>
   </details>
 
-  <details class="block">
+  <details class="block" data-pane="activity">
     <summary><svg class="chev2" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 6 6 6-6 6"/></svg>
       Recent activity <span id="act-count" style="margin-left:auto;font-size:12px;color:var(--faint)"></span></summary>
     <div class="inner" id="activity"></div>
@@ -248,10 +474,40 @@
 <script>
 const $ = (s) => document.querySelector(s);
 const chevSvg = `<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 6 6 6-6 6"/></svg>`;
+
+/* ── tab routing (native hidden + location.hash) ── */
+const PANES = ["portfolio", "market", "ideas", "analyze", "backtest", "chat", "activity"];
+function showPane(name) {
+  if (!PANES.includes(name)) name = "portfolio";
+  document.querySelectorAll("[data-pane]").forEach((el) => { el.hidden = el.dataset.pane !== name; });
+  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+  const badge = document.querySelector(`#tabs button[data-tab="${name}"] .badge`);
+  if (badge) { badge.classList.remove("show"); badge.textContent = ""; }
+  if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
+}
+function bumpBadge(name) {
+  if (document.querySelector("#tabs button.active")?.dataset.tab === name) return;
+  const b = document.querySelector(`#tabs button[data-tab="${name}"] .badge`);
+  if (!b) return;
+  b.textContent = String((+b.textContent || 0) + 1);
+  b.classList.add("show");
+}
+$("#tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-tab]"); if (b) showPane(b.dataset.tab); });
+window.addEventListener("hashchange", () => showPane(location.hash.slice(1)));
+showPane(location.hash.slice(1) || "portfolio");
+
 const esc = (s) => { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; };
 const money = (n) => n.toLocaleString("en-US", { style: "currency", currency: "USD" });
 const signed = (n, dec = 2) => `${n >= 0 ? "+" : ""}${n.toFixed(dec)}`;
 const fmtTime = (ts) => new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+// ET market open/close rendered in the viewer's local timezone, e.g. " · opens 8:30 AM Thu".
+function marketClockSuffix(clock) {
+  if (!clock) return "";
+  const d = new Date(clock.ts * 1000);
+  const sameDay = d.toDateString() === new Date().toDateString();
+  const day = sameDay ? "" : " " + d.toLocaleDateString([], { weekday: "short" });
+  return ` · ${clock.kind === "open" ? "opens" : "closes"} ${fmtTime(clock.ts)}${day}`;
+}
 
 function renderMd(el, text) {
   if (window.marked) { el.classList.add("md"); el.innerHTML = marked.parse(text, { breaks: true }); }
@@ -274,7 +530,10 @@ let portfolio = { holdings: [], watchlist: [] };
 let quotes = {};
 let screener = {};   // ticker -> row
 let events = [];
+let market = null;   // { snapshot, boards }
+let brokerInfo = null;
 let aiLiveState = true;
+let ideasTab = "long";
 
 /* ── helpers shared by rows ── */
 function latestSignal(ticker) {
@@ -291,11 +550,12 @@ function statusChip(ticker) {
   }
   const sc = screener[ticker];
   if (sc) {
+    if (sc.direction === "short") return ["Breaking down", "sell"];
     if (sc.cross_status === "death_formed") return ["Warning sign", "warn"];
     if (sc.cross_status === "golden_formed") return ["Buy signal", "buy"];
     if (sc.cross_status === "golden_soon") return ["Buy signal forming", "buy"];
-    if (sc.score >= 70) return ["Doing well", "buy"];
-    if (sc.score <= 38) return ["Under pressure", "warn"];
+    if (sc.long_score >= 70) return ["Doing well", "buy"];
+    if (sc.long_score <= 38) return ["Under pressure", "warn"];
   }
   return ["Steady", "calm"];
 }
@@ -310,25 +570,32 @@ function factorDetail(ticker) {
   if (i.crossStatus === "golden_soon") plain.push(`A golden cross is forming — ${esc(i.crossDetail)}.`);
   if (i.crossStatus === "death_formed") plain.push("Its short-term trend dropped below its long-term trend (a “death cross”) — historically a caution sign.");
   plain.push(i.pctVs200 >= 0 ? `Trading ${i.pctVs200.toFixed(0)}% above its one-year average price — the long-term trend is up.` : `Trading ${Math.abs(i.pctVs200).toFixed(0)}% below its one-year average price — the long-term trend is down.`);
+  if (i.rangeState === "breakout") plain.push(`Just broke above its recent range${i.rangeVolConfirmed ? " on strong volume" : " (volume unconvincing)"}.`);
+  if (i.rangeState === "breakdown") plain.push(`Just broke below its recent range${i.rangeVolConfirmed ? " on heavy volume" : " (volume unconvincing)"}.`);
+  if (i.rsSpy1m != null && Math.abs(i.rsSpy1m) > 3) plain.push(`It has ${i.rsSpy1m > 0 ? "outperformed" : "lagged"} the S&P 500 by ${Math.abs(i.rsSpy1m).toFixed(0)} points over the past month.`);
   if (Math.abs(i.mom3m) > 5) plain.push(`${i.mom3m > 0 ? "Up" : "Down"} ${Math.abs(i.mom3m).toFixed(0)}% over the last 3 months.`);
   if (i.volTrend > 1.15) plain.push("Trading volume is picking up — more investors are participating.");
   if (i.rsi14 != null && i.rsi14 > 75) plain.push("It has risen fast recently and may be due for a breather (overbought).");
   if (i.rsi14 != null && i.rsi14 < 30) plain.push("It has fallen hard recently (oversold) — sometimes a bounce setup.");
+  const f = (v, d=2) => v != null ? Number(v).toFixed(d) : "—";
   return `
     <p>${plain.join(" ")}</p>
     <div class="klabel">Pro detail</div>
     <div class="stats">
-      <div class="stat"><div class="k">Score</div><div class="v">${sc.score}/100</div></div>
+      <div class="stat"><div class="k">Long / Short</div><div class="v">${sc.long_score} / ${sc.short_score}</div></div>
+      <div class="stat"><div class="k">Sector</div><div class="v" style="font-size:12px">${esc(sc.sector)}</div></div>
       <div class="stat"><div class="k">vs 200-day avg</div><div class="v">${signed(i.pctVs200, 1)}%</div></div>
       <div class="stat"><div class="k">3-mo return</div><div class="v">${signed(i.mom3m, 1)}%</div></div>
-      <div class="stat"><div class="k">6-mo return</div><div class="v">${signed(i.mom6m, 1)}%</div></div>
-      <div class="stat"><div class="k">RSI (14d)</div><div class="v">${i.rsi14?.toFixed(0) ?? "—"}</div></div>
-      <div class="stat"><div class="k">MACD hist</div><div class="v">${i.macdHist?.toFixed(2) ?? "—"}</div></div>
-      <div class="stat"><div class="k">52-wk range</div><div class="v">${i.pct52w.toFixed(0)}/100</div></div>
-      <div class="stat"><div class="k">Volume trend</div><div class="v">${i.volTrend.toFixed(2)}×</div></div>
-      <div class="stat"><div class="k">Cross</div><div class="v">${i.crossStatus === "none" ? "—" : esc(i.crossStatus.replace("_", " "))}</div></div>
+      <div class="stat"><div class="k">RSI (14d)</div><div class="v">${f(i.rsi14, 0)}</div></div>
+      <div class="stat"><div class="k">vs S&amp;P (1m)</div><div class="v">${i.rsSpy1m != null ? signed(i.rsSpy1m, 1) + "pp" : "—"}</div></div>
+      <div class="stat"><div class="k">vs sector (1m)</div><div class="v">${i.rsSector1m != null ? signed(i.rsSector1m, 1) + "pp" : "—"}</div></div>
+      <div class="stat"><div class="k">Volatility (ATR)</div><div class="v">${f(i.atrPct, 1)}%</div></div>
+      <div class="stat"><div class="k">Support</div><div class="v">${i.support ? "$" + f(i.support) : "—"}</div></div>
+      <div class="stat"><div class="k">Resistance</div><div class="v">${i.resistance ? "$" + f(i.resistance) : "—"}</div></div>
+      <div class="stat"><div class="k">Structure</div><div class="v" style="font-size:12px">${esc((i.structure || "—").replace("_", " "))}</div></div>
+      <div class="stat"><div class="k">Volume trend</div><div class="v">${f(i.volTrend)}×</div></div>
     </div>
-    <button class="advise-btn" data-advise="${esc(ticker)}">Get AI advice on ${esc(ticker)}</button>`;
+    <button class="advise-btn" data-validate="${esc(ticker)}" data-direction="auto">Validate as a trade idea</button>`;
 }
 
 function toggleRow(container) {
@@ -337,12 +604,18 @@ function toggleRow(container) {
   btn?.setAttribute("aria-expanded", container.classList.contains("open"));
 }
 
-/* ── portfolio hero ── */
+/* ── portfolio hero + broker ── */
 function renderPortfolio() {
   if (!portfolio.holdings.length) return;
   let value = 0, day = 0, cost = 0, prev = 0;
   for (const h of portfolio.holdings) {
     const q = quotes[h.ticker];
+    // Options/crypto (and any broker-priced position) carry their own market value.
+    if (h.market_value != null) {
+      value += h.market_value;
+      cost += h.shares * h.cost_basis * (h.asset_class === "option" ? 100 : 1);
+      continue;
+    }
     if (!q) continue;
     value += h.shares * q.c;
     day += h.shares * (q.d ?? 0);
@@ -359,7 +632,6 @@ function renderPortfolio() {
   const t = $("#portfolio-total");
   t.innerHTML = `Total return <span class="${tot >= 0 ? "up" : "down"}" style="font-weight:600">${signed(tot / Math.max(cost, 1) * 100, 1)}% (${money(tot)})</span> since you invested`;
 
-  // 90-day weighted sparkline from screener history
   const sparks = portfolio.holdings
     .map((h) => ({ h, s: screener[h.ticker]?.indicators?.spark }))
     .filter((x) => x.s?.length > 1);
@@ -371,6 +643,43 @@ function renderPortfolio() {
     sparkSvg($("#portfolio-spark"), series, true);
   }
 }
+
+function renderBrokerLine() {
+  const el = $("#broker-line");
+  const src = brokerInfo?.source ?? "manual";
+  const srcLabel = src === "robinhood" ? "Linked: Robinhood" : src === "import" ? "Imported positions" : "From portfolio.yaml";
+  const eq = brokerInfo?.account?.equity;
+  const orders = brokerInfo?.openOrders?.length ?? 0;
+  el.innerHTML = `
+    <span class="chip ${src === "robinhood" ? "buy" : src === "import" ? "info" : "calm"} sm">${srcLabel}</span>
+    ${eq != null ? `<span>equity ${money(eq)}</span>` : ""}
+    ${orders ? `<span>· ${orders} open order${orders === 1 ? "" : "s"}</span>` : ""}
+    <button class="linkish" id="import-toggle">Import positions</button>
+    ${src !== "manual" ? `<button class="linkish" id="broker-refresh">Refresh</button>` : ""}`;
+  $("#import-toggle").onclick = () => {
+    const p = $("#import-panel");
+    p.style.display = p.style.display === "block" ? "none" : "block";
+  };
+  const rb = $("#broker-refresh");
+  if (rb) rb.onclick = async () => { await fetch("/api/broker/refresh", { method: "POST" }); loadState(); };
+}
+
+$("#import-go").addEventListener("click", async () => {
+  const msg = $("#import-msg");
+  try {
+    const payload = JSON.parse($("#import-json").value);
+    const res = await (await fetch("/api/broker/import", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+    })).json();
+    msg.textContent = res.ok ? `Imported ${res.positions} positions (source: ${res.source}).` : `Failed: ${res.error}`;
+    if (res.ok) loadState();
+  } catch (e) { msg.textContent = `Invalid JSON: ${e.message}`; }
+});
+$("#import-clear").addEventListener("click", async () => {
+  await fetch("/api/broker/import/clear", { method: "POST" });
+  $("#import-msg").textContent = "Import cleared — back to YAML/linked source.";
+  loadState();
+});
 
 /* ── advice cards ── */
 const ACTION_LABEL = { buy: ["Buy idea", "buy"], add: ["Buy idea", "buy"], sell: ["Sell alert", "sell"], trim: ["Sell alert", "sell"] };
@@ -418,20 +727,26 @@ function renderHoldings() {
     const q = quotes[h.ticker];
     const [chipLabel, chipTone] = statusChip(h.ticker);
     const wrap = document.createElement("div");
-    const gain = q ? (q.c - h.cost_basis) * h.shares : 0;
+    const cls = h.asset_class || "equity";
+    const unit = cls === "option" ? "contract" : cls === "crypto" ? "unit" : "share";
+    const mult = cls === "option" ? 100 : 1;
+    // Options/crypto carry their own market value; equities are quote-priced.
+    const value = h.market_value != null ? h.market_value : q ? q.c * h.shares : null;
+    const gain = h.market_value != null ? h.market_value - h.cost_basis * h.shares * mult : q ? (q.c - h.cost_basis) * h.shares : 0;
+    const priceCell = h.market_value != null ? money(h.market_value) : q ? money(q.c) : "—";
     wrap.innerHTML = `
       <button class="rowbtn" aria-expanded="false">
         ${chevSvg}
-        <div class="tick-name"><div class="sym">${esc(h.ticker)}</div><div class="sub">${h.shares} share${h.shares === 1 ? "" : "s"}</div></div>
+        <div class="tick-name"><div class="sym">${esc(h.ticker)}${cls !== "equity" ? ` <span class="chip calm sm">${cls}</span>` : ""}</div><div class="sub">${h.shares} ${unit}${Math.abs(h.shares) === 1 ? "" : "s"}</div></div>
         <svg class="mini-spark" preserveAspectRatio="none"></svg>
         <span class="chip ${chipTone}">${chipLabel}</span>
         <div class="row-price">
-          <div class="px">${q ? money(q.c) : "—"}</div>
-          <div class="dp ${q && q.dp >= 0 ? "up" : "down"}">${q ? signed(q.dp) + "%" : ""} today</div>
+          <div class="px">${priceCell}</div>
+          <div class="dp ${q && q.dp >= 0 ? "up" : "down"}">${q ? signed(q.dp) + "%" : ""} ${q ? "today" : ""}</div>
         </div>
       </button>
       <div class="detail">
-        <p>You own ${h.shares} share${h.shares === 1 ? "" : "s"} bought around ${money(h.cost_basis)} each — ${gain >= 0 ? "up" : "down"} <b class="${gain >= 0 ? "up" : "down"}">${money(Math.abs(gain))}</b> overall.</p>
+        <p>You hold ${h.shares} ${unit}${Math.abs(h.shares) === 1 ? "" : "s"} at a cost of ${money(h.cost_basis)} each — ${gain >= 0 ? "up" : "down"} <b class="${gain >= 0 ? "up" : "down"}">${money(Math.abs(gain))}</b> overall.</p>
         ${factorDetail(h.ticker)}
       </div>`;
     wrap.querySelector(".rowbtn").addEventListener("click", () => toggleRow(wrap));
@@ -440,38 +755,625 @@ function renderHoldings() {
   }
 }
 
-/* ── buying ideas ── */
+/* ── market pulse ── */
+const SECTOR_STATE_TONE = { leading: "buy", improving: "info", weakening: "warn", lagging: "sell" };
+function renderMarket() {
+  const card = $("#regime-card");
+  const snap = market?.snapshot;
+  if (!snap) { card.innerHTML = `<div class="empty">Market context loads with the first scan (a minute after startup).</div>`; return; }
+  const r = snap.regime;
+  const tone = r.riskOff ? "sell" : r.trend === "up" ? "buy" : r.trend === "down" ? "sell" : "warn";
+  const b = snap.benchmarks || {};
+  const bench = ["SPY", "QQQ", "IWM", "VIX"].filter((k) => b[k]).map((k) => `
+      <div class="stat"><div class="k">${k}</div>
+      <div class="v">${k === "VIX" ? b[k].price.toFixed(1) : money(b[k].price)}</div>
+      <div style="font-size:11.5px;font-weight:600" class="${b[k].ret1d >= 0 ? "up" : "down"}">${signed(b[k].ret1d, 1)}% d · ${signed(b[k].ret1m, 1)}% m</div></div>`).join("");
+  card.innerHTML = `
+    <div id="regime-head">
+      <span class="chip ${tone}">${esc(r.label)}</span>
+      ${r.breadthPct != null ? `<span class="chip calm sm">breadth ${r.breadthPct.toFixed(0)}%</span>` : ""}
+      <span style="font-size:11.5px;color:var(--faint)">${new Date(snap.ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+    </div>
+    <div id="regime-desc">${esc(r.description)}</div>
+    <div class="bench-grid">${bench}</div>`;
+}
+
+function renderSectors() {
+  const tbody = $("#sector-table tbody");
+  const boards = market?.boards ?? [];
+  if (!boards.length) { tbody.innerHTML = `<tr><td class="empty">Waiting for the first scan…</td></tr>`; return; }
+  $("#sector-meta").textContent = `${boards.reduce((a, b) => a + b.scanned, 0)} stocks across ${boards.length} sectors`;
+  tbody.innerHTML = `<tr>
+      <th>Sector</th><th>State</th><th>1w</th><th>1m</th><th>vs SPY</th><th>Breadth</th><th>Setups</th>
+    </tr>` + boards.map((bd, idx) => {
+    const rot = bd.rotation;
+    const stateChip = rot ? `<span class="chip ${SECTOR_STATE_TONE[rot.state] ?? "calm"} sm">${rot.state}</span>` : `<span class="chip calm sm">—</span>`;
+    return `
+      <tr data-sector-row="${idx}">
+        <td>${esc(bd.sector)} <span style="color:var(--faint);font-weight:400">· ${esc(bd.etf)}</span></td>
+        <td>${stateChip}</td>
+        <td class="${rot && rot.ret1w >= 0 ? "up" : "down"}">${rot ? signed(rot.ret1w, 1) + "%" : "—"}</td>
+        <td class="${rot && rot.ret1m >= 0 ? "up" : "down"}">${rot ? signed(rot.ret1m, 1) + "%" : "—"}</td>
+        <td class="${rot && rot.rel1m >= 0 ? "up" : "down"}">${rot ? signed(rot.rel1m, 1) + "pp" : "—"}</td>
+        <td>${bd.breadthPct != null ? bd.breadthPct.toFixed(0) + "%" : "—"}</td>
+        <td>${bd.longs.length}L / ${bd.shorts.length}S</td>
+      </tr>
+      <tr class="sector-detail" data-sector-detail="${idx}" style="display:none">
+        <td colspan="7">
+          <div class="setup-chips" style="margin-bottom:6px">
+            <span style="font-size:11px;color:var(--faint);font-weight:700">LONGS</span>
+            ${bd.longs.map((l) => `<button class="setup-chip" data-validate="${esc(l.ticker)}" data-direction="long">${esc(l.ticker)} ${l.long_score}${l.held ? " ·held" : ""}</button>`).join("") || `<span style="font-size:12px;color:var(--faint)">none setup-grade</span>`}
+          </div>
+          <div class="setup-chips">
+            <span style="font-size:11px;color:var(--faint);font-weight:700">SHORTS</span>
+            ${bd.shorts.map((s) => `<button class="setup-chip s" data-validate="${esc(s.ticker)}" data-direction="short">${esc(s.ticker)} ${s.short_score}${s.held ? " ·HELD⚠" : ""}</button>`).join("") || `<span style="font-size:12px;color:var(--faint)">none (structure gate not met)</span>`}
+          </div>
+        </td>
+      </tr>`;
+  }).join("");
+  tbody.querySelectorAll("[data-sector-row]").forEach((tr) => {
+    tr.addEventListener("click", () => {
+      const det = tbody.querySelector(`[data-sector-detail="${tr.dataset.sectorRow}"]`);
+      det.style.display = det.style.display === "none" ? "" : "none";
+    });
+  });
+}
+
+/* ── trade ideas (by sector, long/short tabs) ── */
 function renderIdeas() {
-  const rows = Object.values(screener)
-    .filter((r) => !r.held && r.score >= 72)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 6);
   const card = $("#ideas");
-  if (!rows.length) return;
+  const boards = market?.boards ?? [];
+  const isLong = ideasTab === "long";
+  const groups = boards
+    .map((bd) => ({ bd, list: isLong ? bd.longs : bd.shorts }))
+    .filter((g) => g.list.length);
+  if (!groups.length) {
+    const rows = Object.values(screener);
+    card.innerHTML = `<div class="empty">${rows.length ? `No setup-grade ${ideasTab} ideas right now — that's a valid answer, not a bug. The scoring requires confluence (structure + volume + relative strength), not just price movement.` : "Scanning the market… the first full scan takes several minutes after startup."}</div>`;
+    return;
+  }
   card.innerHTML = "";
-  for (const r of rows) {
-    const i = r.indicators;
-    const reasons = [];
-    if (r.cross_status === "golden_formed") reasons.push("Golden cross");
-    if (r.cross_status === "golden_soon") reasons.push("Golden cross forming");
-    if (i.mom3m > 15) reasons.push("Strong momentum");
-    if (i.volTrend > 1.15) reasons.push("Volume rising");
-    if (i.pct52w > 85) reasons.push("Near yearly high");
-    const wrap = document.createElement("div");
-    wrap.innerHTML = `
-      <button class="rowbtn" aria-expanded="false">
-        ${chevSvg}
-        <div class="tick-name"><div class="sym">${esc(r.ticker)}</div><div class="sub">${money(i.price)}</div></div>
-        <svg class="mini-spark" preserveAspectRatio="none"></svg>
-        <span class="chip buy">Strength ${r.score}</span>
-        <div class="row-price"><div class="sub" style="font-size:12px;color:var(--dim);max-width:150px;white-space:normal;text-align:right">${reasons.slice(0, 2).join(" · ") || "Broad strength"}</div></div>
-      </button>
-      <div class="detail">${factorDetail(r.ticker)}</div>`;
-    wrap.querySelector(".rowbtn").addEventListener("click", () => toggleRow(wrap));
-    sparkSvg(wrap.querySelector(".mini-spark"), i.spark);
-    card.appendChild(wrap);
+  for (const { bd, list } of groups) {
+    const head = document.createElement("div");
+    head.className = "sector-group-head";
+    head.innerHTML = `${esc(bd.sector)} ${bd.rotation ? `<span class="chip ${SECTOR_STATE_TONE[bd.rotation.state] ?? "calm"} sm">${bd.rotation.state}</span>` : ""}`;
+    card.appendChild(head);
+    for (const item of list) {
+      const r = screener[item.ticker];
+      const i = r?.indicators;
+      const reasons = [];
+      if (i) {
+        if (isLong) {
+          if (r.cross_status === "golden_formed") reasons.push("Golden cross");
+          if (i.rangeState === "breakout") reasons.push(i.rangeVolConfirmed ? "Breakout +vol" : "Breakout");
+          if (i.structure === "higher_lows") reasons.push("Higher lows");
+          if ((i.rsSpy1m ?? 0) > 2) reasons.push("Beating market");
+          if (i.volTrend > 1.15) reasons.push("Volume rising");
+        } else {
+          if (r.cross_status === "death_formed") reasons.push("Death cross");
+          if (i.rangeState === "breakdown") reasons.push(i.rangeVolConfirmed ? "Breakdown +vol" : "Breakdown");
+          if (i.structure === "lower_highs") reasons.push("Lower highs");
+          if ((i.rsSpy1m ?? 0) < -2) reasons.push("Lagging market");
+        }
+      }
+      const wrap = document.createElement("div");
+      wrap.innerHTML = `
+        <button class="rowbtn" aria-expanded="false">
+          ${chevSvg}
+          <div class="tick-name"><div class="sym">${esc(item.ticker)}${item.held ? ` <span class="chip warn sm">held</span>` : ""}</div><div class="sub">${money(item.price)}</div></div>
+          <svg class="mini-spark" preserveAspectRatio="none"></svg>
+          <span class="chip ${isLong ? "buy" : "sell"}">${isLong ? "Long" : "Short"} ${isLong ? item.long_score : item.short_score}</span>
+          <div class="row-price"><div class="sub" style="font-size:12px;color:var(--dim);max-width:150px;white-space:normal;text-align:right">${reasons.slice(0, 2).join(" · ") || "Multi-factor"}</div></div>
+        </button>
+        <div class="detail">${r ? factorDetail(item.ticker) : `<p class="empty">no detail</p>`}</div>`;
+      wrap.querySelector(".rowbtn").addEventListener("click", () => toggleRow(wrap));
+      if (i) sparkSvg(wrap.querySelector(".mini-spark"), i.spark);
+      card.appendChild(wrap);
+    }
   }
 }
+
+$("#ideas-tabs").addEventListener("click", (ev) => {
+  const btn = ev.target.closest("[data-tab]");
+  if (!btn) return;
+  ideasTab = btn.dataset.tab;
+  document.querySelectorAll("#ideas-tabs button").forEach((b) => b.classList.toggle("active", b === btn));
+  renderIdeas();
+});
+
+/* ── idea report rendering ── */
+function scoreBarHtml(label, v) {
+  const cls = v >= 7 ? "" : v >= 4 ? "mid" : "low";
+  return `<div class="scorebar"><div class="lbl"><span>${label}</span><span>${v}/10</span></div><div class="track"><div class="fill ${cls}" style="width:${Math.max(4, v * 10)}%"></div></div></div>`;
+}
+
+function reportCardHtml(rep) {
+  const s = rep.scores || {};
+  const dirTone = rep.direction === "long" ? "buy" : rep.direction === "short" ? "sell" : "calm";
+  const st = rep.stress_tests || {};
+  const tp = rep.trade_plan || {};
+  return `
+    <div class="report">
+      <button class="close-report" title="dismiss">×</button>
+      <div class="rhead">
+        <span style="font-weight:800;font-size:16px">${esc(rep.ticker)}</span>
+        <span class="rbadge ${esc(rep.rating)}">${esc(rep.rating)}</span>
+        <span class="chip ${dirTone}">${esc(rep.direction).replace("_", " ")}</span>
+        <span class="chip calm sm">${esc(rep.confidence)} confidence</span>
+      </div>
+      <div class="rheadline">${esc(rep.headline)}</div>
+      <div class="scorebars">
+        ${scoreBarHtml("Technical", s.technical ?? 0)}
+        ${scoreBarHtml("Catalyst", s.catalyst ?? 0)}
+        ${scoreBarHtml("Market fit", s.market_alignment ?? 0)}
+        ${scoreBarHtml("News/sentiment", s.news_sentiment ?? 0)}
+        ${scoreBarHtml("Risk/reward", s.risk_reward ?? 0)}
+        ${scoreBarHtml("Invalidation clarity", s.invalidation_clarity ?? 0)}
+      </div>
+      ${rep.warnings?.length ? `<div class="klabel">Warnings</div><ul class="warn-list">${rep.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
+      <div class="klabel">Trade plan</div>
+      <div class="stats">
+        <div class="stat"><div class="k">Entry</div><div class="v" style="font-size:12.5px">${esc(tp.entry_zone ?? "—")}</div></div>
+        <div class="stat"><div class="k">Stop</div><div class="v" style="font-size:12.5px">${esc(tp.stop_loss ?? "—")}</div></div>
+        <div class="stat"><div class="k">Risk : reward</div><div class="v">${esc(tp.risk_reward ?? "—")}</div></div>
+        <div class="stat"><div class="k">Holding period</div><div class="v" style="font-size:12.5px">${esc(tp.holding_period ?? "—")}</div></div>
+      </div>
+      ${tp.targets?.length ? `<div class="klabel">Targets</div><ul>${tp.targets.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
+      <div class="klabel">Technical case</div>
+      <ul>${(rep.technical_reasons ?? []).map((r) => `<li>${esc(r)}</li>`).join("") || "<li>—</li>"}</ul>
+      <div class="klabel">News & catalyst ${rep.catalyst ? `<span class="chip ${rep.catalyst.quality === "strong" ? "buy" : rep.catalyst.quality === "conflicting" ? "sell" : rep.catalyst.quality === "noisy" ? "warn" : "calm"} sm">${esc(rep.catalyst.quality)}</span>` : ""}</div>
+      <p class="kv">${esc(rep.catalyst?.description ?? "—")}</p>
+      ${rep.news_reasons?.length ? `<ul>${rep.news_reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : ""}
+      <div class="klabel">Invalidation — this idea is wrong if…</div>
+      <p class="kv">${esc(rep.invalidation ?? "—")}</p>
+      <div class="klabel">Stress tests <span class="chip ${st.survives_risk_off ? "buy" : "sell"} sm">${st.survives_risk_off ? "survives risk-off" : "fails in risk-off"}</span></div>
+      <div class="stress">
+        <div class="case"><b>Base case</b>${esc(st.base_case ?? "—")}</div>
+        <div class="case"><b>If market rallies</b>${esc(st.bull_case ?? "—")}</div>
+        <div class="case"><b>If market sells off</b>${esc(st.bear_case ?? "—")}</div>
+        <div class="case"><b>If it fails</b>${esc(st.invalidation_case ?? "—")}</div>
+      </div>
+      <p class="kv" style="margin-top:6px;color:var(--dim)">${esc(st.risk_off_note ?? "")} ${esc(st.single_condition_dependency ?? "")}</p>
+      <div class="klabel">Sector context</div>
+      <p class="kv">${esc(rep.sector_context ?? "—")}</p>
+      <div class="klabel">Position size</div>
+      <p class="kv">${esc(rep.sizing ?? "—")}</p>
+      <div class="klabel">Exit plan</div>
+      <p class="kv">${esc(rep.exit_plan ?? "—")}</p>
+      ${rep.options_view ? `
+        <div class="klabel">Options view <span class="chip ${rep.options_view.stance === "calls" ? "buy" : rep.options_view.stance === "puts" ? "sell" : "calm"} sm">${esc(rep.options_view.stance)}</span></div>
+        <p class="kv">Strikes: ${esc(rep.options_view.strike_range)} · Expiries: ${esc(rep.options_view.expiry_range)}</p>
+        <p class="kv">${esc(rep.options_view.iv_context)}</p>
+        <p class="kv">Upside risk: ${esc(rep.options_view.upside_risk)} · Downside risk: ${esc(rep.options_view.downside_risk)}</p>` : ""}
+    </div>`;
+}
+
+function showReport(rep, container) {
+  const div = document.createElement("div");
+  div.innerHTML = reportCardHtml(rep);
+  const node = div.firstElementChild;
+  node.querySelector(".close-report").addEventListener("click", () => node.remove());
+  container.prepend(node);
+  node.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// Validate buttons everywhere (event delegation)
+document.addEventListener("click", async (ev) => {
+  const btn = ev.target.closest("[data-validate]");
+  if (!btn) return;
+  const ticker = btn.dataset.validate;
+  const direction = btn.dataset.direction || "auto";
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = "Validating… (~30s)";
+  try {
+    const res = await (await fetch("/api/ideas/validate", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticker, direction }),
+    })).json();
+    if (res.ok) showReport(res.report, $("#report-area"));
+    else alert(`Validation failed: ${res.error}`);
+  } catch (e) { alert(`Validation failed: ${e}`); }
+  finally { btn.disabled = false; btn.textContent = orig; }
+});
+
+$("#gen-btn").addEventListener("click", async () => {
+  const btn = $("#gen-btn");
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = "Validating top setups… (1-3 min)";
+  try {
+    const res = await (await fetch("/api/ideas/generate", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ count: 4 }),
+    })).json();
+    if (res.ok) {
+      if (!res.reports.length) {
+        const note = document.createElement("div");
+        note.className = "empty";
+        note.textContent = res.note || "No setup-grade candidates right now.";
+        $("#report-area").prepend(note);
+        setTimeout(() => note.remove(), 12000);
+      }
+      for (const rep of res.reports.reverse()) showReport(rep, $("#report-area"));
+    } else alert(`Generation failed: ${res.error}`);
+  } catch (e) { alert(`Generation failed: ${e}`); }
+  finally { btn.disabled = false; btn.textContent = orig; }
+});
+
+/* ── intraday analyzer ── */
+let intradayImage = null;
+const dropZone = $("#drop-zone");
+function setIntradayImage(dataUrl) {
+  intradayImage = dataUrl;
+  $("#img-preview").src = dataUrl;
+  $("#img-preview-wrap").style.display = "block";
+  dropZone.style.display = "none";
+}
+function clearIntradayImage() {
+  intradayImage = null;
+  $("#img-preview-wrap").style.display = "none";
+  dropZone.style.display = "";
+}
+$("#img-clear").addEventListener("click", clearIntradayImage);
+dropZone.addEventListener("click", () => $("#file-input").click());
+dropZone.addEventListener("keydown", (e) => { if (e.key === "Enter") $("#file-input").click(); });
+$("#file-input").addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  if (f) { const r = new FileReader(); r.onload = () => setIntradayImage(r.result); r.readAsDataURL(f); }
+});
+["dragover", "dragenter"].forEach((t) => dropZone.addEventListener(t, (e) => { e.preventDefault(); dropZone.classList.add("drag"); }));
+["dragleave", "drop"].forEach((t) => dropZone.addEventListener(t, (e) => { e.preventDefault(); dropZone.classList.remove("drag"); }));
+dropZone.addEventListener("drop", (e) => {
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith("image/")) { const r = new FileReader(); r.onload = () => setIntradayImage(r.result); r.readAsDataURL(f); }
+});
+// Paste anywhere inside the intraday section
+$("#intraday-section").addEventListener("paste", (e) => {
+  for (const item of e.clipboardData.items) {
+    if (item.type.startsWith("image/")) {
+      const f = item.getAsFile();
+      const r = new FileReader(); r.onload = () => setIntradayImage(r.result); r.readAsDataURL(f);
+      e.preventDefault();
+      return;
+    }
+  }
+});
+
+/* downscale to <=1568px (Anthropic image cap) to keep multi-chart uploads cheap */
+function fileToDataUrl(file) {
+  return new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file); });
+}
+function downscaleDataUrl(dataUrl, max = 1568) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      if (scale === 1) return resolve(dataUrl);
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      resolve(c.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+/* ── analyze mode: intraday vs swing/options ── */
+let analyzeMode = "intraday";
+const swingImages = {}; // label -> dataUrl
+$("#mode-tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-mode]"); if (!b) return;
+  analyzeMode = b.dataset.mode;
+  document.querySelectorAll("#mode-tabs button").forEach((x) => x.classList.toggle("active", x === b));
+  const swing = analyzeMode === "swing";
+  $("#swing-slots").style.display = swing ? "" : "none";
+  $("#intraday-tf").style.display = swing ? "none" : "";
+  $("#drop-zone").style.display = swing || intradayImage ? "none" : "";
+  $("#img-preview-wrap").style.display = !swing && intradayImage ? "block" : "none";
+  $("#intraday-go").textContent = swing ? "Analyze swing + options" : "Analyze setup";
+});
+document.querySelectorAll(".swing-slot").forEach((slot) => {
+  const input = document.createElement("input");
+  input.type = "file"; input.accept = "image/png,image/jpeg,image/webp"; input.hidden = true;
+  slot.appendChild(input);
+  const load = async (file) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    const scaled = await downscaleDataUrl(await fileToDataUrl(file));
+    swingImages[slot.dataset.label] = scaled;
+    slot.classList.add("filled");
+    slot.style.backgroundImage = `url(${scaled})`;
+  };
+  slot.addEventListener("click", () => input.click());
+  input.addEventListener("change", (e) => load(e.target.files[0]));
+  ["dragover", "dragenter"].forEach((t) => slot.addEventListener(t, (e) => { e.preventDefault(); slot.classList.add("drag"); }));
+  ["dragleave", "drop"].forEach((t) => slot.addEventListener(t, (e) => { e.preventDefault(); slot.classList.remove("drag"); }));
+  slot.addEventListener("drop", (e) => load(e.dataTransfer.files[0]));
+});
+
+function strategyHtml(s) {
+  if (!s || s.structure === "none" || !s.legs?.length) return "";
+  const legs = s.legs.map((l) => `<li>${esc(l.action)} ${l.quantity}× ${esc(l.right)} $${l.strike} exp ${esc(l.expiry)}</li>`).join("");
+  const st = s.stress;
+  return `
+    <div class="klabel">Options strategy — ${esc(s.structure).replace(/_/g, " ")}</div>
+    <ul>${legs}</ul>
+    <div class="stats">
+      <div class="stat"><div class="k">Net</div><div class="v" style="font-size:12.5px">${esc(s.net_debit_credit)}</div></div>
+      <div class="stat"><div class="k">Max loss</div><div class="v" style="font-size:12.5px">${esc(s.max_loss)}</div></div>
+      <div class="stat"><div class="k">Max gain</div><div class="v" style="font-size:12.5px">${esc(s.max_gain)}</div></div>
+      <div class="stat"><div class="k">Breakeven</div><div class="v" style="font-size:12.5px">${(s.breakevens || []).map(esc).join(", ") || "—"}</div></div>
+    </div>
+    <p class="kv" style="color:var(--dim)">${esc(s.rationale)}</p>
+    ${st ? stressGridHtml(st) : ""}`;
+}
+
+function planCardHtml(p) {
+  const dirTone = p.direction === "long" ? "buy" : p.direction === "short" ? "sell" : "calm";
+  const qualityBadge = p.setup_quality === "no_trade" ? "no_trade" : p.setup_quality;
+  return `
+    <div class="report">
+      <button class="close-report" title="dismiss">×</button>
+      <div class="rhead">
+        <span style="font-weight:800;font-size:16px">${esc(p.ticker)}</span>
+        <span class="rbadge ${esc(qualityBadge)}">${esc(p.setup_quality).replace("_", " ")}</span>
+        <span class="chip ${dirTone}">${esc(p.direction).replace("_", " ")}</span>
+        <span class="chip info sm">${esc(p.trade_type).replace("_", " ")}</span>
+        <span class="chip calm sm">${esc(p.confidence)} confidence</span>
+      </div>
+      <div class="rheadline">${esc(p.regime)}</div>
+      <div class="klabel">Chart read</div>
+      <p class="kv">${esc(p.chart_read)}</p>
+      <div class="klabel">Timeframe / noise check</div>
+      <p class="kv">${esc(p.timeframe_note)}</p>
+      ${p.warnings?.length ? `<div class="klabel">Warnings</div><ul class="warn-list">${p.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
+      <div class="klabel">Plan</div>
+      <div class="stats">
+        <div class="stat"><div class="k">Entry</div><div class="v" style="font-size:12.5px">${esc(p.entry_zone)}</div></div>
+        <div class="stat"><div class="k">Stop</div><div class="v" style="font-size:12.5px">${esc(p.stop_loss)}</div></div>
+        <div class="stat"><div class="k">Risk : reward</div><div class="v">${esc(p.risk_reward)}</div></div>
+        <div class="stat"><div class="k">Holding period</div><div class="v" style="font-size:12.5px">${esc(p.holding_period)}</div></div>
+      </div>
+      ${p.targets?.length ? `<div class="klabel">Targets</div><ul>${p.targets.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
+      <div class="klabel">Invalidation — the setup is dead if…</div>
+      <p class="kv">${esc(p.invalidation)}</p>
+      <div class="klabel">Exit plan (including bailing early)</div>
+      <p class="kv">${esc(p.exit_plan)}</p>
+      <div class="klabel">Position size</div>
+      <p class="kv">${esc(p.sizing)}</p>
+      <div class="klabel">What would improve this setup</div>
+      <p class="kv">${esc(p.what_would_improve)}</p>
+      ${p.options_view ? `
+        <div class="klabel">Options view <span class="chip ${p.options_view.stance === "calls" ? "buy" : p.options_view.stance === "puts" ? "sell" : "calm"} sm">${esc(p.options_view.stance)}</span></div>
+        <p class="kv">Strikes: ${esc(p.options_view.strike_range)} · Expiries: ${esc(p.options_view.expiry_range)}</p>
+        <p class="kv">${esc(p.options_view.iv_context)}</p>
+        <p class="kv">Upside risk: ${esc(p.options_view.upside_risk)} · Downside risk: ${esc(p.options_view.downside_risk)}</p>
+        ${strategyHtml(p.options_view.strategy)}` : ""}
+    </div>`;
+}
+
+// Attach an in-trade follow-up chat to a plan card: ask what to do next and add
+// fresh screenshots as the trade unfolds.
+function attachFollowup(card, plan, ticker, swing) {
+  const wrap = document.createElement("div");
+  wrap.className = "followup";
+  wrap.innerHTML = `
+    <div class="klabel">Manage this trade</div>
+    <div class="fu-log"></div>
+    <div class="fu-thumbs"></div>
+    <div class="fu-row">
+      <input type="text" class="fu-input" placeholder="Ask what to do now — e.g. 'hit my first target, trim or hold?'">
+      <button class="fu-img" title="add a screenshot">📎</button>
+      <button class="advise-btn fu-ask" style="margin-top:0">Ask</button>
+    </div>
+    <input type="file" class="fu-file" accept="image/png,image/jpeg,image/webp" hidden>`;
+  card.appendChild(wrap);
+  const log = wrap.querySelector(".fu-log");
+  const thumbs = wrap.querySelector(".fu-thumbs");
+  const input = wrap.querySelector(".fu-input");
+  const fileInput = wrap.querySelector(".fu-file");
+  const askBtn = wrap.querySelector(".fu-ask");
+  const history = [];
+  let pending = [];
+  const addImage = async (file) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    const data = await downscaleDataUrl(await fileToDataUrl(file));
+    pending.push({ label: "", data });
+    const t = document.createElement("img"); t.src = data; t.className = "fu-thumb"; thumbs.appendChild(t);
+  };
+  wrap.querySelector(".fu-img").addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", (e) => addImage(e.target.files[0]));
+  input.addEventListener("paste", (e) => {
+    for (const it of e.clipboardData.items) if (it.type.startsWith("image/")) { addImage(it.getAsFile()); e.preventDefault(); }
+  });
+  async function ask() {
+    const q = input.value.trim(); if (!q) return;
+    input.value = "";
+    const imgs = pending; pending = []; thumbs.innerHTML = "";
+    const u = document.createElement("div"); u.className = "msg user"; u.textContent = q + (imgs.length ? ` (+${imgs.length} screenshot${imgs.length === 1 ? "" : "s"})` : ""); log.appendChild(u);
+    const p = document.createElement("div"); p.className = "msg ai pending"; p.textContent = "Thinking…"; log.appendChild(p);
+    log.scrollIntoView({ block: "nearest" });
+    askBtn.disabled = true;
+    try {
+      const res = await (await fetch("/api/intraday/followup", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticker, mode: swing ? "swing" : "intraday", plan, question: q, images: imgs.length ? imgs : undefined, history }),
+      })).json();
+      p.classList.remove("pending");
+      if (res.ok) { renderMd(p, res.answer); history.push({ role: "user", content: q }, { role: "assistant", content: res.answer }); while (history.length > 8) history.shift(); }
+      else p.textContent = `Failed: ${res.error}`;
+    } catch (e) { p.classList.remove("pending"); p.textContent = `Failed: ${e}`; }
+    finally { askBtn.disabled = false; }
+  }
+  askBtn.addEventListener("click", ask);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") ask(); });
+}
+
+$("#intraday-go").addEventListener("click", async () => {
+  const ticker = $("#intraday-ticker").value.trim().toUpperCase();
+  const swing = analyzeMode === "swing";
+  const swingList = Object.entries(swingImages).map(([label, data]) => ({ label, data }));
+  if (!ticker && (swing ? !swingList.length : !intradayImage)) { alert(swing ? "Enter a ticker and/or upload at least one chart." : "Enter a ticker, add a chart screenshot, or both."); return; }
+  const btn = $("#intraday-go");
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = "Analyzing… (~30-60s)";
+  try {
+    const res = await (await fetch("/api/intraday/analyze", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ticker: ticker || undefined,
+        mode: swing ? "swing" : "intraday",
+        timeframe: $("#intraday-tf").value,
+        image: !swing && intradayImage ? intradayImage : undefined,
+        images: swing && swingList.length ? swingList : undefined,
+        notes: $("#intraday-notes").value.trim() || undefined,
+      }),
+    })).json();
+    if (res.ok) {
+      const div = document.createElement("div");
+      div.innerHTML = planCardHtml(res.plan);
+      const node = div.firstElementChild;
+      node.querySelector(".close-report").addEventListener("click", () => node.remove());
+      attachFollowup(node, res.plan, res.plan.ticker || ticker, swing);
+      $("#intraday-result").prepend(node);
+      node.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else alert(`Analysis failed: ${res.error}`);
+  } catch (e) { alert(`Analysis failed: ${e}`); }
+  finally { btn.disabled = false; btn.textContent = orig; }
+});
+
+/* ── backtest ── */
+let btImage = null;
+const btDrop = $("#bt-drop");
+async function setBtImage(file) {
+  if (!file || !file.type.startsWith("image/")) return;
+  const s = await downscaleDataUrl(await fileToDataUrl(file));
+  btImage = s; $("#bt-img").src = s; $("#bt-img-wrap").style.display = "block"; btDrop.style.display = "none";
+}
+$("#bt-img-clear").addEventListener("click", () => { btImage = null; $("#bt-img-wrap").style.display = "none"; btDrop.style.display = ""; });
+btDrop.addEventListener("click", () => $("#bt-file").click());
+btDrop.addEventListener("keydown", (e) => { if (e.key === "Enter") $("#bt-file").click(); });
+$("#bt-file").addEventListener("change", (e) => setBtImage(e.target.files[0]));
+["dragover", "dragenter"].forEach((t) => btDrop.addEventListener(t, (e) => { e.preventDefault(); btDrop.classList.add("drag"); }));
+["dragleave", "drop"].forEach((t) => btDrop.addEventListener(t, (e) => { e.preventDefault(); btDrop.classList.remove("drag"); }));
+btDrop.addEventListener("drop", (e) => setBtImage(e.dataTransfer.files[0]));
+
+const pct = (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
+
+function curveSvg(strat, bh) {
+  if (!strat || strat.length < 2) return "";
+  const w = 100, h = 100;
+  const all = [...strat, ...(bh || [])];
+  const min = Math.min(...all), max = Math.max(...all), span = max - min || 1;
+  const pl = (vals) => vals.map((v, i) => `${(i / (vals.length - 1)) * w},${h - ((v - min) / span) * (h - 6) - 3}`).join(" ");
+  const up = strat[strat.length - 1] >= strat[0];
+  return `<svg class="eqcurve" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    ${bh && bh.length > 1 ? `<polyline points="${pl(bh)}" fill="none" stroke="#9aa0a6" stroke-width="1.2" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : ""}
+    <polyline points="${pl(strat)}" fill="none" stroke="${up ? "#00c805" : "#e64a19"}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+function statCell(k, v) { return `<div class="stat"><div class="k">${k}</div><div class="v" style="font-size:13px">${v}</div></div>`; }
+function metricsGrid(m, oos) {
+  return `<div class="stats">
+    ${statCell(oos ? "OOS annualized" : "Annualized", pct(m.annualizedPct))}
+    ${statCell("Total return", pct(m.totalReturnPct))}
+    ${statCell("Max drawdown", "-" + m.maxDrawdownPct.toFixed(1) + "%")}
+    ${statCell("Win rate", m.winRate.toFixed(0) + "%")}
+    ${statCell("Trades", m.trades)}
+    ${statCell("Sharpe", m.sharpe.toFixed(2))}
+    ${!oos ? statCell("Profit factor", isFinite(m.profitFactor) ? m.profitFactor.toFixed(2) : "∞") : ""}
+    ${!oos ? statCell("Buy & hold", pct(m.buyHoldPct)) : ""}
+  </div>`;
+}
+
+function specSummary(spec) {
+  const rd = (r) => {
+    switch (r.kind) {
+      case "sma_cross": return `${r.fast.value}/${r.slow.value} SMA cross ${r.dir}`;
+      case "price_vs_sma": return `price ${r.dir} SMA${r.period.value}`;
+      case "rsi": return `RSI${r.period.value} ${r.dir} ${r.level.value}`;
+      case "breakout": return `${r.lookback.value}-bar ${r.dir === "up" ? "breakout" : "breakdown"}`;
+      case "macd_cross": return `MACD ${r.dir} zero`;
+      default: return r.kind;
+    }
+  };
+  return `${esc(spec.direction)} · entry: ${spec.entry.map(rd).join(" AND ")}${spec.exit.length ? ` · exit: ${spec.exit.map(rd).join(" OR ")}` : ""}${spec.stop_atr ? ` · stop ${spec.stop_atr.value}×ATR` : ""}${spec.target_atr ? ` · target ${spec.target_atr.value}×ATR` : ""}`;
+}
+
+function wfHtml(wf) {
+  const rows = wf.windows.map((w) => `<tr><td>${esc(w.from)}→${esc(w.to)}</td><td>${pct(w.isReturnPct)}</td><td class="${w.oosReturnPct >= 0 ? "up" : "down"}">${pct(w.oosReturnPct)}</td><td>${w.trades}</td></tr>`).join("");
+  return `<div class="klabel">Walk-forward — out-of-sample verdict</div>
+    <p class="kv"><b>${esc(wf.verdict)}</b></p>
+    <p class="kv">Walk-forward efficiency (out-of-sample ÷ in-sample): <b>${wf.wfEfficiency.toFixed(2)}</b> ${wf.wfEfficiency >= 0.5 ? '<span class="chip buy sm">holds up</span>' : '<span class="chip sell sm">curve-fit risk</span>'}</p>
+    <table class="wf-table"><tr><th>Out-of-sample window</th><th>In-sample ann.</th><th>OOS ann.</th><th>Trades</th></tr>${rows}</table>`;
+}
+
+function stressReportHtml(s) {
+  const b = s.bootstrap, w = s.worstWindow;
+  return `<div class="klabel">Stress test — worst history + 1,000-path Monte Carlo</div>
+    <div class="stress">
+      ${w ? `<div class="case"><b>Worst window</b>${esc(w.from)}→${esc(w.to)}: ${pct(w.returnPct)}, drawdown -${w.maxDrawdownPct.toFixed(1)}%</div>` : ""}
+      <div class="case"><b>Monte Carlo median</b>${pct(b.medianPct)} (5th ${pct(b.p5Pct)} / 95th ${pct(b.p95Pct)})</div>
+      <div class="case"><b>Worst-case drawdown (95th pct)</b>-${b.worstDrawdownPct.toFixed(1)}%</div>
+      <div class="case"><b>Chance of halving capital</b>${b.ruinProbPct.toFixed(1)}%</div>
+    </div>`;
+}
+
+function stressGridHtml(st) {
+  if (!st || !st.gridNow) return "";
+  const cols = st.spotShocks.length;
+  const maxAbs = Math.max(1, ...st.gridNow.flat().map((x) => Math.abs(x)));
+  const cell = (pl) => { const a = Math.min(0.85, Math.abs(pl) / maxAbs); return `<div class="heatcell" style="background:${pl >= 0 ? `rgba(0,200,5,${a})` : `rgba(230,74,25,${a})`}">${pl >= 0 ? "+" : ""}${Math.round(pl)}</div>`; };
+  const header = `<div class="heatcell" style="color:var(--faint)">IV\\Spot</div>` + st.spotShocks.map((s) => `<div class="heatcell" style="color:var(--faint)">${(s * 100).toFixed(0)}%</div>`).join("");
+  const rows = st.ivShocks.map((iv, r) => `<div class="heatcell" style="color:var(--faint)">${iv > 0 ? "+" : ""}${(iv * 100).toFixed(0)}%</div>` + st.gridNow[r].map(cell).join("")).join("");
+  return `<div class="klabel">Options stress — P/L in $ (spot move × IV move, at today's time to expiry)</div>
+    <div class="heatgrid" style="grid-template-columns:repeat(${cols + 1},1fr)">${header}${rows}</div>
+    <p class="kv" style="color:var(--faint);font-size:11.5px">Max loss ${money(st.maxLoss)} · max gain ${st.maxGain > 1e7 ? "unbounded" : money(st.maxGain)} · breakeven ${(st.breakevens || []).map((b) => "$" + b.toFixed(0)).join(", ") || "—"}. ${esc(st.note)}</p>`;
+}
+
+function backtestResultHtml(d) {
+  const wf = d.walkForward;
+  const headline = wf ? wf.oosResult : d.result;
+  const list = (wf ? wf.oosResult.tradeList : d.result.tradeList);
+  return `<div class="report" style="margin-top:14px">
+    <div class="rhead">
+      <span style="font-weight:800;font-size:16px">${esc(d.spec.ticker)}</span>
+      <span class="chip calm sm">${d.years}y history</span>
+      ${wf ? `<span class="chip ${wf.wfEfficiency >= 0.5 ? "buy" : "sell"} sm">walk-forward validated</span>` : `<span class="chip info sm">single-pass</span>`}
+    </div>
+    <p class="kv" style="color:var(--dim)">${specSummary(d.spec)}</p>
+    ${d.walkForwardError ? `<p class="kv" style="color:var(--amber)">${esc(d.walkForwardError)}</p>` : ""}
+    ${wf ? `<p class="kv" style="font-size:12px;color:var(--faint)">Headline numbers below are OUT-OF-SAMPLE — the honest ones. In-sample averaged ${pct(wf.windows.reduce((s, w) => s + w.isReturnPct, 0) / (wf.windows.length || 1))} annualized.</p>` : ""}
+    ${metricsGrid(headline, !!wf)}
+    ${curveSvg(headline.equityCurve, wf ? null : d.result.buyHoldCurve)}
+    ${wf ? wfHtml(wf) : ""}
+    ${stressReportHtml(d.stress)}
+    <details style="margin-top:10px"><summary style="cursor:pointer;font-size:12.5px;color:var(--dim)">${list.length} trade${list.length === 1 ? "" : "s"} — show list</summary>
+      <table class="wf-table"><tr><th>Entry</th><th>Exit</th><th>Return</th><th>Reason</th></tr>
+      ${list.slice(0, 80).map((t) => `<tr><td>${esc(t.entryDate)}</td><td>${esc(t.exitDate)}</td><td class="${t.retPct >= 0 ? "up" : "down"}">${pct(t.retPct)}</td><td>${esc(t.reason)}</td></tr>`).join("")}</table>
+    </details>
+  </div>`;
+}
+
+$("#bt-go").addEventListener("click", async () => {
+  const ticker = $("#bt-ticker").value.trim().toUpperCase();
+  const desc = $("#bt-desc").value.trim();
+  if (!ticker) { alert("Enter a ticker."); return; }
+  if (!desc && !btImage) { alert("Describe the strategy or upload a chart."); return; }
+  const btn = $("#bt-go"); btn.disabled = true; const orig = btn.textContent; btn.textContent = "Backtesting… (~10-40s)";
+  try {
+    const res = await (await fetch("/api/backtest", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticker, description: desc || undefined, image: btImage || undefined, walkForward: true }),
+    })).json();
+    if (!res.ok) $("#bt-result").innerHTML = `<div class="empty">${esc(res.error)}</div>`;
+    else if (res.clarification) $("#bt-result").innerHTML = `<div class="report" style="margin-top:14px"><div class="klabel">One detail first</div><p class="kv">${esc(res.clarification)}</p></div>`;
+    else $("#bt-result").innerHTML = backtestResultHtml(res);
+  } catch (e) { $("#bt-result").innerHTML = `<div class="empty">Backtest failed: ${esc(String(e))}</div>`; }
+  finally { btn.disabled = false; btn.textContent = orig; }
+});
 
 /* ── activity ── */
 function plainActivity(e) {
@@ -485,7 +1387,8 @@ function plainActivity(e) {
     case "earnings": return e.title;
     case "golden_cross": return `${e.ticker} is showing a classic buy pattern`;
     case "death_cross": return `${e.ticker} is showing a classic warning pattern`;
-    case "screener_pick": return `${e.ticker} scores highly across our buy checklist`;
+    case "screener_pick": return `${e.ticker} scores highly across our long checklist`;
+    case "screener_short": return `${e.ticker} shows a confirmed breakdown (short setup)`;
     case "market_mover": return e.title;
     default: return e.title;
   }
@@ -511,7 +1414,7 @@ function renderActivity() {
   }
 }
 
-/* ── chat + AI advice requests ── */
+/* ── chat ── */
 function chatAppendUser(text) {
   const log = $("#chat-log");
   const u = document.createElement("div");
@@ -555,31 +1458,6 @@ $("#chat-form").addEventListener("submit", async (ev) => {
   }
 });
 
-// "Get AI advice" buttons (event delegation — they live inside expanders)
-document.addEventListener("click", async (ev) => {
-  const btn = ev.target.closest("[data-advise]");
-  if (!btn) return;
-  const ticker = btn.dataset.advise;
-  btn.disabled = true;
-  document.querySelector("#chat-card").scrollIntoView({ behavior: "smooth", block: "center" });
-  const pending = chatAppendUser(`What do you think of ${ticker}?`);
-  try {
-    const res = await (await fetch("/api/screener/analyze", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ticker }),
-    })).json();
-    pending.classList.remove("pending");
-    if (res.ok) renderMd(pending, res.answer);
-    else pending.textContent = `Something went wrong: ${res.error}`;
-  } catch (e) {
-    pending.classList.remove("pending");
-    pending.textContent = `Something went wrong: ${e}`;
-  } finally {
-    btn.disabled = false;
-    $("#chat-log").scrollTop = $("#chat-log").scrollHeight;
-  }
-});
-
 /* ── header controls ── */
 function renderAiToggle() {
   const sw = $("#ai-toggle");
@@ -619,7 +1497,9 @@ function renderHealth(state) {
   const wsOk = h.ws.connected && (h.ws.staleSec == null || h.ws.staleSec < 120);
   const tripped = h.breakers.some((b) => b.tripped);
   $("#status-dot").classList.toggle("bad", !(wsOk && !tripped));
-  $("#status-label").textContent = tripped ? "AI paused" : wsOk ? (state.marketPhase === "open" ? "market open" : "market closed") : "reconnecting…";
+  $("#status-label").textContent = tripped ? "AI paused"
+    : wsOk ? (state.marketPhase === "open" ? "market open" : "market closed") + marketClockSuffix(state.marketClock)
+    : "reconnecting…";
   $("#banner").style.display = tripped ? "block" : "none";
 }
 
@@ -627,9 +1507,11 @@ async function loadState() {
   const state = await (await fetch("/api/state")).json();
   portfolio = state.portfolio;
   events = state.events;
+  brokerInfo = state.broker;
   aiLiveState = state.aiLive !== false;
   renderAiToggle();
   renderHealth(state);
+  renderBrokerLine();
   renderAdvice();
   renderHoldings();
   renderActivity();
@@ -643,13 +1525,15 @@ async function loadQuotes() {
 async function loadScreener() {
   const data = await (await fetch("/api/screener")).json();
   screener = Object.fromEntries(data.rows.map((r) => [r.ticker, r]));
-  if (data.rows.length) {
-    const latest = Math.max(...data.rows.map((r) => r.updated_at));
-    $("#scan-meta").textContent = `${data.rows.length} stocks scanned · ${new Date(latest * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-  }
   renderIdeas();
   renderPortfolio();
   renderHoldings();
+}
+async function loadMarket() {
+  market = await (await fetch("/api/market")).json();
+  renderMarket();
+  renderSectors();
+  renderIdeas();
 }
 
 const es = new EventSource("/api/stream");
@@ -658,14 +1542,18 @@ es.addEventListener("event", (m) => {
   const idx = events.findIndex((x) => x.id === e.id);
   if (idx >= 0) events[idx] = { ...events[idx], ...e }; else events.unshift(e);
   renderAdvice(); renderHoldings(); renderActivity();
+  bumpBadge("activity");
 });
 es.addEventListener("briefing", (m) => renderMd($("#briefing"), JSON.parse(m.data).content));
+es.addEventListener("broker", () => loadState().then(loadQuotes));
 es.addEventListener("health", () => loadState());
+es.addEventListener("market", () => { loadMarket(); loadScreener(); });
 
-loadState().then(loadQuotes).then(loadScreener);
+loadState().then(loadQuotes).then(loadScreener).then(loadMarket);
 setInterval(loadQuotes, 60_000);
 setInterval(loadState, 5 * 60_000);
 setInterval(loadScreener, 10 * 60_000);
+setInterval(loadMarket, 10 * 60_000);
 </script>
 </body>
 </html>
