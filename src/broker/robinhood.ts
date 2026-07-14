@@ -17,11 +17,32 @@ import type { Holding } from "../config";
 const CLIENT_ID = "c82SH0WZOsabOXGP2sxqcj34FxkvfnWRZBKlBjFS"; // Robinhood's public iOS client id
 const API = "https://api.robinhood.com";
 const NUMMUS = "https://nummus.robinhood.com";
-const UA = {
-  "User-Agent": "Robinhood/8.30.0 (iPhone; iOS 16.0; Scale/3.00)",
-  "Content-Type": "application/json",
-  Accept: "application/json",
+// Mirror robin_stocks' session headers exactly. The X-Robinhood-API-Version gate
+// is what rejects stale clients with "Update to the newest version of Robinhood";
+// bump it here if Robinhood tightens the minimum again. Default body encoding is
+// form-urlencoded (login + challenge); JSON is opted into per-request (pathfinder).
+// ponytail: version pinned to a known-good robin_stocks value — the upgrade path
+//   is to bump this one string, not to rework the client.
+const HEADERS = {
+  Accept: "*/*",
+  "Accept-Encoding": "gzip, deflate, br",
+  "Accept-Language": "en-US,en;q=1",
+  "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+  "X-Robinhood-API-Version": "1.431.4",
+  Connection: "keep-alive",
+  "User-Agent": "*",
 };
+
+// Robinhood's login/challenge endpoints want form-urlencoded bodies. Python's
+// requests renders booleans as "True"/"False" (capitalized) — match that so the
+// wire bytes are identical to the working reference client.
+function formEncode(body: Record<string, unknown>): string {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(body)) {
+    p.set(k, typeof v === "boolean" ? (v ? "True" : "False") : String(v));
+  }
+  return p.toString();
+}
 
 export interface RhAuth {
   access_token: string;
@@ -50,12 +71,12 @@ export function newDeviceToken(): string {
   return crypto.randomUUID();
 }
 
-// Low-level token request — used by both the interactive linker and refresh.
+// Low-level token request (form-urlencoded) — used by the linker and refresh.
 export async function requestToken(body: Record<string, unknown>): Promise<any> {
   const res = await fetch(`${API}/oauth2/token/`, {
     method: "POST",
-    headers: UA,
-    body: JSON.stringify(body),
+    headers: HEADERS,
+    body: formEncode(body),
     signal: AbortSignal.timeout(30_000),
   });
   const json = await res.json().catch(() => ({}));
@@ -63,13 +84,20 @@ export async function requestToken(body: Record<string, unknown>): Promise<any> 
 }
 
 // ── device-approval (Sheriff) workflow ───────────────────────────────────────
-// Pre-auth JSON helpers (no bearer token yet).
-async function pfPost(url: string, body: object): Promise<any> {
-  const r = await fetch(url, { method: "POST", headers: UA, body: JSON.stringify(body), signal: AbortSignal.timeout(30_000) });
+// Pre-auth POST/GET helpers (no bearer token yet). Pathfinder endpoints want
+// JSON (asJson); the challenge-respond endpoint wants form-urlencoded.
+async function pfPost(url: string, body: Record<string, unknown>, asJson: boolean): Promise<any> {
+  const headers = asJson ? { ...HEADERS, "Content-Type": "application/json" } : HEADERS;
+  const r = await fetch(url, {
+    method: "POST",
+    headers,
+    body: asJson ? JSON.stringify(body) : formEncode(body),
+    signal: AbortSignal.timeout(30_000),
+  });
   return r.json().catch(() => ({}));
 }
 async function pfGet(url: string): Promise<any> {
-  const r = await fetch(url, { headers: UA, signal: AbortSignal.timeout(30_000) });
+  const r = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(30_000) });
   return r.json().catch(() => ({}));
 }
 
@@ -78,39 +106,51 @@ async function pfGet(url: string): Promise<any> {
 // polls until the user taps Approve in the Robinhood app. Throws on failure so
 // the linker can report it and fall back to manual import.
 export async function validateSheriff(deviceToken: string, workflowId: string, ask: (q: string) => string): Promise<void> {
-  const machine = await pfPost(`${API}/pathfinder/user_machine/`, { device_id: deviceToken, flow: "suv", input: { workflow_id: workflowId } });
+  const machine = await pfPost(`${API}/pathfinder/user_machine/`, { device_id: deviceToken, flow: "suv", input: { workflow_id: workflowId } }, true);
   const machineId = machine?.id;
   if (!machineId) throw new Error(`no machine id from pathfinder (${JSON.stringify(machine).slice(0, 200)})`);
   const inquiriesUrl = `${API}/pathfinder/inquiries/${machineId}/user_view/`;
 
-  const view = await pfGet(inquiriesUrl);
-  const challenge = view?.type_context?.context?.sheriff_challenge;
-  if (!challenge) {
-    // Some accounts have nothing to challenge — just continue the workflow.
-    await pfPost(inquiriesUrl, { sequence: 0, user_input: { status: "continue" } });
-    return;
-  }
-  const challengeId = challenge.id;
+  // Poll until the challenge surfaces, then satisfy it (app tap, or SMS/email code).
+  const deadline = Date.now() + 120_000;
+  let satisfied = false;
+  while (Date.now() < deadline && !satisfied) {
+    await Bun.sleep(5_000);
+    const resp = await pfGet(inquiriesUrl);
+    const challenge = resp?.context?.sheriff_challenge;
+    if (!challenge) continue;
+    const { id: challengeId, type, status } = challenge;
 
-  if (challenge.type === "prompt") {
-    console.log("→ Approve the login in your Robinhood app (push notification). Waiting up to 5 min…");
-    const statusUrl = `${API}/push/${challengeId}/get_prompts_status/`;
-    let ok = false;
-    for (let i = 0; i < 60; i++) {
-      const s = await pfGet(statusUrl);
-      if (s?.challenge_status === "validated") { ok = true; break; }
-      await Bun.sleep(5_000);
+    if (type === "prompt") {
+      console.log("→ Approve the login in your Robinhood app (push notification). Waiting…");
+      const statusUrl = `${API}/push/${challengeId}/get_prompts_status/`;
+      while (Date.now() < deadline) {
+        await Bun.sleep(5_000);
+        const s = await pfGet(statusUrl);
+        if (s?.challenge_status === "validated") { satisfied = true; break; }
+      }
+    } else if (status === "validated") {
+      satisfied = true;
+    } else if ((type === "sms" || type === "email") && status === "issued") {
+      const code = ask(`Enter the ${type} verification code Robinhood sent: `);
+      const r = await pfPost(`${API}/challenge/${challengeId}/respond/`, { response: code }, false);
+      if (r?.status === "validated") satisfied = true;
+    } else {
+      throw new Error(`unsupported challenge type "${type}" (status ${status})`);
     }
-    if (!ok) throw new Error("app approval timed out");
-  } else if (challenge.type === "sms" || challenge.type === "email") {
-    const code = ask(`Enter the ${challenge.type} verification code Robinhood sent: `);
-    await pfPost(`${API}/challenge/${challengeId}/respond/`, { response: code });
-  } else {
-    throw new Error(`unsupported challenge type "${challenge.type}"`);
   }
+  if (!satisfied) throw new Error("device verification not completed in time");
 
-  // Advance the workflow now that the challenge is satisfied.
-  await pfPost(inquiriesUrl, { sequence: 0, user_input: { status: "continue" } });
+  // Finalize: advance the workflow until Robinhood reports approval. Like
+  // robin_stocks, stop retrying after a bounded window and let the caller's
+  // token re-attempt be the real proof of success.
+  const finalizeDeadline = Date.now() + 120_000;
+  while (Date.now() < finalizeDeadline) {
+    const resp = await pfPost(inquiriesUrl, { sequence: 0, user_input: { status: "continue" } }, true);
+    if (resp?.type_context?.result === "workflow_status_approved") return;
+    if (resp?.verification_workflow?.workflow_status === "workflow_status_approved") return;
+    await Bun.sleep(5_000);
+  }
 }
 
 export function toAuth(json: any, deviceToken: string): RhAuth {
@@ -140,7 +180,7 @@ async function refreshAccess(a: RhAuth): Promise<RhAuth> {
 // ── authenticated GETs + pagination ─────────────────────────────────────────
 let authHeader = "";
 async function rhGet(url: string): Promise<any> {
-  const res = await fetch(url, { headers: { ...UA, Authorization: authHeader }, signal: AbortSignal.timeout(20_000) });
+  const res = await fetch(url, { headers: { ...HEADERS, Authorization: authHeader }, signal: AbortSignal.timeout(20_000) });
   if (res.status === 401) throw Object.assign(new Error("robinhood 401"), { code: 401 });
   if (!res.ok) throw new Error(`robinhood GET ${url} → ${res.status}`);
   return res.json();

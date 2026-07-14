@@ -34,7 +34,6 @@ const base = {
   password,
   device_token: deviceToken,
   expires_in: 86400,
-  challenge_type: "sms",
   try_passkeys: false,
   token_request_path: "/login",
   create_read_only_secondary_token: true,

@@ -93,24 +93,52 @@ export const config = {
   modelFast: process.env.MARKETPULSE_MODEL_FAST ?? "claude-haiku-4-5",
 };
 
-// Current Eastern Time components, extracted directly from Intl parts —
+// Eastern Time components, extracted directly from Intl parts —
 // no round-trip through a locale-string Date parse.
 const ET_FMT = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/New_York",
   hour12: false,
   weekday: "short",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
   hour: "numeric",
   minute: "numeric",
 });
 const DAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 
-export function etNow(now = new Date()): { mins: number; day: number } {
-  const parts = Object.fromEntries(
-    ET_FMT.formatToParts(now).map((p) => [p.type, p.value])
+function etParts(now: Date) {
+  const p = Object.fromEntries(
+    ET_FMT.formatToParts(now).map((x) => [x.type, x.value])
   ) as Record<string, string>;
-  // Intl may render midnight as "24" with hour12:false
-  const hour = Number(parts.hour) % 24;
-  return { mins: hour * 60 + Number(parts.minute), day: DAY_INDEX[parts.weekday] ?? 0 };
+  const hour = Number(p.hour) % 24; // Intl may render midnight as "24"
+  return {
+    year: Number(p.year), month: Number(p.month), dom: Number(p.day),
+    day: DAY_INDEX[p.weekday] ?? 0, mins: hour * 60 + Number(p.minute),
+  };
+}
+
+export function etNow(now = new Date()): { mins: number; day: number } {
+  const { mins, day } = etParts(now);
+  return { mins, day };
+}
+
+// Real UTC epoch (ms) for a given ET wall-clock date+time — DST-correct. Finds
+// the ET offset at a first guess, then refines once in case the guess landed on
+// the far side of a spring-forward/fall-back boundary.
+function etWallToEpoch(year: number, month1: number, dom: number, hour: number, minute: number): number {
+  const guess = Date.UTC(year, month1 - 1, dom, hour, minute);
+  const off1 = etOffsetMs(guess);
+  const epoch = guess - off1;
+  const off2 = etOffsetMs(epoch);
+  return off1 === off2 ? epoch : guess - off2;
+}
+// ET UTC-offset (ms) at a given instant: what ET wall-clock does this epoch show?
+function etOffsetMs(epochMs: number): number {
+  const { year, month, dom, mins } = etParts(new Date(epochMs));
+  const shownAsUTC = Date.UTC(year, month - 1, dom, 0, mins);
+  const epochMin = Math.floor(epochMs / 60000) * 60000;
+  return shownAsUTC - epochMin;
 }
 
 // US market hours in ET. Returns "open" | "extended" | "closed".
@@ -123,35 +151,42 @@ export function marketPhase(now = new Date()): "open" | "extended" | "closed" {
 }
 
 // Next regular-session open/close as an absolute epoch (seconds). Boundaries are
-// ET (9:30/16:00); the returned instant lets the client show them in local time.
-// ponytail: delta off the ET wall clock, so it's off by an hour on the two
-// DST-switch weekends per year — cosmetic label only.
+// ET (9:30/16:00) built as real instants, so the client can render them in local
+// time and they stay correct across DST switches.
 export function nextMarketTransition(now = new Date()): { ts: number; kind: "open" | "close" } {
-  const { mins, day } = etNow(now);
-  const OPEN = 9 * 60 + 30, CLOSE = 16 * 60, DAY = 24 * 60;
-  const nowSec = Math.floor(now.getTime() / 1000);
-  if (day >= 1 && day <= 5 && mins >= OPEN && mins < CLOSE) {
-    return { ts: nowSec + (CLOSE - mins) * 60, kind: "close" };
+  const OPEN = 9 * 60 + 30, CLOSE = 16 * 60;
+  const p = etParts(now);
+  // In session on a weekday → next transition is today's close.
+  if (p.day >= 1 && p.day <= 5 && p.mins >= OPEN && p.mins < CLOSE) {
+    return { ts: Math.floor(etWallToEpoch(p.year, p.month, p.dom, 16, 0) / 1000), kind: "close" };
   }
-  // Walk day-by-day to the next weekday open (skips evenings + weekends).
-  let delta = 0, d = day, m = mins;
+  // Before open on a weekday → today's open. Otherwise the next weekday's open.
+  if (p.day >= 1 && p.day <= 5 && p.mins < OPEN) {
+    return { ts: Math.floor(etWallToEpoch(p.year, p.month, p.dom, 9, 30) / 1000), kind: "open" };
+  }
+  // Probe forward from ET noon (avoids DST/day-boundary drift) to the next weekday.
+  let probe = etWallToEpoch(p.year, p.month, p.dom, 12, 0);
   for (let i = 0; i < 8; i++) {
-    if (d >= 1 && d <= 5 && m <= OPEN) { delta += OPEN - m; break; }
-    delta += DAY - m; // to next midnight ET
-    m = 0;
-    d = (d + 1) % 7;
+    probe += 24 * 3600 * 1000;
+    const q = etParts(new Date(probe));
+    if (q.day >= 1 && q.day <= 5) {
+      return { ts: Math.floor(etWallToEpoch(q.year, q.month, q.dom, 9, 30) / 1000), kind: "open" };
+    }
   }
-  return { ts: nowSec + delta * 60, kind: "open" };
+  return { ts: Math.floor(now.getTime() / 1000), kind: "open" }; // unreachable
 }
 
 if (import.meta.main) {
-  // Self-check: transition kind + rough ordering at known ET wall-clock moments.
   const at = (iso: string) => nextMarketTransition(new Date(iso));
+  const etMinsOf = (ts: number) => etParts(new Date(ts * 1000)).mins;
   const wed_open = at("2026-07-15T14:00:00Z"); // 10:00 ET Wed → in session
   const wed_pre = at("2026-07-15T12:00:00Z");  // 08:00 ET Wed → before open
-  const fri_post = at("2026-07-17T21:00:00Z"); // 17:00 ET Fri → next open is Monday
-  console.assert(wed_open.kind === "close", "in-session → close");
-  console.assert(wed_pre.kind === "open", "pre-market → open");
-  console.assert(fri_post.kind === "open" && fri_post.ts - Math.floor(Date.parse("2026-07-17T21:00:00Z") / 1000) > 2 * 86400, "fri post-close → Monday open (>2 days out)");
-  console.log("nextMarketTransition self-check passed", { wed_open, wed_pre, fri_post });
+  const fri_post = at("2026-07-17T21:00:00Z"); // 17:00 ET Fri → next open Monday
+  console.assert(wed_open.kind === "close" && etMinsOf(wed_open.ts) === 16 * 60, "in-session → 16:00 ET close");
+  console.assert(wed_pre.kind === "open" && etMinsOf(wed_pre.ts) === 9 * 60 + 30, "pre-market → 09:30 ET open");
+  console.assert(fri_post.kind === "open" && fri_post.ts - Date.parse("2026-07-17T21:00:00Z") / 1000 > 2 * 86400, "fri → Monday open");
+  // DST correctness: Fri Oct 30 2026 (EDT) post-close → Mon Nov 2 open must be 09:30 EST, not 08:30.
+  const dst = at("2026-10-30T21:00:00Z"); // 17:00 EDT Fri, after fall-back Nov 1
+  console.assert(etMinsOf(dst.ts) === 9 * 60 + 30, "open lands on 09:30 ET across the DST switch");
+  console.log("nextMarketTransition self-check passed", { wed_open, wed_pre, fri_post, dst });
 }
