@@ -96,6 +96,18 @@ CREATE TABLE IF NOT EXISTS ideas (
   report TEXT NOT NULL           -- full JSON IdeaReport
 );
 
+CREATE TABLE IF NOT EXISTS alerts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ticker TEXT NOT NULL,
+  kind TEXT NOT NULL,            -- price_above | price_below | score_gte
+  threshold REAL NOT NULL,
+  last_value REAL,              -- last observed value; seeds crossing detection
+  active INTEGER NOT NULL DEFAULT 1,
+  created_ts INTEGER NOT NULL,
+  last_fired_ts INTEGER,
+  UNIQUE(ticker, kind, threshold)   -- double-click "create alert" = one row, not two
+);
+
 CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts DESC);
 CREATE INDEX IF NOT EXISTS idx_bars_ticker_ts ON bars(ticker, ts DESC);
 CREATE INDEX IF NOT EXISTS idx_ideas_ts ON ideas(ts DESC);

@@ -9,6 +9,8 @@ import { parseStrategy } from "../ai/strategy";
 import { runBacktest, stressBacktest, walkForward, type StrategySpec } from "../engine/backtest";
 import { fetchDailyCandles } from "../ingest/yahoo";
 import { getScreenerRows, sectorBoards } from "../engine/screener";
+import { scoreTicker } from "../engine/ticker";
+import { listAlerts, createAlert, deleteAlert, type AlertKind } from "../engine/alerts";
 import { getMarketSnapshot } from "../engine/market";
 import { currentPortfolio, brokerSnapshot, refreshBroker } from "../broker";
 import { saveImport, clearImport, type ImportPayload } from "../broker/manual";
@@ -107,6 +109,32 @@ export function startServer() {
       // Ranked screener results (pure quant — no AI cost to view)
       if (url.pathname === "/api/screener") {
         return Response.json({ rows: getScreenerRows(currentPortfolio()) });
+      }
+
+      // On-demand score + news for ANY ticker (search / ⌘K detail panel).
+      if (url.pathname === "/api/ticker") {
+        const outcome = await scoreTicker(url.searchParams.get("sym") ?? "");
+        if (!outcome.ok) return Response.json({ error: outcome.error }, { status: outcome.status });
+        return Response.json(outcome.data);
+      }
+
+      // Price / score alerts
+      if (url.pathname === "/api/alerts" && req.method === "GET") {
+        return Response.json({ alerts: listAlerts() });
+      }
+      if (url.pathname === "/api/alerts" && req.method === "POST") {
+        try {
+          const { ticker, kind, threshold } = (await req.json().catch(() => ({}))) as
+            { ticker?: string; kind?: AlertKind; threshold?: number };
+          if (!ticker || !kind) return Response.json({ error: "ticker and kind required" }, { status: 400 });
+          return Response.json({ alert: await createAlert(ticker, kind, Number(threshold)) });
+        } catch (err) {
+          return Response.json({ error: err instanceof Error ? err.message : "Bad alert" }, { status: 400 });
+        }
+      }
+      if (url.pathname === "/api/alerts" && req.method === "DELETE") {
+        deleteAlert(Number(url.searchParams.get("id")));
+        return Response.json({ ok: true });
       }
 
       // Market regime + sector rotation + per-sector setup boards

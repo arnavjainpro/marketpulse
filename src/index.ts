@@ -1,6 +1,7 @@
 import { config, allTickers, marketPhase, etNow } from "./config";
 import { aiLive } from "./db";
 import { runScan } from "./engine/screener";
+import { evaluateActiveAlerts } from "./engine/alerts";
 import { refreshUniverse, scanUniverse } from "./ingest/universe";
 import { refreshMarketContext } from "./engine/market";
 import { sweepIndex, activeDynamicTickers } from "./engine/sweep";
@@ -122,6 +123,13 @@ async function runDetectors() {
     for (const e of await detectEarnings(tickers)) await processEvent(e);
   } catch (err) {
     console.error("[detectors] earnings:", err);
+  }
+  // Price/score alerts ride the detector cadence (~90s open). The evaluator
+  // fetches its own quotes for alert tickers outside the portfolio set.
+  try {
+    await evaluateActiveAlerts();
+  } catch (err) {
+    console.error("[detectors] alerts:", err);
   }
 }
 

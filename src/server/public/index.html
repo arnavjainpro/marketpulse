@@ -26,6 +26,29 @@
     --blue-soft: #e8f1fd;
     --radius: 14px;
     --sans: "Inter", -apple-system, sans-serif;
+    --header-bg: rgba(255,255,255,.94);
+    --hover: #fafbfb;
+    --card-alt: #fcfcfd;
+    color-scheme: light;
+  }
+  /* Dark theme: same var names, dark values. Applied two ways —
+     prefers-color-scheme for the free baseline (first visit, no stored pref),
+     and :root[data-theme="dark"] which the toggle stamps and which must win. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0b0e11; --text: #e8eaed; --dim: #9aa0a6; --faint: #6b7178;
+      --line: #23272e; --green-soft: #10291b; --red-soft: #2a140d;
+      --gray-soft: #16191d; --amber-soft: #2a2410; --blue-soft: #12233d;
+      --header-bg: rgba(11,14,17,.94); --hover: #16191d; --card-alt: #14171b;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0e11; --text: #e8eaed; --dim: #9aa0a6; --faint: #6b7178;
+    --line: #23272e; --green-soft: #10291b; --red-soft: #2a140d;
+    --gray-soft: #16191d; --amber-soft: #2a2410; --blue-soft: #12233d;
+    --header-bg: rgba(11,14,17,.94); --hover: #16191d; --card-alt: #14171b;
+    color-scheme: dark;
   }
   * { box-sizing: border-box; margin: 0; }
   body { background: var(--bg); color: var(--text); font: 400 15px/1.55 var(--sans); -webkit-font-smoothing: antialiased; }
@@ -34,7 +57,7 @@
 
   /* header */
   header {
-    position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,.94); backdrop-filter: blur(8px);
+    position: sticky; top: 0; z-index: 20; background: var(--header-bg); backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--line);
   }
   .header-inner {
@@ -52,6 +75,37 @@
   .switch.on { background: var(--green-bright); }
   .switch i { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left .2s; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
   .switch.on i { left: 18px; }
+  .theme-btn { background: none; border: 1px solid var(--line); border-radius: 999px; width: 32px; height: 32px; font-size: 15px; line-height: 1; flex-shrink: 0; }
+  .theme-btn:hover { border-color: var(--green-bright); }
+
+  /* ticker search modal (⌘K) */
+  #ticker-modal { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.4); display: flex; align-items: flex-start; justify-content: center; padding: 10vh 16px 16px; }
+  #ticker-modal[hidden] { display: none; }
+  .tm-card { width: 100%; max-width: 480px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,.25); overflow: hidden; max-height: 80vh; display: flex; flex-direction: column; }
+  #ticker-search { border: none; border-bottom: 1px solid var(--line); padding: 16px 18px; font: 600 17px var(--sans); background: var(--bg); color: var(--text); text-transform: uppercase; }
+  #ticker-search:focus { outline: none; }
+  #ticker-search::placeholder { text-transform: none; color: var(--faint); font-weight: 400; }
+  #ticker-result { overflow-y: auto; padding: 16px 18px; }
+  .tm-hint { font-size: 13px; color: var(--dim); line-height: 1.5; }
+  .tm-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 2px; }
+  .tm-sym { font-size: 20px; font-weight: 800; }
+  .tm-name { font-size: 13px; color: var(--dim); }
+  .tm-price { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 6px 0 10px; }
+  .tm-spark { width: 100%; height: 44px; margin-bottom: 12px; }
+  .tm-news { margin-top: 12px; }
+  .tm-news a { display: block; font-size: 13px; color: var(--text); text-decoration: none; padding: 6px 0; border-top: 1px solid var(--line); line-height: 1.4; }
+  .tm-news a:hover { color: var(--green-bright); }
+  .tm-news .src { color: var(--faint); font-size: 11px; }
+  .tm-note { font-size: 12.5px; color: var(--amber); background: var(--amber-soft); padding: 8px 10px; border-radius: 8px; margin: 8px 0; }
+  .tm-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
+  .tm-alert-box select, .tm-alert-box input { font: 13px var(--sans); padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); }
+  .tm-alert-msg { font-size: 12px; color: var(--dim); margin-top: 6px; }
+  .tm-alert-msg.err { color: var(--red); }
+  .tm-alert-list { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .tm-alert-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; }
+  .tm-alert-row.done { opacity: .55; }
+  .tm-alert-row .del { margin-left: auto; background: none; border: none; color: var(--faint); font-size: 15px; }
+  .tm-alert-row .del:hover { color: var(--red); }
 
   /* main tab nav (second row of the sticky header) */
   #tabs { border-top: 1px solid var(--line); }
@@ -93,10 +147,10 @@
     border-bottom: 1px solid var(--line); transition: background .15s;
   }
   .card > div:last-child .rowbtn, .card > .rowbtn:last-child { border-bottom: none; }
-  .rowbtn:hover { background: #fafbfb; }
+  .rowbtn:hover { background: var(--hover); }
   .chev { flex-shrink: 0; color: var(--faint); transition: transform .18s; }
   .open > .rowbtn .chev { transform: rotate(90deg); }
-  .detail { display: none; padding: 4px 16px 16px; border-bottom: 1px solid var(--line); background: #fcfcfd; }
+  .detail { display: none; padding: 4px 16px 16px; border-bottom: 1px solid var(--line); background: var(--card-alt); }
   .open > .detail { display: block; }
   .card > div:last-child > .detail { border-bottom: none; }
 
@@ -127,7 +181,7 @@
 
   /* pro stats grid inside expanders */
   .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-top: 12px; }
-  .stat { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  .stat { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
   .stat .k { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); }
   .stat .v { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 1px; }
 
@@ -147,6 +201,9 @@
   #regime-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   #regime-desc { font-size: 13.5px; color: var(--dim); margin-top: 8px; }
   .bench-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin-top: 12px; }
+  .idx-tile { display: block; text-decoration: none; color: inherit; }
+  .idx-tile .stat { transition: border-color .12s; }
+  .idx-tile:hover .stat { border-color: var(--green-bright); }
 
   /* sector table */
   table.sectors { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -156,10 +213,10 @@
   table.sectors td:first-child { text-align: left; font-weight: 600; }
   table.sectors tr:last-child td { border-bottom: none; }
   table.sectors tbody tr { cursor: pointer; }
-  table.sectors tbody tr:hover { background: #fafbfb; }
-  .sector-detail td { background: #fcfcfd; cursor: default !important; }
+  table.sectors tbody tr:hover { background: var(--hover); }
+  .sector-detail td { background: var(--card-alt); cursor: default !important; }
   .setup-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-  .setup-chip { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
+  .setup-chip { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
   .setup-chip:hover { border-color: var(--green-bright); }
   .setup-chip.s:hover { border-color: var(--red); }
 
@@ -167,13 +224,18 @@
   .tabbar { display: flex; gap: 6px; }
   .tabbar button { border: 1px solid var(--line); background: none; border-radius: 999px; font-size: 12.5px; font-weight: 600; padding: 5px 14px; color: var(--dim); }
   .tabbar button.active { background: var(--text); border-color: var(--text); color: #fff; }
-  .sector-group-head { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); padding: 10px 16px 4px; display: flex; gap: 8px; align-items: center; }
+  .sector-group-head { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); padding: 10px 16px 4px; display: flex; gap: 8px; align-items: center; cursor: pointer; user-select: none; }
+  .sector-group-head .chev { transform: rotate(90deg); transition: transform .15s; flex-shrink: 0; }
+  .sector-group-head.collapsed .chev { transform: rotate(0deg); }
+  .filter-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .filter-chip { font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--dim); }
+  .filter-chip.on { background: var(--green-bright); border-color: var(--green-bright); color: #fff; }
   #gen-btn { border: 1px solid var(--line); background: none; border-radius: 999px; font-size: 12px; font-weight: 600; padding: 4px 12px; color: var(--dim); }
   #gen-btn:hover { border-color: var(--green-bright); color: var(--green); }
   #gen-btn:disabled { opacity: .5; cursor: wait; }
 
   /* report cards */
-  .report { border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-top: 12px; background: #fff; }
+  .report { border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-top: 12px; background: var(--bg); }
   .report .rhead { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .report .rheadline { font-size: 15px; font-weight: 600; margin-top: 8px; line-height: 1.45; }
   .rbadge { font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; }
@@ -203,7 +265,7 @@
   .intraday-row input[type=text], .intraday-row select {
     border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; font: 13.5px var(--sans); background: var(--gray-soft);
   }
-  .intraday-row input[type=text]:focus, .intraday-row select:focus { outline: none; border-color: var(--green-bright); background: #fff; }
+  .intraday-row input[type=text]:focus, .intraday-row select:focus { outline: none; border-color: var(--green-bright); background: var(--bg); }
   #intraday-ticker { width: 110px; text-transform: uppercase; }
   #intraday-notes { flex: 1; min-width: 180px; }
   .checkline { font-size: 13px; color: var(--dim); display: flex; align-items: center; gap: 6px; }
@@ -228,7 +290,7 @@
   /* backtest */
   #backtest-form { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
   #backtest-form #bt-ticker { border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; font: 13.5px var(--sans); background: var(--gray-soft); width: 110px; text-transform: uppercase; }
-  #bt-ticker:focus { outline: none; border-color: var(--green-bright); background: #fff; }
+  #bt-ticker:focus { outline: none; border-color: var(--green-bright); background: var(--bg); }
   #bt-desc { width: 100%; min-height: 90px; border: 1px solid var(--line); border-radius: 10px; font: 13.5px/1.5 var(--sans); padding: 10px 12px; resize: vertical; }
   #bt-desc:focus { outline: none; border-color: var(--green-bright); }
   .dropzone { border: 1.5px dashed var(--line); border-radius: 10px; padding: 14px; text-align: center; font-size: 13px; color: var(--dim); cursor: pointer; transition: border-color .15s; }
@@ -258,7 +320,7 @@
     flex: 1; border: 1px solid var(--line); border-radius: 999px; padding: 10px 16px;
     font: 14px var(--sans); background: var(--gray-soft);
   }
-  #chat-input:focus { outline: none; border-color: var(--green-bright); background: #fff; }
+  #chat-input:focus { outline: none; border-color: var(--green-bright); background: var(--bg); }
   #chat-send { background: var(--green-bright); color: #fff; border: none; border-radius: 999px; padding: 0 20px; font-weight: 700; font-size: 14px; }
   #chat-send:disabled { opacity: .5; cursor: wait; }
 
@@ -305,7 +367,7 @@
   .fu-thumb { width: 46px; height: 46px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
   .fu-row { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
   .fu-input { flex: 1; border: 1px solid var(--line); border-radius: 999px; padding: 9px 14px; font: 13.5px var(--sans); background: var(--gray-soft); }
-  .fu-input:focus { outline: none; border-color: var(--green-bright); background: #fff; }
+  .fu-input:focus { outline: none; border-color: var(--green-bright); background: var(--bg); }
   .fu-img { border: 1px solid var(--line); background: none; border-radius: 999px; width: 36px; height: 36px; font-size: 15px; flex-shrink: 0; }
   .fu-img:hover { border-color: var(--green-bright); }
   .followup .advise-btn { flex-shrink: 0; }
@@ -313,12 +375,21 @@
 </head>
 <body>
 
+<div id="ticker-modal" hidden>
+  <div class="tm-card" role="dialog" aria-label="Ticker search">
+    <input id="ticker-search" type="text" placeholder="Search any ticker — AAPL, NVDA, MSFT…" autocomplete="on" spellcheck="false" maxlength="6">
+    <div id="ticker-result"><div class="tm-hint">Type a symbol. You get its live price, your MarketPulse score, and recent news — then jump to TradingView for the chart.</div></div>
+  </div>
+</div>
+
 <header>
   <div class="header-inner">
     <span class="wordmark">Market<span>Pulse</span></span>
     <span id="status-dot" title="system status"></span>
     <span id="status-label">live</span>
     <span class="spacer"></span>
+    <button class="theme-btn" id="search-open" title="Search any ticker (⌘K)" aria-label="Search any ticker">🔍</button>
+    <button class="theme-btn" id="theme-toggle" title="Toggle dark / light" aria-label="Toggle dark / light theme">🌙</button>
     <span class="switch-wrap">
       Live AI updates
       <button class="switch" id="ai-toggle" role="switch" aria-checked="true" aria-label="Toggle live AI updates"><i></i></button>
@@ -386,6 +457,7 @@
         <button id="gen-btn" title="Validate the strongest setups with AI (a few cents, takes a minute or two)">✦ Generate &amp; validate</button>
       </div>
     </div>
+    <div id="idea-filters" class="filter-bar"></div>
     <div class="card" id="ideas"><div class="empty">Scanning the market… the first full scan takes several minutes after startup.</div></div>
     <div id="report-area"></div>
   </section>
@@ -496,7 +568,150 @@ $("#tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-
 window.addEventListener("hashchange", () => showPane(location.hash.slice(1)));
 showPane(location.hash.slice(1) || "portfolio");
 
-const esc = (s) => { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; };
+/* ── theme: prefers-color-scheme is the free baseline; a stored choice overrides ── */
+function applyTheme(t) {
+  if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+  else document.documentElement.removeAttribute("data-theme");
+  const dark = t === "dark" || (!t && matchMedia("(prefers-color-scheme: dark)").matches);
+  const btn = $("#theme-toggle");
+  if (btn) btn.textContent = dark ? "☀️" : "🌙";
+}
+applyTheme(localStorage.getItem("theme"));
+$("#theme-toggle").addEventListener("click", () => {
+  const cur = document.documentElement.getAttribute("data-theme")
+    || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const next = cur === "dark" ? "light" : "dark";
+  localStorage.setItem("theme", next);
+  applyTheme(next);
+});
+
+/* ── ⌘K ticker search: on-demand score + news for ANY symbol ── */
+const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+const tickerModal = $("#ticker-modal");
+const tickerSearch = $("#ticker-search");
+const tickerResult = $("#ticker-result");
+let tickerSeq = 0;                     // guards against out-of-order keystroke responses
+let lastTickerData = null;             // wave 5 (alerts) reads the currently-shown ticker
+
+function openTickerModal() { tickerModal.hidden = false; tickerSearch.focus(); tickerSearch.select(); }
+function closeTickerModal() { tickerModal.hidden = true; }
+$("#search-open").addEventListener("click", openTickerModal);
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openTickerModal(); }
+  else if (e.key === "Escape" && !tickerModal.hidden) closeTickerModal();
+});
+tickerModal.addEventListener("click", (e) => { if (e.target === tickerModal) closeTickerModal(); });
+
+const runTickerSearch = debounce(async (raw) => {
+  const sym = raw.trim().toUpperCase();
+  if (!sym) { lastTickerData = null; tickerResult.innerHTML = `<div class="tm-hint">Type a symbol…</div>`; return; }
+  const seq = ++tickerSeq;
+  tickerResult.innerHTML = `<div class="tm-hint">Loading ${esc(sym)}…</div>`;
+  let data;
+  try {
+    const res = await fetch(`/api/ticker?sym=${encodeURIComponent(sym)}`);
+    if (res.status === 503) { if (seq === tickerSeq) tickerResult.innerHTML = `<div class="tm-hint">Market scan in progress — try again in a moment.</div>`; return; }
+    data = await res.json();
+  } catch { if (seq === tickerSeq) tickerResult.innerHTML = `<div class="tm-hint">Network error — try again.</div>`; return; }
+  if (seq !== tickerSeq) return;       // a newer keystroke already superseded this response
+  if (data.error) { lastTickerData = null; tickerResult.innerHTML = `<div class="tm-hint">${esc(data.error)} — check the symbol.</div>`; return; }
+  lastTickerData = data;
+  tickerResult.innerHTML = renderTickerDetail(data);
+  const sp = tickerResult.querySelector(".tm-spark");
+  if (sp && data.indicators?.spark) sparkSvg(sp, data.indicators.spark, true);
+  loadAlertList(data.ticker);
+}, 250);
+tickerSearch.addEventListener("input", (e) => runTickerSearch(e.target.value));
+
+/* ── alerts inside the detail panel (create / list / delete) ── */
+const KIND_LABEL = { price_above: "Price >", price_below: "Price <", score_gte: "Score ≥" };
+async function loadAlertList(ticker) {
+  const box = tickerResult.querySelector(".tm-alert-box");
+  if (!box) return;
+  let alerts = [];
+  try { alerts = (await (await fetch("/api/alerts")).json()).alerts || []; } catch { return; }
+  box.querySelector(".tm-alert-list").innerHTML = alerts
+    .filter((a) => a.ticker === ticker)
+    .map((a) => `<div class="tm-alert-row ${a.active ? "" : "done"}">
+        <span>${KIND_LABEL[a.kind] || a.kind} ${a.threshold}</span>
+        ${a.active ? "" : `<span class="chip calm sm">fired</span>`}
+        <button class="del" data-alert-del="${a.id}" title="delete alert">×</button>
+      </div>`).join("");
+}
+tickerResult.addEventListener("click", async (e) => {
+  const createBtn = e.target.closest('[data-alert-action="create"]');
+  const delBtn = e.target.closest("[data-alert-del]");
+  const box = e.target.closest(".tm-alert-box");
+  if (createBtn && box) {
+    const ticker = box.dataset.ticker;
+    const kind = box.querySelector(".alert-kind").value;
+    const threshold = parseFloat(box.querySelector(".alert-threshold").value);
+    const msg = box.querySelector(".tm-alert-msg");
+    if (!Number.isFinite(threshold)) { msg.textContent = "Enter a number."; msg.classList.add("err"); return; }
+    const res = await (await fetch("/api/alerts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ticker, kind, threshold }) })).json();
+    if (res.error) { msg.textContent = res.error; msg.classList.add("err"); }
+    else { msg.classList.remove("err"); msg.textContent = "Alert set — you'll get notified when it crosses."; }
+    loadAlertList(ticker);
+  } else if (delBtn) {
+    await fetch(`/api/alerts?id=${delBtn.dataset.alertDel}`, { method: "DELETE" });
+    if (box) loadAlertList(box.dataset.ticker);
+  }
+});
+
+function renderTickerDetail(d) {
+  const i = d.indicators;
+  const dirTone = d.direction === "long" ? "buy" : d.direction === "short" ? "sell" : "calm";
+  const priceStr = d.price != null
+    ? (String(d.ticker).startsWith("^") ? d.price.toLocaleString("en-US", { maximumFractionDigits: 2 }) : money(d.price))
+    : "—";
+  const scoreLine = d.long_score != null
+    ? `<span class="chip buy">Long ${d.long_score}</span> <span class="chip sell">Short ${d.short_score}</span> ${d.direction && d.direction !== "none" ? `<span class="chip ${dirTone}">${esc(d.direction)}</span>` : `<span class="chip calm">no setup</span>`}`
+    : "";
+  const f = (v, dec = 1) => (v != null ? Number(v).toFixed(dec) : "—");
+  const stats = i ? `
+    <div class="stats" style="margin-top:10px">
+      <div class="stat"><div class="k">vs 200-day</div><div class="v">${signed(i.pctVs200, 1)}%</div></div>
+      <div class="stat"><div class="k">3-mo</div><div class="v">${signed(i.mom3m, 1)}%</div></div>
+      <div class="stat"><div class="k">RSI (14d)</div><div class="v">${f(i.rsi14, 0)}</div></div>
+      <div class="stat"><div class="k">vs S&amp;P (1m)</div><div class="v">${i.rsSpy1m != null ? signed(i.rsSpy1m, 1) + "pp" : "—"}</div></div>
+    </div>` : "";
+  const news = d.news?.length
+    ? `<div class="tm-news">${d.news.map((n) => `<a href="${esc(safeUrl(n.url))}" target="_blank" rel="noopener">${esc(n.headline)}<span class="src"> · ${esc(n.source)}</span></a>`).join("")}</div>`
+    : "";
+  return `
+    <div class="tm-head"><span class="tm-sym">${esc(d.ticker)}</span>${d.name ? `<span class="tm-name">${esc(d.name)}</span>` : ""}${d.sector ? `<span class="chip calm sm">${esc(d.sector)}</span>` : ""}</div>
+    <div class="tm-price">${priceStr}</div>
+    <svg class="tm-spark" preserveAspectRatio="none"></svg>
+    <div>${scoreLine}</div>
+    ${d.note ? `<div class="tm-note">${esc(d.note)}</div>` : ""}
+    ${stats}
+    ${news}
+    <div class="tm-actions" id="tm-actions">
+      <a class="advise-btn" href="${tvLink(d.ticker)}" target="_blank" rel="noopener" style="text-decoration:none">Open in TradingView ↗</a>
+    </div>
+    <div class="tm-alert-box" data-ticker="${esc(d.ticker)}">
+      <div class="klabel" style="margin-top:14px">Set an alert</div>
+      <div class="tm-actions" style="margin-top:6px">
+        <select class="alert-kind">
+          <option value="price_above">Price above</option>
+          <option value="price_below">Price below</option>
+          <option value="score_gte">Score ≥</option>
+        </select>
+        <input class="alert-threshold" type="number" step="any" value="${d.price != null ? Number(d.price).toFixed(2) : 60}" style="width:96px">
+        <button class="advise-btn" data-alert-action="create">🔔 Create</button>
+      </div>
+      <div class="tm-alert-msg"></div>
+      <div class="tm-alert-list"></div>
+    </div>`;
+}
+
+// Escapes for BOTH text and attribute context. The old textContent/innerHTML
+// trick escaped only & < > (that's all HTML text-node serialization does), so
+// esc() in an href="..." was an attribute breakout for any third-party string.
+const ESC_MAP = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ESC_MAP[c]);
+// Escaping can't neutralise a javascript:/data: scheme — an href needs its own gate.
+const safeUrl = (u) => (/^https?:\/\//i.test(String(u ?? "")) ? String(u) : "#");
 const money = (n) => n.toLocaleString("en-US", { style: "currency", currency: "USD" });
 const signed = (n, dec = 2) => `${n >= 0 ? "+" : ""}${n.toFixed(dec)}`;
 const fmtTime = (ts) => new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -513,6 +728,13 @@ function renderMd(el, text) {
   if (window.marked) { el.classList.add("md"); el.innerHTML = marked.parse(text, { breaks: true }); }
   else { el.style.whiteSpace = "pre-wrap"; el.textContent = text; }
 }
+
+// TradingView deep link. Strip the ^ index prefix (TV resolves SPX/DJI/IXIC/RUT
+// as bare symbols); everything else is a plain ticker.
+const tvLink = (sym) => `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(String(sym).replace(/^\^/, ""))}`;
+// Dashboard market row: real indices instead of ETF proxies. Keys match the
+// market_snapshot benchmarks map (^ stripped). VIX stays — it's a regime signal.
+const INDEX_DISPLAY = [["DJI", "Dow", "DJI"], ["GSPC", "S&P 500", "SPX"], ["IXIC", "Nasdaq", "IXIC"], ["RUT", "Russell 2000", "RUT"], ["VIX", "VIX", "VIX"]];
 
 function sparkSvg(el, values, big = false) {
   if (!values || values.length < 2) { el.innerHTML = ""; return; }
@@ -595,13 +817,23 @@ function factorDetail(ticker) {
       <div class="stat"><div class="k">Structure</div><div class="v" style="font-size:12px">${esc((i.structure || "—").replace("_", " "))}</div></div>
       <div class="stat"><div class="k">Volume trend</div><div class="v">${f(i.volTrend)}×</div></div>
     </div>
-    <button class="advise-btn" data-validate="${esc(ticker)}" data-direction="auto">Validate as a trade idea</button>`;
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="advise-btn" data-validate="${esc(ticker)}" data-direction="auto">Validate as a trade idea</button>
+      <a class="advise-btn ghost" href="${tvLink(ticker)}" target="_blank" rel="noopener" style="text-decoration:none">Open in TradingView ↗</a>
+    </div>`;
 }
 
+// Which expandable rows/sectors are open, keyed by a stable id (ticker or
+// sector name). The SSE "market" push re-renders innerHTML wholesale every ~60s;
+// without this the user's open rows collapse mid-browse. Renders re-apply it.
+const openRows = new Set();
 function toggleRow(container) {
   container.classList.toggle("open");
   const btn = container.querySelector(".rowbtn");
-  btn?.setAttribute("aria-expanded", container.classList.contains("open"));
+  const open = container.classList.contains("open");
+  btn?.setAttribute("aria-expanded", open);
+  const key = container.dataset.openkey;
+  if (key) open ? openRows.add(key) : openRows.delete(key);
 }
 
 /* ── portfolio hero + broker ── */
@@ -764,10 +996,14 @@ function renderMarket() {
   const r = snap.regime;
   const tone = r.riskOff ? "sell" : r.trend === "up" ? "buy" : r.trend === "down" ? "sell" : "warn";
   const b = snap.benchmarks || {};
-  const bench = ["SPY", "QQQ", "IWM", "VIX"].filter((k) => b[k]).map((k) => `
-      <div class="stat"><div class="k">${k}</div>
-      <div class="v">${k === "VIX" ? b[k].price.toFixed(1) : money(b[k].price)}</div>
-      <div style="font-size:11.5px;font-weight:600" class="${b[k].ret1d >= 0 ? "up" : "down"}">${signed(b[k].ret1d, 1)}% d · ${signed(b[k].ret1m, 1)}% m</div></div>`).join("");
+  // Tolerate missing index keys: a snapshot persisted before this deploy only
+  // has SPY/QQQ/IWM/VIX until the next refreshMarketContext repopulates it.
+  const bench = INDEX_DISPLAY.filter(([k]) => b[k]).map(([k, label, tv]) => `
+      <a class="idx-tile" href="${tvLink(tv)}" target="_blank" rel="noopener" title="Open ${esc(label)} on TradingView">
+      <div class="stat"><div class="k">${label}</div>
+      <div class="v">${k === "VIX" ? b[k].price.toFixed(1) : b[k].price.toLocaleString("en-US", { maximumFractionDigits: 2 })}</div>
+      <div style="font-size:11.5px;font-weight:600" class="${b[k].ret1d >= 0 ? "up" : "down"}">${signed(b[k].ret1d, 1)}% d · ${signed(b[k].ret1m, 1)}% m</div></div></a>`).join("")
+    || `<div class="empty" style="grid-column:1/-1">Index data loads with the next market refresh.</div>`;
   card.innerHTML = `
     <div id="regime-head">
       <span class="chip ${tone}">${esc(r.label)}</span>
@@ -798,7 +1034,7 @@ function renderSectors() {
         <td>${bd.breadthPct != null ? bd.breadthPct.toFixed(0) + "%" : "—"}</td>
         <td>${bd.longs.length}L / ${bd.shorts.length}S</td>
       </tr>
-      <tr class="sector-detail" data-sector-detail="${idx}" style="display:none">
+      <tr class="sector-detail" data-sector-detail="${idx}" style="display:${openRows.has("sector:" + bd.sector) ? "" : "none"}">
         <td colspan="7">
           <div class="setup-chips" style="margin-bottom:6px">
             <span style="font-size:11px;color:var(--faint);font-weight:700">LONGS</span>
@@ -813,11 +1049,50 @@ function renderSectors() {
   }).join("");
   tbody.querySelectorAll("[data-sector-row]").forEach((tr) => {
     tr.addEventListener("click", () => {
-      const det = tbody.querySelector(`[data-sector-detail="${tr.dataset.sectorRow}"]`);
-      det.style.display = det.style.display === "none" ? "" : "none";
+      const idx = tr.dataset.sectorRow;
+      const det = tbody.querySelector(`[data-sector-detail="${idx}"]`);
+      const open = det.style.display === "none";
+      det.style.display = open ? "" : "none";
+      const key = "sector:" + boards[idx].sector;
+      open ? openRows.add(key) : openRows.delete(key);
     });
   });
 }
+
+/* ── idea metric filters + collapsible sector tree (persisted to localStorage) ── */
+const FILTERS = [
+  { id: "above200", label: "Above 200-day", test: (i) => !!i && i.pctVs200 > 0 },
+  { id: "volrising", label: "Volume rising", test: (i) => !!i && i.volTrend > 1.15 },
+  { id: "beatspy", label: "Beating S&P", test: (i) => !!i && (i.rsSpy1m ?? 0) > 2 },
+  { id: "oversold", label: "Oversold (RSI<35)", test: (i) => !!i && i.rsi14 != null && i.rsi14 < 35 },
+  { id: "score70", label: "Score ≥ 70", test: (i, item, isLong) => (isLong ? item.long_score : item.short_score) >= 70 },
+];
+// Corrupt localStorage must not throw at top level — that would blank the whole
+// dashboard with no recovery path. Bad JSON just means "no saved preference".
+const readStoredSet = (key) => { try { return new Set(JSON.parse(localStorage.getItem(key) || "[]")); } catch { return new Set(); } };
+const activeFilters = readStoredSet("ideaFilters");
+const collapsedSectors = readStoredSet("collapsedSectors");
+const saveFilters = () => localStorage.setItem("ideaFilters", JSON.stringify([...activeFilters]));
+const saveCollapsed = () => localStorage.setItem("collapsedSectors", JSON.stringify([...collapsedSectors]));
+function passesFilters(item, i, isLong) {
+  for (const f of FILTERS) if (activeFilters.has(f.id) && !f.test(i, item, isLong)) return false;
+  return true;
+}
+function renderFilterBar() {
+  $("#idea-filters").innerHTML = FILTERS
+    .map((f) => `<button class="filter-chip ${activeFilters.has(f.id) ? "on" : ""}" data-filter="${f.id}">${f.label}</button>`)
+    .join("");
+}
+$("#idea-filters").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-filter]");
+  if (!btn) return;
+  const id = btn.dataset.filter;
+  activeFilters.has(id) ? activeFilters.delete(id) : activeFilters.add(id);
+  saveFilters();
+  renderFilterBar();
+  renderIdeas();
+});
+renderFilterBar();
 
 /* ── trade ideas (by sector, long/short tabs) ── */
 function renderIdeas() {
@@ -825,18 +1100,33 @@ function renderIdeas() {
   const boards = market?.boards ?? [];
   const isLong = ideasTab === "long";
   const groups = boards
-    .map((bd) => ({ bd, list: isLong ? bd.longs : bd.shorts }))
+    .map((bd) => ({ bd, list: (isLong ? bd.longs : bd.shorts).filter((item) => passesFilters(item, screener[item.ticker]?.indicators, isLong)) }))
     .filter((g) => g.list.length);
   if (!groups.length) {
     const rows = Object.values(screener);
-    card.innerHTML = `<div class="empty">${rows.length ? `No setup-grade ${ideasTab} ideas right now — that's a valid answer, not a bug. The scoring requires confluence (structure + volume + relative strength), not just price movement.` : "Scanning the market… the first full scan takes several minutes after startup."}</div>`;
+    const msg = activeFilters.size
+      ? "No ideas match the active filters — loosen them to see more."
+      : rows.length
+        ? `No setup-grade ${ideasTab} ideas right now — that's a valid answer, not a bug. The scoring requires confluence (structure + volume + relative strength), not just price movement.`
+        : "Scanning the market… the first full scan takes several minutes after startup.";
+    card.innerHTML = `<div class="empty">${msg}</div>`;
     return;
   }
   card.innerHTML = "";
   for (const { bd, list } of groups) {
+    const collapsed = collapsedSectors.has(bd.sector);
     const head = document.createElement("div");
-    head.className = "sector-group-head";
-    head.innerHTML = `${esc(bd.sector)} ${bd.rotation ? `<span class="chip ${SECTOR_STATE_TONE[bd.rotation.state] ?? "calm"} sm">${bd.rotation.state}</span>` : ""}`;
+    head.className = "sector-group-head" + (collapsed ? " collapsed" : "");
+    head.innerHTML = `${chevSvg}${esc(bd.sector)} ${bd.rotation ? `<span class="chip ${SECTOR_STATE_TONE[bd.rotation.state] ?? "calm"} sm">${bd.rotation.state}</span>` : ""} <span style="color:var(--faint);font-weight:400">· ${list.length}</span>`;
+    const groupBox = document.createElement("div");
+    if (collapsed) groupBox.style.display = "none";
+    head.addEventListener("click", () => {
+      const nowCollapsed = !collapsedSectors.has(bd.sector);
+      nowCollapsed ? collapsedSectors.add(bd.sector) : collapsedSectors.delete(bd.sector);
+      saveCollapsed();
+      head.classList.toggle("collapsed", nowCollapsed);
+      groupBox.style.display = nowCollapsed ? "none" : "";
+    });
     card.appendChild(head);
     for (const item of list) {
       const r = screener[item.ticker];
@@ -857,8 +1147,12 @@ function renderIdeas() {
         }
       }
       const wrap = document.createElement("div");
+      const openKey = "ideas:" + item.ticker;
+      const isOpen = openRows.has(openKey);
+      wrap.dataset.openkey = openKey;
+      if (isOpen) wrap.classList.add("open");
       wrap.innerHTML = `
-        <button class="rowbtn" aria-expanded="false">
+        <button class="rowbtn" aria-expanded="${isOpen}">
           ${chevSvg}
           <div class="tick-name"><div class="sym">${esc(item.ticker)}${item.held ? ` <span class="chip warn sm">held</span>` : ""}</div><div class="sub">${money(item.price)}</div></div>
           <svg class="mini-spark" preserveAspectRatio="none"></svg>
@@ -868,8 +1162,9 @@ function renderIdeas() {
         <div class="detail">${r ? factorDetail(item.ticker) : `<p class="empty">no detail</p>`}</div>`;
       wrap.querySelector(".rowbtn").addEventListener("click", () => toggleRow(wrap));
       if (i) sparkSvg(wrap.querySelector(".mini-spark"), i.spark);
-      card.appendChild(wrap);
+      groupBox.appendChild(wrap);
     }
+    card.appendChild(groupBox);
   }
 }
 

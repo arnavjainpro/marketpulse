@@ -7,7 +7,12 @@ import { fetchDailyCandles, type DailyCandles } from "../ingest/yahoo";
 import { SECTOR_ETF } from "../ingest/universe";
 import { sma, slopePctPerBar } from "./technicals";
 
-export const BENCHMARKS = ["SPY", "QQQ", "IWM", "^VIX"] as const;
+// SPY/QQQ/IWM stay in the fetch set: SPY drives regime + every sector's rel1m +
+// breadth (see refreshMarketContext), and QQQ/IWM feed relative-strength math.
+// The ^-prefixed indices are added so the dashboard can DISPLAY the real indices
+// (Dow/S&P/Nasdaq/Russell) instead of the ETF proxies — renderMarket picks which
+// keys to show; the math keeps using SPY.
+export const BENCHMARKS = ["SPY", "QQQ", "IWM", "^VIX", "^GSPC", "^DJI", "^IXIC", "^RUT"] as const;
 
 export interface SectorRotation {
   sector: string;          // NASDAQ taxonomy name
