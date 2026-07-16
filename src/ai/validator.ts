@@ -456,6 +456,7 @@ export interface IdeaFilters {
   sectors?: string[];                    // exact sector names; empty/absent = all
   minScore?: number;                     // floor for the directional score (default 68)
   direction?: "long" | "short" | "both"; // default both
+  tickers?: string[];                    // allowlist — the dashboard's filtered view; absent = all
 }
 
 // Batch idea generation: strongest screener confluences, both directions,
@@ -465,10 +466,12 @@ export function pickCandidates(portfolio: Portfolio, count: number, filters?: Id
   const regime = getMarketSnapshot()?.regime;
   const minScore = filters?.minScore ?? 68;
   const sectorSet = filters?.sectors?.length ? new Set(filters.sectors) : null;
+  const tickerSet = filters?.tickers?.length ? new Set(filters.tickers) : null;
   const dirWant = filters?.direction === "long" || filters?.direction === "short" ? filters.direction : null;
   const picks: { ticker: string; direction: "long" | "short"; score: number; sector: string }[] = [];
   for (const r of rows) {
     if (sectorSet && !sectorSet.has(r.sector)) continue;
+    if (tickerSet && !tickerSet.has(r.ticker)) continue;
     if (r.direction === "long" && dirWant !== "short" && r.long_score >= minScore) picks.push({ ticker: r.ticker, direction: "long", score: r.long_score, sector: r.sector });
     else if (r.direction === "short" && dirWant !== "long" && r.short_score >= minScore) picks.push({ ticker: r.ticker, direction: "short", score: r.short_score, sector: r.sector });
   }

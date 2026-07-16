@@ -1,6 +1,6 @@
 import { db, aiLive, setAiLive } from "../db";
 import { config, marketPhase, nextMarketTransition } from "../config";
-import { cachedQuote, wsStatus } from "../ingest/finnhub";
+import { cachedQuote, wsStatus, fetchCompanyNews } from "../ingest/finnhub";
 import { opusBreaker, haikuBreaker } from "../ai/breaker";
 import { askAdvisor, type ChatTurn } from "../ai/advisor";
 import { validateIdea, pickCandidates, recentIdeas, type IdeaReport, type IdeaFilters } from "../ai/validator";
@@ -19,7 +19,7 @@ import { saveImport, clearImport, type ImportPayload } from "../broker/manual";
 import { getBrokerLink } from "../db";
 import { allTickers } from "../config";
 import { logOutcome, listOutcomes, deleteOutcome } from "../ai/journal";
-import { hashPassword, verifyPassword, createUser, findUserByEmail, findUserById, createSession, destroySession } from "../auth";
+import { hashPassword, verifyPassword, createUser, findUserByEmail, findUserById, getProfile, updateProfile, createSession, destroySession } from "../auth";
 import { userIdFromRequest, sessionTokenFromRequest, sessionCookieHeader, clearCookieHeader } from "../auth/middleware";
 import { join } from "path";
 
@@ -241,6 +241,7 @@ export function startServer() {
                 sectors: Array.isArray(body.filters.sectors) ? body.filters.sectors.map(String).slice(0, 20) : undefined,
                 minScore: Number.isFinite(Number(body.filters.minScore)) ? Math.min(Math.max(Number(body.filters.minScore), 50), 100) : undefined,
                 direction: body.filters.direction === "long" || body.filters.direction === "short" ? body.filters.direction : undefined,
+                tickers: Array.isArray(body.filters.tickers) ? body.filters.tickers.map((t) => String(t).toUpperCase()).slice(0, 300) : undefined,
               }
             : undefined;
           const candidates = pickCandidates(portfolio, count, filters);
@@ -400,6 +401,25 @@ export function startServer() {
         return Response.json({ prefs: loadRiskConfigFor(userId), customized: !!getRiskPrefs(userId) });
       }
 
+      // Profile: name/phone are editable; email is the login identity and stays read-only.
+      if (url.pathname === "/api/profile") {
+        if (req.method === "PUT") {
+          try {
+            const body = (await req.json()) as Record<string, unknown>;
+            const str = (v: unknown, max: number) => {
+              const s = String(v ?? "").trim().slice(0, max);
+              return s || null;
+            };
+            const fields = { full_name: str(body.full_name, 120), phone: str(body.phone, 32) };
+            updateProfile(userId, fields);
+            return Response.json({ ok: true, profile: getProfile(userId) });
+          } catch (err) {
+            return Response.json({ ok: false, error: String(err) }, { status: 400 });
+          }
+        }
+        return Response.json({ ok: true, profile: getProfile(userId) });
+      }
+
       // Master switch for automatic AI spend (triage/analysis/scheduled briefings).
       // Global, not per-user — background monitoring is one shared pipeline (see index.ts).
       if (url.pathname === "/api/ai-live" && req.method === "POST") {
@@ -453,10 +473,31 @@ export function startServer() {
         let quote: any = null;
         try { quote = await cachedQuote(ticker); } catch {}
         let spark: { timestamps: number[]; closes: number[] } | null = null;
+        let ohlc: { timestamps: number[]; opens: number[]; highs: number[]; lows: number[]; closes: number[] } | null = null;
         try {
           const c = await fetchDailyCandles(ticker, "1y", 30);
-          if (c) spark = { timestamps: c.timestamps.slice(-120), closes: c.closes.slice(-120) };
+          if (c) {
+            spark = { timestamps: c.timestamps.slice(-120), closes: c.closes.slice(-120) };
+            if (c.opens && c.highs && c.lows) {
+              ohlc = {
+                timestamps: c.timestamps.slice(-120),
+                opens: c.opens.slice(-120),
+                highs: c.highs.slice(-120),
+                lows: c.lows.slice(-120),
+                closes: c.closes.slice(-120),
+              };
+            }
+          }
         } catch {}
+        // Finnhub /company-news 4xxs on ^-index symbols; skip news for those.
+        let news: { headline: string; url: string; source: string; datetime: number }[] = [];
+        if (!ticker.startsWith("^")) {
+          try {
+            const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+            const items = await fetchCompanyNews(ticker, iso(Date.now() - 7 * 86400_000), iso(Date.now()));
+            news = (items ?? []).slice(0, 8).map((n: any) => ({ headline: n.headline, url: n.url, source: n.source, datetime: n.datetime }));
+          } catch {}
+        }
         if (!meta && !row && !quote?.c && !spark) {
           return Response.json({ ok: false, error: `No data found for "${ticker}" — check the symbol.` }, { status: 404 });
         }
@@ -465,7 +506,7 @@ export function startServer() {
           .all(userId, ticker) as any[];
         const held = currentPortfolio(userId).holdings.find((h) => h.ticker === ticker) ?? null;
         return Response.json({
-          ok: true, ticker, meta, quote, spark, held,
+          ok: true, ticker, meta, quote, spark, ohlc, news, held,
           screener: row ? { ...row, indicators: JSON.parse(row.indicators) } : null,
           ideas: ideaRows.map((r) => ({ ...(JSON.parse(r.report)), ts: r.ts, source: r.source })),
         });
