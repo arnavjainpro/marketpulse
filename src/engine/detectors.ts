@@ -1,7 +1,7 @@
 // Deterministic event detectors. Each returns raw events; AI triage decides what matters.
 import { db, insertEvent, recentBars } from "../db";
 import { returnStats } from "./technicals";
-import { fetchQuote, fetchCompanyNews, fetchEarningsCalendar, type NewsItem } from "../ingest/finnhub";
+import { cachedQuote, fetchCompanyNews, fetchEarningsCalendar, type NewsItem } from "../ingest/finnhub";
 import { fetchRecentFilings } from "../ingest/edgar";
 
 export interface RawEvent {
@@ -27,7 +27,7 @@ function stats(ticker: string): { avg_volume_20d: number; prev_close: number; we
 export async function detectPriceVolume(ticker: string): Promise<RawEvent[]> {
   const out: RawEvent[] = [];
   const s = stats(ticker);
-  const q = await fetchQuote(ticker);
+  const q = await cachedQuote(ticker);
   const now = Math.floor(Date.now() / 1000);
 
   // Large session move vs prev close (thresholded so triage isn't spammed)

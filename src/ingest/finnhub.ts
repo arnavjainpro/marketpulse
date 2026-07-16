@@ -3,7 +3,13 @@ import { upsertBar, db } from "../db";
 
 const BASE = "https://finnhub.io/api/v1";
 
+// Symbol-form boundary: storage/cache use dash form (BRK-B, Yahoo convention);
+// Finnhub speaks dot form (BRK.B). Convert at this file's edges only.
+export const toFinnhub = (t: string) => t.replace(/-/g, ".");
+export const fromFinnhub = (t: string) => t.replace(/\./g, "-");
+
 async function get<T>(path: string, params: Record<string, string>): Promise<T> {
+  if (params.symbol) params = { ...params, symbol: toFinnhub(params.symbol) };
   const qs = new URLSearchParams({ ...params, token: config.finnhubKey });
   const res = await fetch(`${BASE}${path}?${qs}`);
   if (!res.ok) throw new Error(`Finnhub ${path} ${res.status}: ${await res.text()}`);
@@ -20,6 +26,36 @@ export interface Quote {
 }
 
 export const fetchQuote = (ticker: string) => get<Quote>("/quote", { symbol: ticker });
+
+// Shared quote cache: single-flight, 60s TTL, patched live by the websocket.
+// All read paths (server, alerts, detectors, AI context) go through this so 8
+// call sites share one 60/min REST budget instead of competing for it.
+const QUOTE_TTL_MS = 60_000;
+type QuoteEntry = { at: number; p: Promise<Quote>; q?: Quote };
+const quoteCache = new Map<string, QuoteEntry>();
+
+export function cachedQuote(ticker: string): Promise<Quote> {
+  const hit = quoteCache.get(ticker);
+  if (hit && Date.now() - hit.at < QUOTE_TTL_MS) return hit.p;
+  if (quoteCache.size > 500) quoteCache.clear(); // ponytail: crude cap; single-user dash never needs LRU
+  const entry: QuoteEntry = { at: Date.now(), p: fetchQuote(ticker) };
+  entry.p
+    .then((q) => { entry.q = q; })
+    .catch(() => { if (quoteCache.get(ticker) === entry) quoteCache.delete(ticker); });
+  quoteCache.set(ticker, entry);
+  return entry.p;
+}
+
+// Websocket trades patch the live price of an existing cache entry (never
+// create one — a bare price with zeroed pc/d/dp would corrupt callers).
+// TTL is untouched: REST still refreshes pc/h/l/o on expiry.
+export function patchQuoteFromTrade(dashSym: string, price: number, tradeTsMs: number) {
+  const q = quoteCache.get(dashSym)?.q;
+  if (!q) return;
+  q.c = price;
+  if (q.pc > 0) { q.d = price - q.pc; q.dp = ((price - q.pc) / q.pc) * 100; }
+  q.t = Math.floor(tradeTsMs / 1000); // trade t is ms; Quote.t is unix seconds
+}
 
 export interface NewsItem {
   id: number;
@@ -119,7 +155,7 @@ export function startTradeStream(tickers: string[], onTrade?: (t: { s: string; p
       wsStatus.connected = true;
       wsStatus.lastMessageAt = Date.now();
       console.log(`[finnhub] websocket connected, subscribing to ${tickers.length} tickers`);
-      for (const t of tickers) ws!.send(JSON.stringify({ type: "subscribe", symbol: t }));
+      for (const t of tickers) ws!.send(JSON.stringify({ type: "subscribe", symbol: toFinnhub(t) }));
     };
     ws.onmessage = (msg) => {
       wsStatus.lastMessageAt = Date.now();
@@ -128,9 +164,11 @@ export function startTradeStream(tickers: string[], onTrade?: (t: { s: string; p
         const data = JSON.parse(String(msg.data));
         if (data.type !== "trade") return; // pings etc. still count as liveness above
         for (const tr of data.data as { s: string; p: number; v: number; t: number }[]) {
+          const sym = fromFinnhub(tr.s); // bars/cache keyed dash-form like the rest of storage
           const tsMin = Math.floor(tr.t / 1000 / 60) * 60;
-          upsertBar(tr.s, tsMin, tr.p, tr.p, tr.p, tr.p, tr.v);
-          onTrade?.(tr);
+          upsertBar(sym, tsMin, tr.p, tr.p, tr.p, tr.p, tr.v);
+          patchQuoteFromTrade(sym, tr.p, tr.t);
+          onTrade?.({ ...tr, s: sym });
         }
       } catch {}
     };

@@ -1,6 +1,6 @@
 import { db, aiLive, setAiLive, getSetting } from "../db";
 import { config, marketPhase, nextMarketTransition } from "../config";
-import { fetchQuote, wsStatus } from "../ingest/finnhub";
+import { cachedQuote, wsStatus } from "../ingest/finnhub";
 import { opusBreaker, haikuBreaker } from "../ai/breaker";
 import { askAdvisor, type ChatTurn } from "../ai/advisor";
 import { validateIdea, pickCandidates, recentIdeas, type IdeaReport } from "../ai/validator";
@@ -317,7 +317,7 @@ export function startServer() {
         await Promise.all(
           allTickers(portfolio).map(async (t) => {
             try {
-              out[t] = await fetchQuote(t);
+              out[t] = await cachedQuote(t);
             } catch {}
           })
         );

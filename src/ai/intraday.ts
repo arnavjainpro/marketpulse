@@ -9,7 +9,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { config, marketPhase, type Portfolio } from "../config";
 import { db } from "../db";
 import { fetchIntradayBars, fetchDailyCandles, type IntradayBars } from "../ingest/yahoo";
-import { fetchCompanyNews, fetchNextEarnings, fetchQuote } from "../ingest/finnhub";
+import { fetchCompanyNews, fetchNextEarnings, cachedQuote } from "../ingest/finnhub";
 import { fetchOptionsSummary, optionsContextText } from "../ingest/options";
 import { stressStructure, type Leg } from "../engine/optionsMath";
 import { universeMeta, sectorEtf } from "../ingest/universe";
@@ -228,7 +228,7 @@ async function buildDataContext(req: IntradayRequest): Promise<{ text: string; t
   const daily = await fetchDailyCandles(ticker, "1y", 60);
   let quote: { c: number; dp: number } | null = null;
   try {
-    const q = await fetchQuote(ticker);
+    const q = await cachedQuote(ticker);
     quote = { c: q.c, dp: q.dp };
   } catch {}
 
