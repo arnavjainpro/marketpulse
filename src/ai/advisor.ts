@@ -7,7 +7,7 @@ import { db, recentBars } from "../db";
 import { snapshot } from "../engine/technicals";
 import { marketContextText } from "../engine/market";
 import { accountContextText } from "../broker";
-import { fetchQuote, fetchCompanyNews } from "../ingest/finnhub";
+import { cachedQuote, fetchCompanyNews } from "../ingest/finnhub";
 import { journalContextText } from "./journal";
 import { claudeQueue } from "./queue";
 import { opusBreaker } from "./breaker";
@@ -67,7 +67,7 @@ async function buildMarketContext(userId: number, portfolio: Portfolio, question
     let chg = tech.sessionChangePct;
     if (price == null) {
       try {
-        const q = await fetchQuote(t);
+        const q = await cachedQuote(t);
         price = q.c;
         chg = q.dp;
       } catch {}

@@ -1,6 +1,6 @@
 import { db, aiLive, setAiLive } from "../db";
 import { config, marketPhase, nextMarketTransition } from "../config";
-import { fetchQuote, wsStatus } from "../ingest/finnhub";
+import { cachedQuote, wsStatus } from "../ingest/finnhub";
 import { opusBreaker, haikuBreaker } from "../ai/breaker";
 import { askAdvisor, type ChatTurn } from "../ai/advisor";
 import { validateIdea, pickCandidates, recentIdeas, type IdeaReport, type IdeaFilters } from "../ai/validator";
@@ -436,7 +436,7 @@ export function startServer() {
         await Promise.all(
           allTickers(portfolio).map(async (t) => {
             try {
-              out[t] = await fetchQuote(t);
+              out[t] = await cachedQuote(t);
             } catch {}
           })
         );
@@ -451,7 +451,7 @@ export function startServer() {
         const meta = universeMeta(ticker);
         const row = db.query(`SELECT * FROM screener WHERE ticker = ?`).get(ticker) as any;
         let quote: any = null;
-        try { quote = await fetchQuote(ticker); } catch {}
+        try { quote = await cachedQuote(ticker); } catch {}
         let spark: { timestamps: number[]; closes: number[] } | null = null;
         try {
           const c = await fetchDailyCandles(ticker, "1y", 30);

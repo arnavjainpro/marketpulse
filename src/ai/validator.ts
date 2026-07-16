@@ -12,7 +12,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { config, type Portfolio } from "../config";
 import { db } from "../db";
 import { fetchDailyCandles } from "../ingest/yahoo";
-import { fetchCompanyNews, fetchNextEarnings, fetchQuote } from "../ingest/finnhub";
+import { fetchCompanyNews, fetchNextEarnings, cachedQuote } from "../ingest/finnhub";
 import { fetchOptionsSummary, optionsContextText, type OptionsSummary } from "../ingest/options";
 import { stressStructure, type Leg } from "../engine/optionsMath";
 import { universeMeta, sectorEtf } from "../ingest/universe";
@@ -281,7 +281,7 @@ export async function gatherIdeaContext(
   // Live price refresh so the frame isn't anchored to a stale scan.
   let price = ind.price;
   try {
-    const q = await fetchQuote(ticker);
+    const q = await cachedQuote(ticker);
     if (q.c) price = q.c;
   } catch {}
   ind = { ...ind, price };

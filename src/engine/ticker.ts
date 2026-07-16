@@ -41,11 +41,14 @@ const cache = new Map<string, { ts: number; data: TickerResult }>();
 const TTL_MS = 60_000;
 
 export async function scoreTicker(rawSym: string): Promise<ScoreTickerOutcome> {
-  const sym = (rawSym ?? "").trim().toUpperCase();
+  // BRK.B / BRK/B → BRK-B: storage and Yahoo use dash form (^-indexes untouched).
+  const sym = (rawSym ?? "").trim().toUpperCase().replace(/[./]/g, "-");
   if (!validTicker(sym)) return { ok: false, error: "Invalid ticker", status: 400 };
 
+  // During the 10-min screener run, serve stale cache instead of 503ing every
+  // search — stale scores beat a dead search box. True misses still 503.
   const hit = cache.get(sym);
-  if (hit && Date.now() - hit.ts < TTL_MS) return { ok: true, data: hit.data };
+  if (hit && (Date.now() - hit.ts < TTL_MS || isScanRunning())) return { ok: true, data: hit.data };
 
   if (isScanRunning()) return { ok: false, error: "Scan in progress, retry shortly", status: 503 };
 

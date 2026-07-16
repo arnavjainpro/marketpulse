@@ -12,7 +12,7 @@
 // table for scanned-universe tickers, and recompute off-universe tickers hourly
 // through the cached /api/ticker path.
 import { db } from "../db";
-import { fetchQuote } from "../ingest/finnhub";
+import { cachedQuote } from "../ingest/finnhub";
 import { notifyTelegram, telegramEnabled } from "../notify/telegram";
 import { notifyMac } from "../notify/macos";
 import { scoreTicker } from "./ticker";
@@ -84,7 +84,7 @@ export async function createAlert(userId: number, rawTicker: string, kind: Alert
   // doesn't fire instantly.
   let seed: number | null = null;
   if (kind === "score_gte") seed = scoreFromScreener(ticker);
-  else { try { const q = await fetchQuote(ticker); seed = q?.c ?? null; } catch { /* seed stays null */ } }
+  else { try { const q = await cachedQuote(ticker); seed = q?.c ?? null; } catch { /* seed stays null */ } }
 
   db.query(
     `INSERT INTO alerts (user_id, ticker, kind, threshold, last_value, active, created_ts)
@@ -141,7 +141,7 @@ export async function evaluateActiveAlerts(): Promise<void> {
   const priceTickers = [...new Set(priceAlerts.map((a) => a.ticker))].slice(0, MAX_ALERT_TICKERS);
   const prices = new Map<string, number>();
   for (const t of priceTickers) {
-    try { const q = await fetchQuote(t); if (q && q.c > 0) prices.set(t, q.c); }
+    try { const q = await cachedQuote(t); if (q && q.c > 0) prices.set(t, q.c); }
     catch (err) { console.error(`[alerts] quote ${t}:`, err); }
     await Bun.sleep(1100);
   }

@@ -2,7 +2,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { config, allTickers, type Portfolio } from "../config";
 import { db } from "../db";
-import { fetchQuote } from "../ingest/finnhub";
+import { cachedQuote } from "../ingest/finnhub";
 import { marketContextText, getMarketSnapshot } from "../engine/market";
 import { claudeQueue } from "./queue";
 
@@ -14,7 +14,7 @@ export async function generateBriefing(kind: "open" | "close", portfolio: Portfo
   const quotes: string[] = [];
   for (const t of tickers) {
     try {
-      const q = await fetchQuote(t);
+      const q = await cachedQuote(t);
       quotes.push(`${t}: $${q.c} (${q.dp >= 0 ? "+" : ""}${q.dp.toFixed(2)}% today)`);
     } catch {}
   }

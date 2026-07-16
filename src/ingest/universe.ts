@@ -42,23 +42,56 @@ const num = (s: any) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-async function fetchNasdaqScreener(): Promise<UniverseRow[]> {
-  const res = await fetch("https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit=0&download=true", {
+// Base symbol + optional one-letter class suffix. NASDAQ's feed writes class
+// shares with a slash (BRK/B); the S&P list uses dots (BRK.B); Yahoo uses
+// dashes (BRK-B). Accept all three, store dash form. Still skips ^-preferreds,
+// units/warrants, and multi-letter suffix garbage.
+export const SYMBOL_RE = /^[A-Z]{1,5}([./-][A-Z])?$/;
+// Storage convention is dash form (Yahoo-compatible, matches fetchSP500).
+export const normalizeSymbol = (s: string) => s.trim().toUpperCase().replace(/[./]/g, "-");
+
+async function fetchNasdaq(path: string): Promise<any[]> {
+  const res = await fetch(`https://api.nasdaq.com/api/screener/${path}?tableonly=true&limit=0&download=true`, {
     headers: { "User-Agent": "Mozilla/5.0 (Macintosh) MarketPulse personal-use", Accept: "application/json" },
     signal: AbortSignal.timeout(60_000),
   });
-  if (!res.ok) throw new Error(`nasdaq screener ${res.status}`);
+  if (!res.ok) throw new Error(`nasdaq ${path} ${res.status}`);
   const data = (await res.json()) as any;
-  const rows: any[] = data?.data?.rows ?? [];
+  // stocks nests rows at data.rows; the etf endpoint at data.data.rows — accept either.
+  return data?.data?.rows ?? data?.data?.data?.rows ?? [];
+}
+
+async function fetchNasdaqScreener(): Promise<UniverseRow[]> {
+  const rows = await fetchNasdaq("stocks");
   return rows
-    .filter((r) => /^[A-Z]{1,5}$/.test(r.symbol ?? "")) // plain common stock symbols; skips units/warrants/^/. classes
+    .filter((r) => SYMBOL_RE.test(r.symbol ?? ""))
     .map((r) => ({
-      ticker: r.symbol as string,
+      ticker: normalizeSymbol(r.symbol),
       name: String(r.name ?? "").replace(/ (Common|Class [A-Z]|Ordinary).*$/i, ""),
       sector: r.sector?.trim() || "Unknown",
       industry: r.industry?.trim() || "Unknown",
       marketCap: num(r.marketCap),
       lastPrice: num(r.lastsale),
+      dayVolume: num(r.volume),
+      sp500: false,
+      inScan: false,
+    }));
+}
+
+// ETFs: stored for search/on-demand scoring, never scanned (unless held/watched —
+// dollar-volume ranking would let SPY/QQQ crowd stocks out of the scan slots).
+// Feed has no sector/marketCap; field names differ from the stocks feed.
+async function fetchNasdaqEtfs(): Promise<UniverseRow[]> {
+  const rows = await fetchNasdaq("etf");
+  return rows
+    .filter((r) => SYMBOL_RE.test(r.symbol ?? ""))
+    .map((r) => ({
+      ticker: normalizeSymbol(r.symbol),
+      name: String(r.companyName ?? r.name ?? "").trim() || normalizeSymbol(r.symbol),
+      sector: "ETF",
+      industry: "ETF",
+      marketCap: 0,
+      lastPrice: num(r.lastSalePrice ?? r.lastsale),
       dayVolume: num(r.volume),
       sp500: false,
       inScan: false,
@@ -100,8 +133,10 @@ function extraTickersFromConfig(): string[] {
 export async function refreshUniverse(portfolio: Portfolio): Promise<string[]> {
   const filters = loadUniverseFilters();
   const [sp500, extras] = [await fetchSP500(), extraTickersFromConfig()];
-  const protectedSet = new Set([...sp500, ...extras, ...allTickers(portfolio)]);
+  const protectedSet = new Set([...sp500, ...extras, ...allTickers(portfolio)].map(normalizeSymbol));
 
+  // Feeds fetched independently: an ETF-endpoint breakage must not shrink the
+  // stock universe (and vice versa).
   let all: UniverseRow[] = [];
   try {
     all = await fetchNasdaqScreener();
@@ -109,8 +144,17 @@ export async function refreshUniverse(portfolio: Portfolio): Promise<string[]> {
   } catch (err) {
     console.warn("[universe] NASDAQ feed failed — falling back to S&P 500 + config:", err);
   }
+  let etfs: UniverseRow[] = [];
+  try {
+    etfs = await fetchNasdaqEtfs();
+    console.log(`[universe] NASDAQ ETF feed: ${etfs.length} ETFs`);
+  } catch (err) {
+    console.warn("[universe] NASDAQ ETF feed failed — ETFs skipped this refresh:", err);
+  }
 
   const bySymbol = new Map(all.map((r) => [r.ticker, r]));
+  const etfSet = new Set(etfs.map((r) => r.ticker));
+  for (const r of etfs) if (!bySymbol.has(r.ticker)) bySymbol.set(r.ticker, r);
   // Protected names missing from the feed (dots→dashes classes etc.) still scan.
   for (const t of protectedSet) {
     if (!bySymbol.has(t)) {
@@ -131,8 +175,9 @@ export async function refreshUniverse(portfolio: Portfolio): Promise<string[]> {
     r.lastPrice >= filters.min_price &&
     r.dayVolume >= filters.min_volume;
 
+  // ETFs never compete for scan slots unless held/watched/config-listed.
   const candidates = rows
-    .filter((r) => protectedSet.has(r.ticker) || passes(r))
+    .filter((r) => protectedSet.has(r.ticker) || (!etfSet.has(r.ticker) && passes(r)))
     .sort((a, b) => b.lastPrice * b.dayVolume - a.lastPrice * a.dayVolume);
 
   const scan = new Set<string>();

@@ -8,3 +8,4 @@ config/portfolio.yaml
 dist/
 build/
 .gstack/
+PLAN.md
