@@ -232,6 +232,7 @@
   #ideas-filters label { display: flex; align-items: center; gap: 6px; font-weight: 600; }
   #ideas-filters input[type=number] { border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; width: 64px; font: 12.5px var(--sans); background: var(--gray-soft); }
   #ideas-filters input[type=number]:focus { outline: none; border-color: var(--green-bright); background: var(--bg); }
+  #ideas-filters select { border: 1px solid var(--line); border-radius: 999px; padding: 4px 8px; font: 12.5px var(--sans); background: var(--gray-soft); color: var(--text); }
   .refresh-btn { border: 1px solid var(--line); background: none; border-radius: 999px; font-size: 12px; font-weight: 600; padding: 4px 12px; color: var(--dim); }
   .refresh-btn:hover { border-color: var(--green-bright); color: var(--green); }
   .refresh-btn:disabled { opacity: .5; cursor: wait; }
@@ -461,7 +462,6 @@
     <div class="tabs-inner">
       <button data-tab="portfolio" class="active">Portfolio</button>
       <button data-tab="market">Market</button>
-      <button data-tab="ideas">Ideas</button>
       <button data-tab="analyze">Analyze<span class="badge"></span></button>
       <button data-tab="backtest">Backtest</button>
       <button data-tab="chat">Chat</button>
@@ -518,7 +518,7 @@
     <div id="stock-page"><div class="empty">Loading…</div></div>
   </section>
 
-  <section id="ideas-section" data-pane="ideas">
+  <section id="ideas-section" data-pane="market">
     <div class="section-head">
       <h2>Trade ideas</h2>
       <div style="display:flex;gap:8px;align-items:center">
@@ -526,13 +526,31 @@
           <button data-tab="long" class="active">Long</button>
           <button data-tab="short">Short</button>
         </div>
-        <button class="refresh-btn" id="ideas-refresh" title="Re-pull the latest scan and market data">↻ Refresh</button>
       </div>
     </div>
     <div id="idea-filters" class="filter-bar"></div>
     <div id="ideas-filters">
       <label>Min score <input type="number" id="flt-score" min="50" max="100" step="1" placeholder="—"></label>
       <label>Min cap $B <input type="number" id="flt-mcap" min="0" step="1" placeholder="—"></label>
+      <label>Custom
+        <select id="cf-metric">
+          <option value="rsi14">RSI (14d)</option>
+          <option value="pctVs200">% vs 200-day</option>
+          <option value="mom1m">1-mo return %</option>
+          <option value="mom3m">3-mo return %</option>
+          <option value="mom6m">6-mo return %</option>
+          <option value="rsSpy1m">vs S&amp;P 1m (pp)</option>
+          <option value="rsSector1m">vs sector 1m (pp)</option>
+          <option value="volTrend">Volume trend ×</option>
+          <option value="atrPct">ATR %</option>
+          <option value="pct52w">52-wk range %</option>
+          <option value="score">Score</option>
+          <option value="mcapB">Market cap $B</option>
+        </select>
+        <select id="cf-op"><option value=">">&gt;</option><option value="<">&lt;</option></select>
+        <input type="number" id="cf-val" step="any" placeholder="value" style="width:74px">
+        <button class="refresh-btn" id="cf-add" title="Add as a removable filter chip">+ Add filter</button>
+      </label>
       <span class="spacer"></span>
       <button id="gen-btn" title="Pick the strongest setups matching these filters and run each through full AI validation (a few cents, takes a minute or two)">✦ Generate ideas from filters</button>
     </div>
@@ -664,13 +682,14 @@ const chevSvg = `<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fi
    Flat tabs use #name; the stock detail page is a synthetic pane at
    #stock/TICKER (reached via search, not a tab). Stock navigations use
    pushState so the browser back button walks out of them naturally. */
-const PANES = ["portfolio", "market", "ideas", "analyze", "backtest", "chat", "activity", "settings"];
+const PANES = ["portfolio", "market", "analyze", "backtest", "chat", "activity", "settings"];
 function parseHash() {
   const raw = location.hash.slice(1);
   const [name, ...rest] = raw.split("/");
   return { name, param: rest.join("/") || null };
 }
 function showPane(name, param) {
+  if (name === "ideas") name = "market"; // Ideas merged into Market — keep old links/bookmarks working
   if (name === "stock" && param) {
     const ticker = decodeURIComponent(param).toUpperCase();
     document.querySelectorAll("[data-pane]").forEach((el) => { el.hidden = el.dataset.pane !== "stock"; });
@@ -1214,6 +1233,22 @@ const FILTERS = [
   { id: "oversold", label: "Oversold (RSI<35)", test: (i) => !!i && i.rsi14 != null && i.rsi14 < 35 },
   { id: "score70", label: "Score ≥ 70", test: (i, item, isLong) => (isLong ? item.long_score : item.short_score) >= 70 },
 ];
+// Custom user-built filters: metric + operator + value, rendered as removable
+// chips alongside the built-ins. Per-browser (localStorage) like the chips.
+const CUSTOM_METRICS = {
+  rsi14: { label: "RSI", get: (i) => i?.rsi14 },
+  pctVs200: { label: "% vs 200-day", get: (i) => i?.pctVs200 },
+  mom1m: { label: "1-mo %", get: (i) => i?.mom1m },
+  mom3m: { label: "3-mo %", get: (i) => i?.mom3m },
+  mom6m: { label: "6-mo %", get: (i) => i?.mom6m },
+  rsSpy1m: { label: "vs S&P 1m pp", get: (i) => i?.rsSpy1m },
+  rsSector1m: { label: "vs sector 1m pp", get: (i) => i?.rsSector1m },
+  volTrend: { label: "Vol trend ×", get: (i) => i?.volTrend },
+  atrPct: { label: "ATR %", get: (i) => i?.atrPct },
+  pct52w: { label: "52-wk range %", get: (i) => i?.pct52w },
+  score: { label: "Score", get: (i, item, isLong) => (isLong ? item.long_score : item.short_score) },
+  mcapB: { label: "Mkt cap $B", get: (i, item) => { const c = screener[item.ticker]?.market_cap; return c != null ? c / 1e9 : null; } },
+};
 // Corrupt localStorage must not throw at top level — that would blank the whole
 // dashboard with no recovery path. Bad JSON just means "no saved preference".
 const readStoredSet = (key) => { try { return new Set(JSON.parse(localStorage.getItem(key) || "[]")); } catch { return new Set(); } };
@@ -1221,11 +1256,21 @@ const activeFilters = readStoredSet("ideaFilters");
 const collapsedSectors = readStoredSet("collapsedSectors");
 const saveFilters = () => localStorage.setItem("ideaFilters", JSON.stringify([...activeFilters]));
 const saveCollapsed = () => localStorage.setItem("collapsedSectors", JSON.stringify([...collapsedSectors]));
+let customFilters = [];
+try {
+  const raw = JSON.parse(localStorage.getItem("customIdeaFilters") || "[]");
+  if (Array.isArray(raw)) customFilters = raw.filter((f) => f && CUSTOM_METRICS[f.metric] && (f.op === ">" || f.op === "<") && Number.isFinite(f.value));
+} catch {}
+const saveCustomFilters = () => localStorage.setItem("customIdeaFilters", JSON.stringify(customFilters));
 // Numeric thresholds (min score / min market cap) layer on top of the chips.
 const numFilters = { minScore: null, minCapB: null };
-const anyFilterActive = () => activeFilters.size > 0 || numFilters.minScore != null || numFilters.minCapB != null;
+const anyFilterActive = () => activeFilters.size > 0 || customFilters.length > 0 || numFilters.minScore != null || numFilters.minCapB != null;
 function passesFilters(item, i, isLong) {
   for (const f of FILTERS) if (activeFilters.has(f.id) && !f.test(i, item, isLong)) return false;
+  for (const cf of customFilters) {
+    const v = CUSTOM_METRICS[cf.metric]?.get(i, item, isLong);
+    if (v == null || !(cf.op === ">" ? v > cf.value : v < cf.value)) return false;
+  }
   const score = isLong ? item.long_score : item.short_score;
   if (numFilters.minScore != null && score < numFilters.minScore) return false;
   if (numFilters.minCapB != null) {
@@ -1237,14 +1282,36 @@ function passesFilters(item, i, isLong) {
 function renderFilterBar() {
   $("#idea-filters").innerHTML = FILTERS
     .map((f) => `<button class="filter-chip ${activeFilters.has(f.id) ? "on" : ""}" data-filter="${f.id}">${f.label}</button>`)
-    .join("");
+    .join("")
+    + customFilters
+      .map((cf, idx) => `<button class="filter-chip on" data-cfilter="${idx}" title="Remove this filter">${esc(CUSTOM_METRICS[cf.metric].label)} ${cf.op} ${cf.value} ×</button>`)
+      .join("");
 }
 $("#idea-filters").addEventListener("click", (e) => {
+  const cbtn = e.target.closest("[data-cfilter]");
+  if (cbtn) {
+    customFilters.splice(+cbtn.dataset.cfilter, 1);
+    saveCustomFilters();
+    renderFilterBar();
+    renderIdeas();
+    return;
+  }
   const btn = e.target.closest("[data-filter]");
   if (!btn) return;
   const id = btn.dataset.filter;
   activeFilters.has(id) ? activeFilters.delete(id) : activeFilters.add(id);
   saveFilters();
+  renderFilterBar();
+  renderIdeas();
+});
+$("#cf-add").addEventListener("click", () => {
+  const metric = $("#cf-metric").value;
+  const op = $("#cf-op").value;
+  const value = parseFloat($("#cf-val").value);
+  if (!CUSTOM_METRICS[metric] || !Number.isFinite(value)) return;
+  customFilters.push({ metric, op, value });
+  saveCustomFilters();
+  $("#cf-val").value = "";
   renderFilterBar();
   renderIdeas();
 });
@@ -1467,6 +1534,16 @@ $("#gen-btn").addEventListener("click", async () => {
       minScore: numFilters.minScore ?? undefined,
       direction: ideasTab, // generate what the current view shows
     };
+    if (anyFilterActive()) {
+      // Send exactly the tickers the filtered view is showing so the server
+      // only validates candidates the user can see.
+      const isLong = ideasTab === "long";
+      const tickers = [];
+      for (const bd of market?.boards ?? [])
+        for (const item of isLong ? bd.longs : bd.shorts)
+          if (passesFilters(item, screener[item.ticker]?.indicators, isLong)) tickers.push(item.ticker);
+      filters.tickers = tickers;
+    }
     const res = await (await fetch("/api/ideas/generate", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ count: 4, filters }),
     })).json();
@@ -1491,8 +1568,7 @@ async function withSpin(btn, fn) {
   btn.textContent = "↻ Refreshing…";
   try { await fn(); } finally { btn.disabled = false; btn.textContent = orig; }
 }
-$("#ideas-refresh").addEventListener("click", () => withSpin($("#ideas-refresh"), () => loadScreener().then(loadMarket)));
-$("#market-refresh").addEventListener("click", () => withSpin($("#market-refresh"), () => loadMarket()));
+$("#market-refresh").addEventListener("click", () => withSpin($("#market-refresh"), () => loadScreener().then(loadMarket)));
 
 /* ── settings: risk prefs ── */
 async function loadRiskPrefs() {

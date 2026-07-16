@@ -241,6 +241,7 @@ export function startServer() {
                 sectors: Array.isArray(body.filters.sectors) ? body.filters.sectors.map(String).slice(0, 20) : undefined,
                 minScore: Number.isFinite(Number(body.filters.minScore)) ? Math.min(Math.max(Number(body.filters.minScore), 50), 100) : undefined,
                 direction: body.filters.direction === "long" || body.filters.direction === "short" ? body.filters.direction : undefined,
+                tickers: Array.isArray(body.filters.tickers) ? body.filters.tickers.map((t) => String(t).toUpperCase()).slice(0, 300) : undefined,
               }
             : undefined;
           const candidates = pickCandidates(portfolio, count, filters);
