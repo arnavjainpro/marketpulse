@@ -19,7 +19,7 @@ import { saveImport, clearImport, type ImportPayload } from "../broker/manual";
 import { getBrokerLink } from "../db";
 import { allTickers } from "../config";
 import { logOutcome, listOutcomes, deleteOutcome } from "../ai/journal";
-import { hashPassword, verifyPassword, createUser, findUserByEmail, findUserById, createSession, destroySession } from "../auth";
+import { hashPassword, verifyPassword, createUser, findUserByEmail, findUserById, getProfile, updateProfile, createSession, destroySession } from "../auth";
 import { userIdFromRequest, sessionTokenFromRequest, sessionCookieHeader, clearCookieHeader } from "../auth/middleware";
 import { join } from "path";
 
@@ -399,6 +399,25 @@ export function startServer() {
           }
         }
         return Response.json({ prefs: loadRiskConfigFor(userId), customized: !!getRiskPrefs(userId) });
+      }
+
+      // Profile: name/phone are editable; email is the login identity and stays read-only.
+      if (url.pathname === "/api/profile") {
+        if (req.method === "PUT") {
+          try {
+            const body = (await req.json()) as Record<string, unknown>;
+            const str = (v: unknown, max: number) => {
+              const s = String(v ?? "").trim().slice(0, max);
+              return s || null;
+            };
+            const fields = { full_name: str(body.full_name, 120), phone: str(body.phone, 32) };
+            updateProfile(userId, fields);
+            return Response.json({ ok: true, profile: getProfile(userId) });
+          } catch (err) {
+            return Response.json({ ok: false, error: String(err) }, { status: 400 });
+          }
+        }
+        return Response.json({ ok: true, profile: getProfile(userId) });
       }
 
       // Master switch for automatic AI spend (triage/analysis/scheduled briefings).

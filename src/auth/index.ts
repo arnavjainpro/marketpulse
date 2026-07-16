@@ -59,6 +59,16 @@ export function findUserById(id: number): { id: number; email: string } | null {
   return db.query(`SELECT id, email FROM users WHERE id = ?`).get(id) as { id: number; email: string } | null;
 }
 
+export function getProfile(id: number): { email: string; full_name: string | null; phone: string | null } | null {
+  return db.query(`SELECT email, full_name, phone FROM users WHERE id = ?`).get(id) as
+    | { email: string; full_name: string | null; phone: string | null }
+    | null;
+}
+
+export function updateProfile(id: number, fields: { full_name: string | null; phone: string | null }) {
+  db.query(`UPDATE users SET full_name = ?, phone = ? WHERE id = ?`).run(fields.full_name, fields.phone, id);
+}
+
 export function createSession(userId: number): string {
   const token = crypto.randomUUID() + crypto.randomUUID(); // 256+ bits, unguessable
   const now = Math.floor(Date.now() / 1000);

@@ -205,6 +205,13 @@ db.exec(`CREATE INDEX IF NOT EXISTS idx_ideas_user_ts ON ideas(user_id, ts DESC)
 try {
   db.exec(`ALTER TABLE risk_prefs ADD COLUMN target_rr_ratio REAL NOT NULL DEFAULT 2`);
 } catch {}
+// Migration: optional profile fields (Settings → Profile card).
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN full_name TEXT`);
+} catch {}
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN phone TEXT`);
+} catch {}
 
 export function getSetting(key: string, fallback: string): string {
   const row = db.query(`SELECT value FROM settings WHERE user_id = 0 AND key = ?`).get(key) as { value: string } | null;

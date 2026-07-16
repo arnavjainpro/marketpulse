@@ -655,6 +655,39 @@
     </form>
   </section>
 
+  <section data-pane="settings">
+    <h2>Profile</h2>
+    <form class="settings-card" id="profile-form">
+      <div class="settings-row">
+        <label>Email<input type="email" id="pf-email" disabled title="Email is your sign-in identity and can't be changed here"></label>
+        <label>Full name<input type="text" id="pf-name" maxlength="120" placeholder="optional"></label>
+        <label>Phone<input type="tel" id="pf-phone" maxlength="32" placeholder="optional"></label>
+        <button type="submit" class="advise-btn" style="margin-top:0">Save</button>
+      </div>
+      <div class="settings-msg" id="profile-msg"></div>
+    </form>
+  </section>
+
+  <section data-pane="settings">
+    <h2>Appearance</h2>
+    <div class="settings-card">
+      <div class="settings-row" style="align-items:center">
+        <span style="font-weight:600">Theme</span>
+        <div class="tabbar" id="theme-tabs">
+          <button data-theme-opt="system">System</button>
+          <button data-theme-opt="light">Light</button>
+          <button data-theme-opt="dark">Dark</button>
+        </div>
+        <span style="font-weight:600;margin-left:18px">Chart type</span>
+        <div class="tabbar" id="chart-tabs">
+          <button data-chart-opt="line">Line</button>
+          <button data-chart-opt="candles">Candlestick</button>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--faint)">Chart type applies to the stock page price chart. Both preferences are saved in this browser.</p>
+    </div>
+  </section>
+
   <section data-pane="history">
     <h2>Trade journal</h2>
     <form class="settings-card" id="journal-form">
@@ -712,7 +745,7 @@ function showPane(name, param) {
   document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
   const badge = document.querySelector(`#tabs button[data-tab="${name}"] .badge`);
   if (badge) { badge.classList.remove("show"); badge.textContent = ""; }
-  if (name === "settings") loadRiskPrefs();
+  if (name === "settings") { loadRiskPrefs(); loadProfile(); syncAppearanceTabs(); }
   if (name === "history") { loadJournal(); loadPastIdeas(); }
   if (name === "analyze") loadAnalyzeRisk();
   if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
@@ -753,6 +786,7 @@ $("#theme-toggle").addEventListener("click", () => {
   const next = cur === "dark" ? "light" : "dark";
   localStorage.setItem("theme", next);
   applyTheme(next);
+  syncAppearanceTabs(); // keep the Settings segmented control in step
 });
 
 /* ── ⌘K ticker search: on-demand score + news for ANY symbol ── */
@@ -921,6 +955,32 @@ function sparkSvg(el, values, big = false) {
   const up = values[values.length - 1] >= values[0];
   el.setAttribute("viewBox", `0 0 ${w} ${h}`);
   el.innerHTML = `<polyline points="${pts}" fill="none" stroke="${up ? "#00c805" : "#e64a19"}" stroke-width="${big ? 2 : 3}" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>`;
+}
+
+// Hand-drawn daily candlesticks (no chart lib): one wick <line> + body <rect>
+// per bar, same palette as sparkSvg. Used when the chart-type setting is "candles".
+function candleSvg(el, ohlc, maxBars = 90) {
+  const n0 = ohlc?.closes?.length ?? 0;
+  if (n0 < 2) { el.innerHTML = ""; return; }
+  const start = Math.max(0, n0 - maxBars);
+  const opens = ohlc.opens.slice(start), highs = ohlc.highs.slice(start), lows = ohlc.lows.slice(start), closes = ohlc.closes.slice(start);
+  const n = closes.length;
+  const w = n * 4, h = 100;
+  const min = Math.min(...lows), max = Math.max(...highs);
+  const span = max - min || 1;
+  const y = (v) => h - ((v - min) / span) * (h - 8) - 4;
+  let svg = "";
+  for (let i = 0; i < n; i++) {
+    const up = closes[i] >= opens[i];
+    const color = up ? "#00c805" : "#e64a19";
+    const x = i * 4;
+    const top = y(Math.max(opens[i], closes[i]));
+    const bodyH = Math.max(0.5, Math.abs(y(opens[i]) - y(closes[i]))); // dojis stay visible
+    svg += `<line x1="${x + 2}" y1="${y(highs[i]).toFixed(2)}" x2="${x + 2}" y2="${y(lows[i]).toFixed(2)}" stroke="${color}" stroke-width="0.8"/>`;
+    svg += `<rect x="${x + 0.7}" y="${top.toFixed(2)}" width="2.6" height="${bodyH.toFixed(2)}" fill="${color}"/>`;
+  }
+  el.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  el.innerHTML = svg;
 }
 
 /* ── data stores ── */
@@ -1622,6 +1682,50 @@ async function loadPastIdeas() {
   }
 }
 
+/* ── settings: profile ── */
+async function loadProfile() {
+  try {
+    const { profile } = await (await fetch("/api/profile")).json();
+    if (!profile) return;
+    $("#pf-email").value = profile.email ?? "";
+    $("#pf-name").value = profile.full_name ?? "";
+    $("#pf-phone").value = profile.phone ?? "";
+  } catch {}
+}
+$("#profile-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const res = await (await fetch("/api/profile", {
+    method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ full_name: $("#pf-name").value, phone: $("#pf-phone").value }),
+  })).json();
+  const msg = $("#profile-msg");
+  msg.textContent = res.ok ? "Saved." : `Failed: ${res.error}`;
+  setTimeout(() => { msg.textContent = ""; }, 5000);
+});
+
+/* ── settings: appearance (theme + chart type, per-browser) ── */
+function syncAppearanceTabs() {
+  const theme = localStorage.getItem("theme") || "system";
+  document.querySelectorAll("#theme-tabs [data-theme-opt]").forEach((b) => b.classList.toggle("active", b.dataset.themeOpt === theme));
+  const chart = localStorage.getItem("chartType") || "line";
+  document.querySelectorAll("#chart-tabs [data-chart-opt]").forEach((b) => b.classList.toggle("active", b.dataset.chartOpt === chart));
+}
+$("#theme-tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-theme-opt]");
+  if (!b) return;
+  const opt = b.dataset.themeOpt;
+  if (opt === "system") localStorage.removeItem("theme");
+  else localStorage.setItem("theme", opt);
+  applyTheme(opt === "system" ? null : opt);
+  syncAppearanceTabs();
+});
+$("#chart-tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-chart-opt]");
+  if (!b) return;
+  localStorage.setItem("chartType", b.dataset.chartOpt);
+  syncAppearanceTabs();
+});
+
 /* ── settings: risk prefs ── */
 async function loadRiskPrefs() {
   try {
@@ -1749,7 +1853,9 @@ async function renderStockPage(ticker) {
     ${data.news?.length ? `<h2 style="margin-top:18px">Recent news</h2>${newsListHtml(data.news)}` : ""}
     ${alertBoxHtml(ticker, q?.c)}
     ${data.ideas?.length ? `<h2 style="margin-top:18px">Past analyses</h2><div id="stock-past"></div>` : ""}`;
-  if (data.spark?.closes) sparkSvg($("#stock-spark"), data.spark.closes, true);
+  const chartType = localStorage.getItem("chartType") || "line";
+  if (chartType === "candles" && data.ohlc?.closes?.length > 1) candleSvg($("#stock-spark"), data.ohlc);
+  else if (data.spark?.closes) sparkSvg($("#stock-spark"), data.spark.closes, true);
   if (r) {
     screener[ticker] = r; // make factorDetail work for off-universe lookups too
     $("#stock-factors").innerHTML = factorDetail(ticker, { actions: false });
