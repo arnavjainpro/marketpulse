@@ -7,4 +7,4 @@ config/portfolio.yaml
 .DS_Store
 dist/
 build/
-.gstack/
+.gstack/PLAN.md
