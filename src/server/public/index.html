@@ -65,7 +65,7 @@
     max-width: 760px; margin: 0 auto; padding: 14px 20px;
     display: flex; align-items: center; gap: 14px;
   }
-  .wordmark { font-weight: 800; font-size: 17px; letter-spacing: -.02em; }
+  .wordmark { font-weight: 800; font-size: 17px; letter-spacing: -.02em; color: inherit; text-decoration: none; cursor: pointer; }
   .wordmark span { color: var(--green-bright); }
   #status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green-bright); }
   #status-dot.bad { background: var(--red); }
@@ -445,7 +445,7 @@
 
 <header hidden>
   <div class="header-inner">
-    <span class="wordmark">Market<span>Pulse</span></span>
+    <a class="wordmark" id="home-link" href="#portfolio" title="Home">Market<span>Pulse</span></a>
     <span id="status-dot" title="system status"></span>
     <span id="status-label">live</span>
     <span class="spacer"></span>
@@ -482,7 +482,7 @@
     <div id="broker-line"></div>
     <div id="import-panel">
       <div class="hint">Link Robinhood (read-only) for live positions — run <code>bun run link:robinhood</code> once. It takes priority over this manual paste, which is the universal fallback for any broker's export.</div>
-      <textarea id="import-json" spellcheck="false" placeholder='{"positions":[{"ticker":"AAPL","shares":10,"cost_basis":180}],"watchlist":["NVDA"],"account":{"equity":25000}}'></textarea>
+      <textarea id="import-json" spellcheck="false" placeholder='{"positions":[{"ticker":"AAPL","shares":10,"cost_basis":180},{"ticker":"AAPL 2026-08-21 250C","shares":2,"cost_basis":5.20,"asset_class":"option","market_value":1240,"option":{"type":"call","strike":250,"expiry":"2026-08-21","underlying":"AAPL"}}],"watchlist":["NVDA"],"account":{"equity":25000}}'></textarea>
       <div class="hint" id="import-msg"></div>
       <button class="advise-btn" id="import-go" style="margin-top:6px">Import</button>
       <button class="advise-btn ghost" id="import-clear" style="margin-top:6px">Clear import (back to YAML)</button>

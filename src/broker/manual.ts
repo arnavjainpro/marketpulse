@@ -23,8 +23,17 @@ export const yamlProvider: BrokerProvider = {
 };
 
 // Normalized import payload — tolerant of common broker-export field names.
+// Options/crypto positions carry asset_class + market_value (and option legs
+// their contract details) so non-equity holdings survive a manual import.
 export interface ImportPayload {
-  positions?: { ticker?: string; symbol?: string; shares?: number; quantity?: number; qty?: number; cost_basis?: number; avg_price?: number; average_buy_price?: number }[];
+  positions?: {
+    ticker?: string; symbol?: string;
+    shares?: number; quantity?: number; qty?: number; // contracts for options (negative = short)
+    cost_basis?: number; avg_price?: number; average_buy_price?: number;
+    asset_class?: "equity" | "option" | "crypto";
+    market_value?: number;
+    option?: { type: "call" | "put"; strike: number; expiry: string; underlying: string };
+  }[];
   watchlist?: string[];
   orders?: Partial<BrokerOrder & { symbol: string }>[];
   account?: { equity?: number; cash?: number; buying_power?: number };
@@ -36,8 +45,11 @@ export function saveImport(userId: number, payload: ImportPayload): BrokerSnapsh
       ticker: String(p.ticker ?? p.symbol ?? "").toUpperCase().trim(),
       shares: Number(p.shares ?? p.quantity ?? p.qty ?? 0),
       cost_basis: Number(p.cost_basis ?? p.avg_price ?? p.average_buy_price ?? 0),
+      ...(p.asset_class && p.asset_class !== "equity" ? { asset_class: p.asset_class } : {}),
+      ...(p.market_value != null ? { market_value: Number(p.market_value) } : {}),
+      ...(p.option ? { option: p.option } : {}),
     }))
-    .filter((h) => h.ticker && h.shares > 0);
+    .filter((h) => h.ticker && h.shares !== 0);
   if (!holdings.length && !(payload.watchlist ?? []).length) {
     throw new Error("import contained no positions or watchlist symbols");
   }
