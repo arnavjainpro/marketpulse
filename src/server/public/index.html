@@ -384,6 +384,8 @@
   details.block summary .chev2 { color: var(--faint); transition: transform .18s; }
   details.block[open] summary .chev2 { transform: rotate(90deg); }
   details.block .inner { padding: 0 16px 16px; }
+  #history-ideas details.block { margin-bottom: 10px; }
+  #history-ideas .close-report { display: none; }
   #brief-gen { margin-left: auto; background: none; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; font-weight: 600; padding: 4px 12px; color: var(--dim); }
   #brief-gen:hover { border-color: var(--green-bright); color: var(--green); }
   #brief-gen:disabled { opacity: .5; cursor: wait; }
@@ -466,6 +468,7 @@
       <button data-tab="backtest">Backtest</button>
       <button data-tab="chat">Chat</button>
       <button data-tab="activity">Activity<span class="badge"></span></button>
+      <button data-tab="history">History</button>
       <button data-tab="settings">Settings</button>
     </div>
   </nav>
@@ -565,6 +568,7 @@
         <button data-mode="intraday" class="active">Intraday</button>
         <button data-mode="swing">Swing / Options</button>
       </div>
+      <div class="hint" id="analyze-risk-line"></div>
       <div class="intraday-row">
         <input type="text" id="intraday-ticker" placeholder="Ticker" autocomplete="off">
         <select id="intraday-tf">
@@ -651,7 +655,7 @@
     </form>
   </section>
 
-  <section data-pane="settings">
+  <section data-pane="history">
     <h2>Trade journal</h2>
     <form class="settings-card" id="journal-form">
       <div class="settings-row">
@@ -671,6 +675,11 @@
     <div class="card" style="margin-top:12px;padding:4px 16px" id="journal-list"><div class="empty">No trades logged yet. Each one you log makes future AI analysis more personal.</div></div>
   </section>
 
+  <section data-pane="history">
+    <h2>Past analyses</h2>
+    <div id="history-ideas"><div class="empty">No validated ideas yet — validate a ticker or generate ideas and they'll show up here.</div></div>
+  </section>
+
   <p class="disclaimer">MarketPulse is a decision-support tool, not licensed financial advice. Every trade is your decision.</p>
 </main>
 
@@ -682,7 +691,7 @@ const chevSvg = `<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fi
    Flat tabs use #name; the stock detail page is a synthetic pane at
    #stock/TICKER (reached via search, not a tab). Stock navigations use
    pushState so the browser back button walks out of them naturally. */
-const PANES = ["portfolio", "market", "analyze", "backtest", "chat", "activity", "settings"];
+const PANES = ["portfolio", "market", "analyze", "backtest", "chat", "activity", "history", "settings"];
 function parseHash() {
   const raw = location.hash.slice(1);
   const [name, ...rest] = raw.split("/");
@@ -703,7 +712,9 @@ function showPane(name, param) {
   document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
   const badge = document.querySelector(`#tabs button[data-tab="${name}"] .badge`);
   if (badge) { badge.classList.remove("show"); badge.textContent = ""; }
-  if (name === "settings") { loadRiskPrefs(); loadJournal(); }
+  if (name === "settings") loadRiskPrefs();
+  if (name === "history") { loadJournal(); loadPastIdeas(); }
+  if (name === "analyze") loadAnalyzeRisk();
   if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
 }
 function bumpBadge(name) {
@@ -1569,6 +1580,47 @@ async function withSpin(btn, fn) {
   try { await fn(); } finally { btn.disabled = false; btn.textContent = orig; }
 }
 $("#market-refresh").addEventListener("click", () => withSpin($("#market-refresh"), () => loadScreener().then(loadMarket)));
+
+/* ── analyze tab: show which risk settings drive position sizing ── */
+async function loadAnalyzeRisk() {
+  const line = $("#analyze-risk-line");
+  if (!line) return;
+  try {
+    const { prefs } = await (await fetch("/api/risk-prefs")).json();
+    const equity = prefs.account_equity != null ? money(Number(prefs.account_equity)) : "from broker";
+    line.innerHTML = `Position sizing uses your risk settings: equity ${esc(equity)} · max ${esc(String(prefs.max_risk_per_trade_pct))}%/trade · max position ${esc(String(prefs.max_position_pct))}% · target R:R ${esc(String(prefs.target_rr_ratio))} — <a href="#settings">edit</a>`;
+  } catch { line.textContent = ""; }
+}
+
+/* ── history: past validated ideas ── */
+async function loadPastIdeas() {
+  const box = $("#history-ideas");
+  try {
+    const { ideas } = await (await fetch("/api/ideas")).json();
+    if (!ideas?.length) {
+      box.innerHTML = `<div class="empty">No validated ideas yet — validate a ticker or generate ideas and they'll show up here.</div>`;
+      return;
+    }
+    box.innerHTML = "";
+    for (const rep of ideas) {
+      const det = document.createElement("details");
+      det.className = "block";
+      const dirTone = rep.direction === "long" ? "buy" : rep.direction === "short" ? "sell" : "calm";
+      det.innerHTML = `
+        <summary><svg class="chev2" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 6 6 6-6 6"/></svg>
+          <span style="font-weight:700">${esc(rep.ticker)}</span>
+          <span class="chip ${dirTone} sm">${esc(rep.direction ?? "—").replace("_", " ")}</span>
+          <span class="rbadge ${esc(rep.rating)}">${esc(rep.rating)}</span>
+          <span style="margin-left:auto;font-size:12px;color:var(--faint)">${esc(rep.source ?? "")} · ${new Date(rep.ts * 1000).toLocaleString()}</span>
+        </summary>
+        <div class="inner">${reportCardHtml(rep)}</div>`;
+      det.querySelector(".close-report")?.remove();
+      box.appendChild(det);
+    }
+  } catch {
+    box.innerHTML = `<div class="empty">Could not load past analyses.</div>`;
+  }
+}
 
 /* ── settings: risk prefs ── */
 async function loadRiskPrefs() {
