@@ -20,6 +20,7 @@ import { scoreTicker } from "./ticker";
 export type AlertKind = "price_above" | "price_below" | "score_gte";
 export interface AlertRow {
   id: number;
+  user_id: number;
   ticker: string;
   kind: AlertKind;
   threshold: number;
@@ -52,17 +53,18 @@ function scoreFromScreener(ticker: string): number | null {
   return Math.max(row.long_score ?? row.score ?? 0, row.short_score ?? 0);
 }
 
-export function listAlerts(): AlertRow[] {
-  return db.query(`SELECT * FROM alerts ORDER BY active DESC, created_ts DESC`).all() as AlertRow[];
+export function listAlerts(userId: number): AlertRow[] {
+  return db.query(`SELECT * FROM alerts WHERE user_id = ? ORDER BY active DESC, created_ts DESC`).all(userId) as AlertRow[];
 }
-export function deleteAlert(id: number): void {
-  db.query(`DELETE FROM alerts WHERE id = ?`).run(id);
+export function deleteAlert(userId: number, id: number): void {
+  db.query(`DELETE FROM alerts WHERE user_id = ? AND id = ?`).run(userId, id);
 }
-export function activeAlertTickerCount(): number {
-  return (db.query(`SELECT COUNT(DISTINCT ticker) n FROM alerts WHERE active = 1`).get() as any).n;
+// Distinct alert tickers for one user (the per-user cap on how many they can watch).
+export function activeAlertTickerCount(userId: number): number {
+  return (db.query(`SELECT COUNT(DISTINCT ticker) n FROM alerts WHERE active = 1 AND user_id = ?`).get(userId) as any).n;
 }
 
-export async function createAlert(rawTicker: string, kind: AlertKind, threshold: number): Promise<AlertRow> {
+export async function createAlert(userId: number, rawTicker: string, kind: AlertKind, threshold: number): Promise<AlertRow> {
   const ticker = rawTicker.trim().toUpperCase();
   if (!ticker) throw new Error("Ticker required");
   if (!["price_above", "price_below", "score_gte"].includes(kind)) throw new Error("Bad alert kind");
@@ -73,8 +75,8 @@ export async function createAlert(rawTicker: string, kind: AlertKind, threshold:
     throw new Error("Score threshold must be between 0 and 100");
   }
 
-  const isNewTicker = !(db.query(`SELECT 1 FROM alerts WHERE ticker = ? AND active = 1`).get(ticker));
-  if (isNewTicker && activeAlertTickerCount() >= MAX_ALERT_TICKERS) {
+  const isNewTicker = !(db.query(`SELECT 1 FROM alerts WHERE user_id = ? AND ticker = ? AND active = 1`).get(userId, ticker));
+  if (isNewTicker && activeAlertTickerCount(userId) >= MAX_ALERT_TICKERS) {
     throw new Error(`Alert limit reached (${MAX_ALERT_TICKERS} tickers). Delete one first.`);
   }
 
@@ -85,12 +87,12 @@ export async function createAlert(rawTicker: string, kind: AlertKind, threshold:
   else { try { const q = await cachedQuote(ticker); seed = q?.c ?? null; } catch { /* seed stays null */ } }
 
   db.query(
-    `INSERT INTO alerts (ticker, kind, threshold, last_value, active, created_ts)
-     VALUES (?, ?, ?, ?, 1, unixepoch())
-     ON CONFLICT(ticker, kind, threshold)
+    `INSERT INTO alerts (user_id, ticker, kind, threshold, last_value, active, created_ts)
+     VALUES (?, ?, ?, ?, ?, 1, unixepoch())
+     ON CONFLICT(user_id, ticker, kind, threshold)
        DO UPDATE SET active = 1, last_value = excluded.last_value, last_fired_ts = NULL`
-  ).run(ticker, kind, threshold, seed);
-  return db.query(`SELECT * FROM alerts WHERE ticker = ? AND kind = ? AND threshold = ?`).get(ticker, kind, threshold) as AlertRow;
+  ).run(userId, ticker, kind, threshold, seed);
+  return db.query(`SELECT * FROM alerts WHERE user_id = ? AND ticker = ? AND kind = ? AND threshold = ?`).get(userId, ticker, kind, threshold) as AlertRow;
 }
 
 // ── evaluation (called from the detector loop) ───────────────────────────────

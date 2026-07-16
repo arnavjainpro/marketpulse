@@ -10,7 +10,7 @@ import { fetchDailyCandles } from "../ingest/yahoo";
 import { scanUniverse, sectorMap, sectorEtf } from "../ingest/universe";
 import { benchmarkCandles, refreshMarketContext, getMarketSnapshot } from "./market";
 import { rsi, macd, sma, atr, slopePctPerBar, pivotLevels, rangeBreak, betaVs } from "./technicals";
-import type { Portfolio } from "../config";
+import { loadUniverseFilters, type Portfolio } from "../config";
 import type { RawEvent } from "./detectors";
 
 export interface Indicators {
@@ -285,11 +285,14 @@ export interface ScreenRow {
   indicators: Indicators;
   updated_at: number;
   held: boolean;
+  market_cap: number | null; // from the universe table (dashboard filters)
 }
 
 export function getScreenerRows(portfolio: Portfolio): ScreenRow[] {
   const heldSet = new Set(portfolio.holdings.map((h) => h.ticker));
-  const rows = db.query(`SELECT * FROM screener ORDER BY score DESC`).all() as any[];
+  const rows = db
+    .query(`SELECT s.*, u.market_cap FROM screener s LEFT JOIN universe u ON u.ticker = s.ticker ORDER BY s.score DESC`)
+    .all() as any[];
   return rows.map((r) => ({
     ticker: r.ticker,
     score: r.score,
@@ -301,6 +304,7 @@ export function getScreenerRows(portfolio: Portfolio): ScreenRow[] {
     indicators: JSON.parse(r.indicators),
     updated_at: r.updated_at,
     held: heldSet.has(r.ticker),
+    market_cap: r.market_cap ?? null,
   }));
 }
 
@@ -371,7 +375,8 @@ export async function runScan(portfolio: Portfolio): Promise<RawEvent[]> {
   const sectors = sectorMap();
   const heldSet = new Set(portfolio.holdings.map((h) => h.ticker));
   const regime = getMarketSnapshot()?.regime;
-  console.log(`[screener] scanning ${tickers.length} tickers (~${Math.round((tickers.length * 0.4) / 60)} min)`);
+  const concurrency = loadUniverseFilters().concurrency;
+  console.log(`[screener] scanning ${tickers.length} tickers, concurrency ${concurrency} (~${Math.max(1, Math.round((tickers.length * 0.4) / 60 / concurrency))} min)`);
   const events: RawEvent[] = [];
   let scanned = 0;
 
@@ -394,19 +399,25 @@ export async function runScan(portfolio: Portfolio): Promise<RawEvent[]> {
   const pickCands: { t: string; ind: Indicators; score: number; sector: string }[] = [];
   const shortCands: { t: string; ind: Indicators; score: number; sector: string }[] = [];
 
-  for (const t of tickers) {
+  // Bounded-concurrency pool over Yahoo's unauthenticated candle endpoint.
+  // Each worker keeps the 180ms politeness delay, so aggregate request rate is
+  // concurrency × ~5.5 req/s. If Yahoo starts failing (nulls/429s), workers
+  // above the first two park themselves for the rest of the scan.
+  let cursor = 0;
+  let recentFailures = 0; // rolling penalty: +1 per null fetch, -1 (floor 0) per success
+  const scanOne = async (t: string) => {
     const candles = await fetchDailyCandles(t);
-    await Bun.sleep(180); // be polite to Yahoo
-    if (scanned > 0 && scanned % 200 === 0) console.log(`[screener] progress: ${scanned}/${tickers.length}`);
-    if (!candles) continue;
+    if (!candles) { recentFailures++; return; }
+    recentFailures = Math.max(0, recentFailures - 1);
     const sector = sectors.get(t) ?? "Unknown";
     const sectorCloses = benchmarkCandles(sectorEtf(sector))?.closes ?? null;
     const ind = computeIndicators(candles, spyCloses, sectorCloses);
-    if (!ind) continue;
+    if (!ind) return;
     const longScore = scoreLong(ind);
     const shortScore = scoreShort(ind);
     const direction = directionOf(longScore, shortScore);
     scanned++;
+    if (scanned % 200 === 0) console.log(`[screener] progress: ${scanned}/${tickers.length}`);
 
     upsert.run(t, longScore, longScore, shortScore, direction, sector, ind.crossStatus, JSON.stringify(ind));
 
@@ -421,7 +432,27 @@ export async function runScan(portfolio: Portfolio): Promise<RawEvent[]> {
     }
     if (longScore >= 84 && !regime?.riskOff) pickCands.push({ t, ind, score: longScore, sector });
     if (shortScore >= 84) shortCands.push({ t, ind, score: shortScore, sector });
-  }
+  };
+  await Promise.all(
+    Array.from({ length: Math.max(1, concurrency) }, async (_, w) => {
+      while (cursor < tickers.length) {
+        // Failure spike (sustained nulls): park every worker beyond the first
+        // two — serial-ish pace is the safe fallback, and successes heal the counter.
+        if (w >= 2 && recentFailures >= 15) {
+          console.log(`[screener] worker ${w} parked — Yahoo failure spike (${recentFailures} rolling)`);
+          return;
+        }
+        const t = tickers[cursor++];
+        try {
+          await scanOne(t);
+        } catch (err) {
+          recentFailures++;
+          console.error(`[screener] ${t}:`, err);
+        }
+        await Bun.sleep(180); // be polite to Yahoo
+      }
+    })
+  );
 
   // Only the strongest confluences in the whole universe become events.
   for (const c of pickCands.sort((a, b) => b.score - a.score).slice(0, 12)) {

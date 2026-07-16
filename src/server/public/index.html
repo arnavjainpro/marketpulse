@@ -60,6 +60,7 @@
     position: sticky; top: 0; z-index: 20; background: var(--header-bg); backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--line);
   }
+  [hidden] { display: none !important; }
   .header-inner {
     max-width: 760px; margin: 0 auto; padding: 14px 20px;
     display: flex; align-items: center; gap: 14px;
@@ -192,6 +193,54 @@
   }
   .advise-btn:hover { opacity: .85; }
   .advise-btn:disabled { opacity: .5; cursor: wait; }
+
+  /* auth screen */
+  #auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  #auth-card { width: 100%; max-width: 360px; border: 1px solid var(--line); border-radius: var(--radius); padding: 28px 26px; display: flex; flex-direction: column; gap: 12px; }
+  #auth-card .wordmark { font-size: 22px; margin-bottom: 4px; }
+  #auth-card p { font-size: 13px; color: var(--dim); margin-bottom: 6px; }
+  #auth-card input {
+    border: 1px solid var(--line); border-radius: 999px; padding: 10px 16px;
+    font: 14px var(--sans); background: var(--gray-soft); width: 100%;
+  }
+  #auth-card input:focus { outline: none; border-color: var(--green-bright); background: var(--bg); }
+  #auth-card .advise-btn { margin-top: 4px; width: 100%; }
+  #auth-error { color: var(--red); font-size: 13px; min-height: 16px; }
+  #auth-flip { border: none; background: none; color: var(--dim); font-size: 13px; text-decoration: underline; align-self: center; }
+  #logout-btn { border: 1px solid var(--line); background: none; border-radius: 999px; font-size: 12px; font-weight: 600; padding: 4px 12px; color: var(--dim); }
+  #logout-btn:hover { border-color: var(--red); color: var(--red); }
+
+  /* settings pane */
+  .settings-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .settings-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .settings-row label { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--dim); font-weight: 600; }
+  .settings-row input, .settings-row select {
+    border: 1px solid var(--line); border-radius: 999px; padding: 7px 12px; font: 13px var(--sans); background: var(--gray-soft); width: 120px;
+  }
+  .settings-row input:focus, .settings-row select:focus { outline: none; border-color: var(--green-bright); background: var(--bg); }
+  .settings-msg { font-size: 12.5px; color: var(--green); min-height: 15px; }
+  #journal-notes { width: 100%; min-height: 60px; border: 1px solid var(--line); border-radius: 10px; font: 13px/1.5 var(--sans); padding: 8px 12px; resize: vertical; }
+  #journal-notes:focus { outline: none; border-color: var(--green-bright); }
+  .journal-item { display: flex; gap: 10px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13px; flex-wrap: wrap; }
+  .journal-item:last-child { border-bottom: none; }
+  .journal-item .del { margin-left: auto; border: none; background: none; color: var(--faint); font-size: 15px; }
+  .journal-item .del:hover { color: var(--red); }
+  .journal-item .note { width: 100%; color: var(--dim); font-size: 12.5px; }
+
+  /* ideas filter panel */
+  #ideas-filters { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 12px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; font-size: 12.5px; color: var(--dim); }
+  #ideas-filters label { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+  #ideas-filters input[type=number] { border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; width: 64px; font: 12.5px var(--sans); background: var(--gray-soft); }
+  #ideas-filters input[type=number]:focus { outline: none; border-color: var(--green-bright); background: var(--bg); }
+  .refresh-btn { border: 1px solid var(--line); background: none; border-radius: 999px; font-size: 12px; font-weight: 600; padding: 4px 12px; color: var(--dim); }
+  .refresh-btn:hover { border-color: var(--green-bright); color: var(--green); }
+  .refresh-btn:disabled { opacity: .5; cursor: wait; }
+
+  /* stock detail page */
+  #stock-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  #stock-head .px { font-size: 30px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  #stock-head .sym { font-size: 22px; font-weight: 800; }
+  #stock-spark { width: 100%; height: 90px; margin: 12px 0 4px; }
   .advise-btn.ghost { background: none; color: var(--text); border: 1px solid var(--line); }
 
   .empty { color: var(--faint); font-size: 14px; padding: 18px 16px; }
@@ -375,14 +424,26 @@
 </head>
 <body>
 
+<section id="auth-screen" hidden>
+  <form id="auth-card">
+    <span class="wordmark">Market<span>Pulse</span></span>
+    <p id="auth-blurb">Sign in to your account.</p>
+    <input type="email" id="auth-email" placeholder="Email" autocomplete="email" required>
+    <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password" required minlength="8">
+    <div id="auth-error"></div>
+    <button type="submit" class="advise-btn" id="auth-submit">Sign in</button>
+    <button type="button" id="auth-flip">New here? Create an account</button>
+  </form>
+</section>
+
 <div id="ticker-modal" hidden>
   <div class="tm-card" role="dialog" aria-label="Ticker search">
     <input id="ticker-search" type="text" placeholder="Search any ticker — AAPL, NVDA, MSFT…" autocomplete="on" spellcheck="false" maxlength="6">
-    <div id="ticker-result"><div class="tm-hint">Type a symbol. You get its live price, your MarketPulse score, and recent news — then jump to TradingView for the chart.</div></div>
+    <div id="ticker-result"><div class="tm-hint">Type a symbol. You get its live price, your MarketPulse score, and recent news — jump to the full page or TradingView.</div></div>
   </div>
 </div>
 
-<header>
+<header hidden>
   <div class="header-inner">
     <span class="wordmark">Market<span>Pulse</span></span>
     <span id="status-dot" title="system status"></span>
@@ -394,6 +455,7 @@
       Live AI updates
       <button class="switch" id="ai-toggle" role="switch" aria-checked="true" aria-label="Toggle live AI updates"><i></i></button>
     </span>
+    <button id="logout-btn" title="Sign out">Log out</button>
   </div>
   <nav id="tabs">
     <div class="tabs-inner">
@@ -404,12 +466,13 @@
       <button data-tab="backtest">Backtest</button>
       <button data-tab="chat">Chat</button>
       <button data-tab="activity">Activity<span class="badge"></span></button>
+      <button data-tab="settings">Settings</button>
     </div>
   </nav>
 </header>
 <div id="banner">AI was halted after unusually high activity to protect your API spend.<button id="breaker-reset">Resume</button></div>
 
-<main>
+<main hidden>
   <section id="portfolio" data-pane="portfolio">
     <h2>Your portfolio</h2>
     <div id="portfolio-value">$—</div>
@@ -442,8 +505,17 @@
   </section>
 
   <section id="sectors-section" data-pane="market">
-    <div class="section-head"><h2>Sectors — rotation &amp; setups</h2><span id="sector-meta" style="font-size:12px;color:var(--faint)"></span></div>
+    <div class="section-head"><h2>Sectors — rotation &amp; setups</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="sector-meta" style="font-size:12px;color:var(--faint)"></span>
+        <button class="refresh-btn" id="market-refresh" title="Re-pull regime and sector data">↻ Refresh</button>
+      </div>
+    </div>
     <div class="card"><table class="sectors" id="sector-table"><tbody><tr><td class="empty">Waiting for the first scan…</td></tr></tbody></table></div>
+  </section>
+
+  <section id="stock-section" data-pane="stock" hidden>
+    <div id="stock-page"><div class="empty">Loading…</div></div>
   </section>
 
   <section id="ideas-section" data-pane="ideas">
@@ -454,10 +526,16 @@
           <button data-tab="long" class="active">Long</button>
           <button data-tab="short">Short</button>
         </div>
-        <button id="gen-btn" title="Validate the strongest setups with AI (a few cents, takes a minute or two)">✦ Generate &amp; validate</button>
+        <button class="refresh-btn" id="ideas-refresh" title="Re-pull the latest scan and market data">↻ Refresh</button>
       </div>
     </div>
     <div id="idea-filters" class="filter-bar"></div>
+    <div id="ideas-filters">
+      <label>Min score <input type="number" id="flt-score" min="50" max="100" step="1" placeholder="—"></label>
+      <label>Min cap $B <input type="number" id="flt-mcap" min="0" step="1" placeholder="—"></label>
+      <span class="spacer"></span>
+      <button id="gen-btn" title="Pick the strongest setups matching these filters and run each through full AI validation (a few cents, takes a minute or two)">✦ Generate ideas from filters</button>
+    </div>
     <div class="card" id="ideas"><div class="empty">Scanning the market… the first full scan takes several minutes after startup.</div></div>
     <div id="report-area"></div>
   </section>
@@ -540,6 +618,41 @@
     <div class="inner" id="activity"></div>
   </details>
 
+  <section data-pane="settings">
+    <h2>Risk settings</h2>
+    <form class="settings-card" id="risk-form">
+      <div class="settings-row">
+        <label>Account equity $ (fallback)<input type="number" id="rp-equity" min="0" step="100" placeholder="from broker"></label>
+        <label>Max risk per trade %<input type="number" id="rp-risk" min="0.1" max="10" step="0.1"></label>
+        <label>Max position %<input type="number" id="rp-pos" min="1" max="100" step="1"></label>
+        <label>Target risk : reward<input type="number" id="rp-rr" min="1" max="10" step="0.5" title="Minimum R:R for an idea to rate 'strong' — raise it and the AI grades setups more harshly"></label>
+        <button type="submit" class="advise-btn" style="margin-top:0">Save</button>
+      </div>
+      <div class="settings-msg" id="risk-msg"></div>
+      <p style="font-size:12px;color:var(--faint)">The target R:R feeds directly into idea validation: a setup only rates “strong” if its reward-to-risk clears your bar. Equity is only used when no broker is linked.</p>
+    </form>
+  </section>
+
+  <section data-pane="settings">
+    <h2>Trade journal</h2>
+    <form class="settings-card" id="journal-form">
+      <div class="settings-row">
+        <label>Ticker<input type="text" id="jr-ticker" style="text-transform:uppercase" required></label>
+        <label>Direction<select id="jr-dir"><option value="long">Long</option><option value="short">Short</option></select></label>
+        <label>Outcome<select id="jr-outcome"><option value="win">Win</option><option value="loss">Loss</option><option value="breakeven">Breakeven</option></select></label>
+        <label>P&amp;L %<input type="number" id="jr-pnl" step="0.1" placeholder="optional"></label>
+        <label>Entry $<input type="number" id="jr-entry" step="0.01" placeholder="optional"></label>
+        <label>Exit $<input type="number" id="jr-exit" step="0.01" placeholder="optional"></label>
+      </div>
+      <textarea id="journal-notes" placeholder="What actually happened — what went right or wrong, in your own words. The AI reads this history when validating future setups (e.g. “chased the breakout with no volume confirmation, stopped out at the pivot”)."></textarea>
+      <div class="settings-row">
+        <button type="submit" class="advise-btn" style="margin-top:0">Log trade</button>
+        <span class="settings-msg" id="journal-msg"></span>
+      </div>
+    </form>
+    <div class="card" style="margin-top:12px;padding:4px 16px" id="journal-list"><div class="empty">No trades logged yet. Each one you log makes future AI analysis more personal.</div></div>
+  </section>
+
   <p class="disclaimer">MarketPulse is a decision-support tool, not licensed financial advice. Every trade is your decision.</p>
 </main>
 
@@ -547,14 +660,31 @@
 const $ = (s) => document.querySelector(s);
 const chevSvg = `<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 6 6 6-6 6"/></svg>`;
 
-/* ── tab routing (native hidden + location.hash) ── */
-const PANES = ["portfolio", "market", "ideas", "analyze", "backtest", "chat", "activity"];
-function showPane(name) {
+/* ── tab routing (native hidden + location.hash) ──
+   Flat tabs use #name; the stock detail page is a synthetic pane at
+   #stock/TICKER (reached via search, not a tab). Stock navigations use
+   pushState so the browser back button walks out of them naturally. */
+const PANES = ["portfolio", "market", "ideas", "analyze", "backtest", "chat", "activity", "settings"];
+function parseHash() {
+  const raw = location.hash.slice(1);
+  const [name, ...rest] = raw.split("/");
+  return { name, param: rest.join("/") || null };
+}
+function showPane(name, param) {
+  if (name === "stock" && param) {
+    const ticker = decodeURIComponent(param).toUpperCase();
+    document.querySelectorAll("[data-pane]").forEach((el) => { el.hidden = el.dataset.pane !== "stock"; });
+    document.querySelectorAll("#tabs button").forEach((b) => b.classList.remove("active"));
+    if (location.hash !== "#stock/" + ticker) history.pushState(null, "", "#stock/" + ticker);
+    renderStockPage(ticker);
+    return;
+  }
   if (!PANES.includes(name)) name = "portfolio";
   document.querySelectorAll("[data-pane]").forEach((el) => { el.hidden = el.dataset.pane !== name; });
   document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
   const badge = document.querySelector(`#tabs button[data-tab="${name}"] .badge`);
   if (badge) { badge.classList.remove("show"); badge.textContent = ""; }
+  if (name === "settings") { loadRiskPrefs(); loadJournal(); }
   if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
 }
 function bumpBadge(name) {
@@ -565,8 +695,18 @@ function bumpBadge(name) {
   b.classList.add("show");
 }
 $("#tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-tab]"); if (b) showPane(b.dataset.tab); });
-window.addEventListener("hashchange", () => showPane(location.hash.slice(1)));
-showPane(location.hash.slice(1) || "portfolio");
+window.addEventListener("hashchange", () => { const { name, param } = parseHash(); showPane(name, param); });
+{ const { name, param } = parseHash(); showPane(name || "portfolio", param); }
+
+/* ── ⌘K modal: Enter jumps from the quick-preview to the full stock page ── */
+$("#ticker-search").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  const t = e.target.value.toUpperCase().trim().replace(/[^A-Z0-9.\-]/g, "");
+  if (!t) return;
+  e.target.value = "";
+  closeTickerModal();
+  showPane("stock", t);
+});
 
 /* ── theme: prefers-color-scheme is the free baseline; a stored choice overrides ── */
 function applyTheme(t) {
@@ -639,6 +779,8 @@ async function loadAlertList(ticker) {
       </div>`).join("");
 }
 tickerResult.addEventListener("click", async (e) => {
+  const fullBtn = e.target.closest("[data-full-page]");
+  if (fullBtn) { closeTickerModal(); showPane("stock", fullBtn.dataset.fullPage); return; }
   const createBtn = e.target.closest('[data-alert-action="create"]');
   const delBtn = e.target.closest("[data-alert-del]");
   const box = e.target.closest(".tm-alert-box");
@@ -687,7 +829,8 @@ function renderTickerDetail(d) {
     ${stats}
     ${news}
     <div class="tm-actions" id="tm-actions">
-      <a class="advise-btn" href="${tvLink(d.ticker)}" target="_blank" rel="noopener" style="text-decoration:none">Open in TradingView ↗</a>
+      <button class="advise-btn" data-full-page="${esc(d.ticker)}">Full analysis →</button>
+      <a class="advise-btn ghost" href="${tvLink(d.ticker)}" target="_blank" rel="noopener" style="text-decoration:none">Open in TradingView ↗</a>
     </div>
     <div class="tm-alert-box" data-ticker="${esc(d.ticker)}">
       <div class="klabel" style="margin-top:14px">Set an alert</div>
@@ -1059,7 +1202,8 @@ function renderSectors() {
   });
 }
 
-/* ── idea metric filters + collapsible sector tree (persisted to localStorage) ── */
+/* ── idea filters: one-tap metric chips + numeric score/cap thresholds, both
+   client-side; plus a collapsible sector tree. Chip + collapse state persist. ── */
 const FILTERS = [
   { id: "above200", label: "Above 200-day", test: (i) => !!i && i.pctVs200 > 0 },
   { id: "volrising", label: "Volume rising", test: (i) => !!i && i.volTrend > 1.15 },
@@ -1074,8 +1218,17 @@ const activeFilters = readStoredSet("ideaFilters");
 const collapsedSectors = readStoredSet("collapsedSectors");
 const saveFilters = () => localStorage.setItem("ideaFilters", JSON.stringify([...activeFilters]));
 const saveCollapsed = () => localStorage.setItem("collapsedSectors", JSON.stringify([...collapsedSectors]));
+// Numeric thresholds (min score / min market cap) layer on top of the chips.
+const numFilters = { minScore: null, minCapB: null };
+const anyFilterActive = () => activeFilters.size > 0 || numFilters.minScore != null || numFilters.minCapB != null;
 function passesFilters(item, i, isLong) {
   for (const f of FILTERS) if (activeFilters.has(f.id) && !f.test(i, item, isLong)) return false;
+  const score = isLong ? item.long_score : item.short_score;
+  if (numFilters.minScore != null && score < numFilters.minScore) return false;
+  if (numFilters.minCapB != null) {
+    const cap = screener[item.ticker]?.market_cap;
+    if (cap != null && cap < numFilters.minCapB * 1e9) return false;
+  }
   return true;
 }
 function renderFilterBar() {
@@ -1092,6 +1245,8 @@ $("#idea-filters").addEventListener("click", (e) => {
   renderFilterBar();
   renderIdeas();
 });
+$("#flt-score").addEventListener("input", (e) => { numFilters.minScore = e.target.value === "" ? null : +e.target.value; renderIdeas(); });
+$("#flt-mcap").addEventListener("input", (e) => { numFilters.minCapB = e.target.value === "" ? null : +e.target.value; renderIdeas(); });
 renderFilterBar();
 
 /* ── trade ideas (by sector, long/short tabs) ── */
@@ -1104,8 +1259,8 @@ function renderIdeas() {
     .filter((g) => g.list.length);
   if (!groups.length) {
     const rows = Object.values(screener);
-    const msg = activeFilters.size
-      ? "No ideas match the active filters — loosen them to see more."
+    const msg = anyFilterActive()
+      ? "No ideas match the current filters — loosen them to see more."
       : rows.length
         ? `No setup-grade ${ideasTab} ideas right now — that's a valid answer, not a bug. The scoring requires confluence (structure + volume + relative strength), not just price movement.`
         : "Scanning the market… the first full scan takes several minutes after startup.";
@@ -1235,12 +1390,37 @@ function reportCardHtml(rep) {
       <p class="kv">${esc(rep.sizing ?? "—")}</p>
       <div class="klabel">Exit plan</div>
       <p class="kv">${esc(rep.exit_plan ?? "—")}</p>
-      ${rep.options_view ? `
-        <div class="klabel">Options view <span class="chip ${rep.options_view.stance === "calls" ? "buy" : rep.options_view.stance === "puts" ? "sell" : "calm"} sm">${esc(rep.options_view.stance)}</span></div>
-        <p class="kv">Strikes: ${esc(rep.options_view.strike_range)} · Expiries: ${esc(rep.options_view.expiry_range)}</p>
-        <p class="kv">${esc(rep.options_view.iv_context)}</p>
-        <p class="kv">Upside risk: ${esc(rep.options_view.upside_risk)} · Downside risk: ${esc(rep.options_view.downside_risk)}</p>` : ""}
+      ${ideaOptionsHtml(rep.options_view)}
     </div>`;
+}
+
+// Options structure on an idea report: strategy label + concrete legs, with
+// server-computed (Black-Scholes) max loss/gain/breakevens — never model math.
+function ideaOptionsHtml(ov) {
+  if (!ov) return "";
+  const BULL = ["long_call", "vertical_call_debit", "vertical_put_credit", "cash_secured_put"];
+  const BEAR = ["long_put", "vertical_put_debit", "vertical_call_credit"];
+  const tone = BULL.includes(ov.strategy) ? "buy" : BEAR.includes(ov.strategy) ? "sell" : "calm";
+  const label = String(ov.strategy || "").replace(/_/g, " ");
+  let html = `<div class="klabel">Options view <span class="chip ${tone} sm">${esc(label)}</span></div>`;
+  if (ov.legs?.length) {
+    html += `<ul>${ov.legs.map((l) => `<li>${esc(l.action)} ${l.quantity}× ${esc(l.right)} $${l.strike} exp ${esc(l.expiry)}</li>`).join("")}</ul>`;
+  }
+  const pr = ov.pricing;
+  if (pr) {
+    const usd = (n) => (n == null ? "—" : (n < 0 ? "−$" : "$") + Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 }));
+    html += `
+      <div class="stats">
+        <div class="stat"><div class="k">${pr.entryCost >= 0 ? "Net debit" : "Net credit"}</div><div class="v" style="font-size:12.5px">${usd(Math.abs(pr.entryCost))}</div></div>
+        <div class="stat"><div class="k">Max loss</div><div class="v" style="font-size:12.5px">${usd(pr.maxLoss)}</div></div>
+        <div class="stat"><div class="k">Max gain</div><div class="v" style="font-size:12.5px">${usd(pr.maxGain)}</div></div>
+        <div class="stat"><div class="k">Breakeven</div><div class="v" style="font-size:12.5px">${(pr.breakevens || []).map((b) => "$" + b.toFixed(2)).join(", ") || "—"}</div></div>
+      </div>
+      <p class="kv" style="color:var(--faint);font-size:11.5px">${esc(pr.note || "")}</p>`;
+  }
+  if (ov.rationale) html += `<p class="kv">${esc(ov.rationale)}</p>`;
+  if (ov.iv_context) html += `<p class="kv" style="color:var(--dim)">${esc(ov.iv_context)}</p>`;
+  return html;
 }
 
 function showReport(rep, container) {
@@ -1258,15 +1438,17 @@ document.addEventListener("click", async (ev) => {
   if (!btn) return;
   const ticker = btn.dataset.validate;
   const direction = btn.dataset.direction || "auto";
+  const inStockPage = !!btn.closest("#stock-section"); // stock page routes its report locally + honors its options box
+  const target = inStockPage ? $("#stock-report-area") : $("#report-area");
   btn.disabled = true;
   const orig = btn.textContent;
   btn.textContent = "Validating… (~30s)";
   try {
     const res = await (await fetch("/api/ideas/validate", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ticker, direction }),
+      body: JSON.stringify({ ticker, direction, options: inStockPage && !!$("#stock-opts")?.checked }),
     })).json();
-    if (res.ok) showReport(res.report, $("#report-area"));
+    if (res.ok) showReport(res.report, target || $("#report-area"));
     else alert(`Validation failed: ${res.error}`);
   } catch (e) { alert(`Validation failed: ${e}`); }
   finally { btn.disabled = false; btn.textContent = orig; }
@@ -1278,8 +1460,12 @@ $("#gen-btn").addEventListener("click", async () => {
   const orig = btn.textContent;
   btn.textContent = "Validating top setups… (1-3 min)";
   try {
+    const filters = {
+      minScore: numFilters.minScore ?? undefined,
+      direction: ideasTab, // generate what the current view shows
+    };
     const res = await (await fetch("/api/ideas/generate", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ count: 4 }),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ count: 4, filters }),
     })).json();
     if (res.ok) {
       if (!res.reports.length) {
@@ -1294,6 +1480,149 @@ $("#gen-btn").addEventListener("click", async () => {
   } catch (e) { alert(`Generation failed: ${e}`); }
   finally { btn.disabled = false; btn.textContent = orig; }
 });
+
+/* ── manual refresh buttons (same idiom as #broker-refresh) ── */
+async function withSpin(btn, fn) {
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = "↻ Refreshing…";
+  try { await fn(); } finally { btn.disabled = false; btn.textContent = orig; }
+}
+$("#ideas-refresh").addEventListener("click", () => withSpin($("#ideas-refresh"), () => loadScreener().then(loadMarket)));
+$("#market-refresh").addEventListener("click", () => withSpin($("#market-refresh"), () => loadMarket()));
+
+/* ── settings: risk prefs ── */
+async function loadRiskPrefs() {
+  try {
+    const { prefs } = await (await fetch("/api/risk-prefs")).json();
+    $("#rp-equity").value = prefs.account_equity ?? "";
+    $("#rp-risk").value = prefs.max_risk_per_trade_pct;
+    $("#rp-pos").value = prefs.max_position_pct;
+    $("#rp-rr").value = prefs.target_rr_ratio;
+  } catch {}
+}
+$("#risk-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const res = await (await fetch("/api/risk-prefs", {
+    method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      account_equity: $("#rp-equity").value,
+      max_risk_per_trade_pct: $("#rp-risk").value,
+      max_position_pct: $("#rp-pos").value,
+      target_rr_ratio: $("#rp-rr").value,
+    }),
+  })).json();
+  const msg = $("#risk-msg");
+  msg.textContent = res.ok ? "Saved — future idea validations use these settings." : `Failed: ${res.error}`;
+  setTimeout(() => { msg.textContent = ""; }, 5000);
+});
+
+/* ── settings: trade journal ── */
+async function loadJournal() {
+  try {
+    const { outcomes } = await (await fetch("/api/journal")).json();
+    const box = $("#journal-list");
+    if (!outcomes.length) {
+      box.innerHTML = `<div class="empty">No trades logged yet. Each one you log makes future AI analysis more personal.</div>`;
+      return;
+    }
+    box.innerHTML = "";
+    for (const o of outcomes) {
+      const div = document.createElement("div");
+      div.className = "journal-item";
+      const tone = o.outcome === "win" ? "buy" : o.outcome === "loss" ? "sell" : "calm";
+      div.innerHTML = `
+        <span style="font-weight:700">${esc(o.ticker)}</span>
+        <span class="chip ${o.direction === "long" ? "buy" : "sell"} sm">${esc(o.direction)}</span>
+        <span class="chip ${tone} sm">${esc(o.outcome)}${o.pnl_pct != null ? ` ${signed(o.pnl_pct, 1)}%` : ""}</span>
+        <span style="color:var(--faint);font-size:12px">${new Date(o.closed_at * 1000).toLocaleDateString()}</span>
+        <button class="del" title="delete entry">×</button>
+        ${o.notes ? `<div class="note">${esc(o.notes)}</div>` : ""}`;
+      div.querySelector(".del").addEventListener("click", async () => {
+        await fetch(`/api/journal/${o.id}`, { method: "DELETE" });
+        loadJournal();
+      });
+      box.appendChild(div);
+    }
+  } catch {}
+}
+$("#journal-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const res = await (await fetch("/api/journal/outcome", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ticker: $("#jr-ticker").value,
+      direction: $("#jr-dir").value,
+      outcome: $("#jr-outcome").value,
+      pnl_pct: $("#jr-pnl").value,
+      entry_price: $("#jr-entry").value,
+      exit_price: $("#jr-exit").value,
+      notes: $("#journal-notes").value,
+    }),
+  })).json();
+  const msg = $("#journal-msg");
+  if (res.ok) {
+    msg.textContent = "Logged — the AI will see this in future analyses.";
+    $("#journal-form").reset();
+    loadJournal();
+  } else {
+    msg.textContent = `Failed: ${res.error}`;
+  }
+  setTimeout(() => { msg.textContent = ""; }, 5000);
+});
+
+/* ── stock detail page (#stock/TICKER) ── */
+async function renderStockPage(ticker) {
+  const page = $("#stock-page");
+  page.innerHTML = `<div class="empty">Loading ${esc(ticker)}…</div>`;
+  let data;
+  try {
+    data = await (await fetch(`/api/stock/${encodeURIComponent(ticker)}`)).json();
+  } catch {
+    page.innerHTML = `<div class="empty">Could not reach the server.</div>`;
+    return;
+  }
+  if (!data.ok) {
+    page.innerHTML = `<div class="empty">${esc(data.error || "No data for " + ticker)}</div>`;
+    return;
+  }
+  const q = data.quote, m = data.meta, r = data.screener;
+  const chg = q?.dp;
+  const capB = m?.marketCap ? (m.marketCap / 1e9).toFixed(m.marketCap >= 1e10 ? 0 : 1) + "B" : null;
+  page.innerHTML = `
+    <div id="stock-head">
+      <span class="sym">${esc(ticker)}</span>
+      <span style="color:var(--dim);font-size:14px">${esc(m?.name ?? "")}</span>
+      ${data.held ? `<span class="chip warn sm">held · ${data.held.shares} @ $${data.held.cost_basis}</span>` : ""}
+      <span class="spacer"></span>
+      <span class="px">${q?.c ? money(q.c) : "—"}</span>
+      ${chg != null ? `<span class="chip ${chg >= 0 ? "buy" : "sell"}">${signed(chg)}% today</span>` : ""}
+    </div>
+    <p style="font-size:12.5px;color:var(--faint);margin-top:2px">
+      ${[m?.sector, m?.industry, capB ? "mkt cap $" + capB : null].filter(Boolean).map(esc).join(" · ") || "Not in the scan universe"}
+    </p>
+    <svg id="stock-spark" preserveAspectRatio="none"></svg>
+    ${r ? `
+      <div style="display:flex;gap:8px;align-items:center;margin:10px 0 6px">
+        <span class="chip buy">Long ${r.long_score ?? "—"}</span>
+        <span class="chip sell">Short ${r.short_score ?? "—"}</span>
+        <span style="font-size:12px;color:var(--faint)">scored ${new Date(r.updated_at * 1000).toLocaleString()}</span>
+      </div>
+      <div class="card" style="padding:12px 16px" id="stock-factors"></div>` : `<p class="empty">Not scored by the screener (outside the scan universe or too little history).</p>`}
+    <div style="margin:14px 0">
+      <button class="advise-btn" data-validate="${esc(ticker)}" style="margin-top:0">✦ Validate this ticker (~30s)</button>
+      <label class="checkline" style="display:inline-flex;margin-left:10px"><input type="checkbox" id="stock-opts"> include options strategy</label>
+    </div>
+    <div id="stock-report-area"></div>
+    ${data.ideas?.length ? `<h2 style="margin-top:18px">Past analyses</h2><div id="stock-past"></div>` : ""}`;
+  if (data.spark?.closes) sparkSvg($("#stock-spark"), data.spark.closes, true);
+  if (r) {
+    screener[ticker] = r; // make factorDetail work for off-universe lookups too
+    $("#stock-factors").innerHTML = factorDetail(ticker);
+  }
+  const past = $("#stock-past");
+  if (past) for (const rep of data.ideas) showReport(rep, past);
+}
 
 /* ── intraday analyzer ── */
 let intradayImage = null;
@@ -1831,24 +2160,75 @@ async function loadMarket() {
   renderIdeas();
 }
 
-const es = new EventSource("/api/stream");
-es.addEventListener("event", (m) => {
-  const e = JSON.parse(m.data);
-  const idx = events.findIndex((x) => x.id === e.id);
-  if (idx >= 0) events[idx] = { ...events[idx], ...e }; else events.unshift(e);
-  renderAdvice(); renderHoldings(); renderActivity();
-  bumpBadge("activity");
-});
-es.addEventListener("briefing", (m) => renderMd($("#briefing"), JSON.parse(m.data).content));
-es.addEventListener("broker", () => loadState().then(loadQuotes));
-es.addEventListener("health", () => loadState());
-es.addEventListener("market", () => { loadMarket(); loadScreener(); });
+/* ── auth gate ── */
+/* The SSE stream and all data routes are cookie-gated — only open them once
+   /api/auth/me confirms a session, or the EventSource would 401-retry forever. */
+function bootApp() {
+  document.querySelector("header").hidden = false;
+  document.querySelector("main").hidden = false;
+  $("#auth-screen").hidden = true;
 
-loadState().then(loadQuotes).then(loadScreener).then(loadMarket);
-setInterval(loadQuotes, 60_000);
-setInterval(loadState, 5 * 60_000);
-setInterval(loadScreener, 10 * 60_000);
-setInterval(loadMarket, 10 * 60_000);
+  const es = new EventSource("/api/stream");
+  es.addEventListener("event", (m) => {
+    const e = JSON.parse(m.data);
+    const idx = events.findIndex((x) => x.id === e.id);
+    if (idx >= 0) events[idx] = { ...events[idx], ...e }; else events.unshift(e);
+    renderAdvice(); renderHoldings(); renderActivity();
+    bumpBadge("activity");
+  });
+  es.addEventListener("briefing", (m) => renderMd($("#briefing"), JSON.parse(m.data).content));
+  es.addEventListener("broker", () => loadState().then(loadQuotes));
+  es.addEventListener("health", () => loadState());
+  es.addEventListener("market", () => { loadMarket(); loadScreener(); });
+
+  loadState().then(loadQuotes).then(loadScreener).then(loadMarket);
+  setInterval(loadQuotes, 60_000);
+  setInterval(loadState, 5 * 60_000);
+  setInterval(loadScreener, 10 * 60_000);
+  setInterval(loadMarket, 10 * 60_000);
+}
+
+let authMode = "login";
+function renderAuthMode() {
+  const signup = authMode === "signup";
+  $("#auth-blurb").textContent = signup ? "Create your account." : "Sign in to your account.";
+  $("#auth-submit").textContent = signup ? "Create account" : "Sign in";
+  $("#auth-flip").textContent = signup ? "Already have an account? Sign in" : "New here? Create an account";
+  $("#auth-password").autocomplete = signup ? "new-password" : "current-password";
+  $("#auth-error").textContent = "";
+}
+$("#auth-flip").addEventListener("click", () => { authMode = authMode === "login" ? "signup" : "login"; renderAuthMode(); });
+$("#auth-card").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const btn = $("#auth-submit");
+  btn.disabled = true;
+  try {
+    const res = await (await fetch(`/api/auth/${authMode}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: $("#auth-email").value, password: $("#auth-password").value }),
+    })).json();
+    if (res.ok) location.reload(); // rerun the full boot against the new session
+    else $("#auth-error").textContent = res.error || "Something went wrong.";
+  } catch (e) {
+    $("#auth-error").textContent = "Could not reach the server.";
+  } finally {
+    btn.disabled = false;
+  }
+});
+$("#logout-btn").addEventListener("click", async () => {
+  await fetch("/api/auth/logout", { method: "POST" });
+  location.reload();
+});
+
+(async () => {
+  try {
+    const res = await fetch("/api/auth/me");
+    if (res.ok) { bootApp(); return; }
+  } catch {}
+  renderAuthMode();
+  $("#auth-screen").hidden = false;
+})();
 </script>
 </body>
 </html>

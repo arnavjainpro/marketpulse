@@ -60,8 +60,57 @@ CREATE TABLE IF NOT EXISTS screener (
 );
 
 CREATE TABLE IF NOT EXISTS settings (
-  key TEXT PRIMARY KEY,
-  value TEXT NOT NULL
+  user_id INTEGER NOT NULL DEFAULT 0,  -- 0 = global (background pipeline switches, not per-user)
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  PRIMARY KEY (user_id, key)
+);
+
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  token TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+
+CREATE TABLE IF NOT EXISTS broker_links (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id),
+  provider TEXT NOT NULL,
+  auth_json TEXT NOT NULL,
+  linked_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS trade_outcomes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  ticker TEXT NOT NULL,
+  direction TEXT NOT NULL,            -- long | short
+  idea_id INTEGER REFERENCES ideas(id),
+  entry_price REAL,
+  exit_price REAL,
+  outcome TEXT NOT NULL,              -- win | loss | breakeven
+  pnl_pct REAL,
+  notes TEXT,                         -- what went right/wrong, in the trader's words
+  closed_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_outcomes_user_ticker ON trade_outcomes(user_id, ticker);
+CREATE INDEX IF NOT EXISTS idx_outcomes_user_closed ON trade_outcomes(user_id, closed_at DESC);
+
+CREATE TABLE IF NOT EXISTS risk_prefs (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id),
+  account_equity REAL,
+  max_risk_per_trade_pct REAL NOT NULL DEFAULT 1,
+  max_position_pct REAL NOT NULL DEFAULT 20,
+  target_rr_ratio REAL NOT NULL DEFAULT 2
 );
 
 CREATE TABLE IF NOT EXISTS universe (
@@ -98,6 +147,7 @@ CREATE TABLE IF NOT EXISTS ideas (
 
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL DEFAULT 1,  -- owner; the global evaluator fires them all to the shared notify channel
   ticker TEXT NOT NULL,
   kind TEXT NOT NULL,            -- price_above | price_below | score_gte
   threshold REAL NOT NULL,
@@ -105,7 +155,7 @@ CREATE TABLE IF NOT EXISTS alerts (
   active INTEGER NOT NULL DEFAULT 1,
   created_ts INTEGER NOT NULL,
   last_fired_ts INTEGER,
-  UNIQUE(ticker, kind, threshold)   -- double-click "create alert" = one row, not two
+  UNIQUE(user_id, ticker, kind, threshold)   -- double-click "create alert" = one row, not two
 );
 
 CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts DESC);
@@ -123,14 +173,96 @@ for (const col of ["long_score REAL", "short_score REAL", "direction TEXT", "sec
     db.exec(`ALTER TABLE screener ADD COLUMN ${col}`);
   } catch {}
 }
+// Migration: alerts become per-user (owner scoping for the ⌘K alert manager).
+// Only matters for a DB that ran the pre-merge global-alerts build; a fresh
+// alerts table is already created with user_id above. Existing rows adopt user 1.
+try {
+  db.exec(`ALTER TABLE alerts ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1`);
+} catch {}
+// Migration: settings becomes per-user (composite user_id+key PK). Pre-existing
+// rows (all global before multi-user existed) are kept under user_id=0.
+{
+  const cols = db.query(`PRAGMA table_info(settings)`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === "user_id")) {
+    db.exec(`ALTER TABLE settings RENAME TO settings_old`);
+    db.exec(`CREATE TABLE settings (
+      user_id INTEGER NOT NULL DEFAULT 0,
+      key TEXT NOT NULL,
+      value TEXT NOT NULL,
+      PRIMARY KEY (user_id, key)
+    )`);
+    db.exec(`INSERT INTO settings (user_id, key, value) SELECT 0, key, value FROM settings_old`);
+    db.exec(`DROP TABLE settings_old`);
+  }
+}
+// Migration: ideas become per-user. Pre-existing rows adopt the bootstrap
+// owner (user id 1 — whoever signs up first inherits the original single-user data).
+try {
+  db.exec(`ALTER TABLE ideas ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1`);
+} catch {}
+db.exec(`CREATE INDEX IF NOT EXISTS idx_ideas_user_ts ON ideas(user_id, ts DESC)`);
+// Migration: trader-chosen minimum risk/reward for a "strong" rating.
+try {
+  db.exec(`ALTER TABLE risk_prefs ADD COLUMN target_rr_ratio REAL NOT NULL DEFAULT 2`);
+} catch {}
 
 export function getSetting(key: string, fallback: string): string {
-  const row = db.query(`SELECT value FROM settings WHERE key = ?`).get(key) as { value: string } | null;
+  const row = db.query(`SELECT value FROM settings WHERE user_id = 0 AND key = ?`).get(key) as { value: string } | null;
   return row?.value ?? fallback;
 }
 
 export function setSetting(key: string, value: string) {
-  db.query(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(key, value);
+  db.query(`INSERT INTO settings (user_id, key, value) VALUES (0, ?, ?) ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value`).run(key, value);
+}
+
+// Per-user settings (e.g. broker JSON import blob).
+export function getSettingFor(userId: number, key: string, fallback: string): string {
+  const row = db.query(`SELECT value FROM settings WHERE user_id = ? AND key = ?`).get(userId, key) as { value: string } | null;
+  return row?.value ?? fallback;
+}
+
+export function setSettingFor(userId: number, key: string, value: string) {
+  db.query(`INSERT INTO settings (user_id, key, value) VALUES (?, ?, ?) ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value`).run(userId, key, value);
+}
+
+export interface RiskPrefs {
+  account_equity: number | null;
+  max_risk_per_trade_pct: number;
+  max_position_pct: number;
+  target_rr_ratio: number; // minimum R:R for a "strong" rating in idea validation
+}
+
+export function getRiskPrefs(userId: number): RiskPrefs | null {
+  return db.query(`SELECT account_equity, max_risk_per_trade_pct, max_position_pct, target_rr_ratio FROM risk_prefs WHERE user_id = ?`).get(userId) as RiskPrefs | null;
+}
+
+export function setRiskPrefs(userId: number, prefs: RiskPrefs) {
+  db.query(
+    `INSERT INTO risk_prefs (user_id, account_equity, max_risk_per_trade_pct, max_position_pct, target_rr_ratio) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(user_id) DO UPDATE SET account_equity = excluded.account_equity,
+       max_risk_per_trade_pct = excluded.max_risk_per_trade_pct, max_position_pct = excluded.max_position_pct,
+       target_rr_ratio = excluded.target_rr_ratio`
+  ).run(userId, prefs.account_equity, prefs.max_risk_per_trade_pct, prefs.max_position_pct, prefs.target_rr_ratio);
+}
+
+export interface BrokerLink {
+  provider: string;
+  auth_json: string;
+}
+
+export function getBrokerLink(userId: number): BrokerLink | null {
+  return db.query(`SELECT provider, auth_json FROM broker_links WHERE user_id = ?`).get(userId) as BrokerLink | null;
+}
+
+export function setBrokerLink(userId: number, provider: string, authJson: string) {
+  db.query(
+    `INSERT INTO broker_links (user_id, provider, auth_json, linked_at) VALUES (?, ?, ?, unixepoch())
+     ON CONFLICT(user_id) DO UPDATE SET provider = excluded.provider, auth_json = excluded.auth_json, linked_at = excluded.linked_at`
+  ).run(userId, provider, authJson);
+}
+
+export function clearBrokerLink(userId: number) {
+  db.query(`DELETE FROM broker_links WHERE user_id = ?`).run(userId);
 }
 
 // Master switch for automatic AI calls (triage, analysis, scheduled briefings).

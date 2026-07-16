@@ -6,6 +6,7 @@
 //   If Robinhood rejects the password grant for your account, use the dashboard's
 //   manual position import instead.
 import { requestToken, toAuth, saveAuth, loadAuth, newDeviceToken, clearAuth, validateSheriff } from "../src/broker/robinhood";
+import { findUserByEmail } from "../src/auth";
 
 const CLIENT_ID = "c82SH0WZOsabOXGP2sxqcj34FxkvfnWRZBKlBjFS";
 
@@ -15,16 +16,25 @@ function ask(q: string): string {
   return a.trim();
 }
 
+// Which MarketPulse account (sign up in the dashboard first) this link belongs to.
+const mpEmail = ask("MarketPulse account email (sign up in the dashboard first if you haven't): ");
+const mpUser = findUserByEmail(mpEmail);
+if (!mpUser) {
+  console.error(`\n✗ No MarketPulse account for "${mpEmail}". Sign up at the dashboard first, then re-run this.`);
+  process.exit(1);
+}
+const userId = mpUser.id;
+
 if (process.argv.includes("--clear")) {
-  clearAuth();
-  console.log("Robinhood tokens cleared.");
+  clearAuth(userId);
+  console.log(`Robinhood tokens cleared for ${mpEmail}.`);
   process.exit(0);
 }
 
 console.log("Robinhood link (read-only). Your password is sent only to Robinhood; tokens are stored locally.\n");
 const username = ask("Robinhood email/username: ");
 const password = ask("Password: ");
-const deviceToken = loadAuth()?.device_token ?? newDeviceToken();
+const deviceToken = loadAuth(userId)?.device_token ?? newDeviceToken();
 
 const base = {
   client_id: CLIENT_ID,
@@ -64,7 +74,7 @@ if (json?.verification_workflow?.id) {
 }
 
 if (json?.access_token) {
-  saveAuth(toAuth(json, deviceToken));
+  saveAuth(userId, toAuth(json, deviceToken));
   console.log("\n✓ Linked. Restart the server (or hit Refresh in the dashboard) to pull positions.");
 } else {
   console.error(`\n✗ Login failed (status ${status}): ${JSON.stringify(json).slice(0, 300)}`);

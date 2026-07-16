@@ -1,7 +1,8 @@
 // Broker resolution + cached snapshot. Priority: linked brokerage (Robinhood) >
 // one-shot JSON import > portfolio.yaml. YAML theses are merged onto broker
 // positions by ticker either way, so "why you own it" survives auto-linking.
-import { loadPortfolio, loadRiskConfig, type Portfolio } from "../config";
+import { loadPortfolio, loadRiskConfig, type Portfolio, type RiskConfig } from "../config";
+import { getRiskPrefs } from "../db";
 import { yamlProvider, importProvider } from "./manual";
 import { robinhoodProvider } from "./robinhood";
 import type { BrokerSnapshot } from "./types";
@@ -9,21 +10,24 @@ import type { BrokerSnapshot } from "./types";
 // Priority: linked Robinhood > one-shot import > portfolio.yaml.
 const providers = [robinhoodProvider, importProvider, yamlProvider];
 
-let cached: BrokerSnapshot | null = null;
-let inFlight: Promise<BrokerSnapshot> | null = null;
+// Per-user cache — each signed-in user may have their own linked broker/import.
+const cached = new Map<number, BrokerSnapshot>();
+const inFlight = new Map<number, Promise<BrokerSnapshot>>();
 
-export async function refreshBroker(): Promise<BrokerSnapshot> {
-  // Collapse concurrent refreshes (interval timer + user clicking Refresh).
-  if (inFlight) return inFlight;
-  inFlight = doRefresh().finally(() => { inFlight = null; });
-  return inFlight;
+export async function refreshBroker(userId: number): Promise<BrokerSnapshot> {
+  // Collapse concurrent refreshes per user (interval timer + user clicking Refresh).
+  const existing = inFlight.get(userId);
+  if (existing) return existing;
+  const p = doRefresh(userId).finally(() => { inFlight.delete(userId); });
+  inFlight.set(userId, p);
+  return p;
 }
 
-async function doRefresh(): Promise<BrokerSnapshot> {
+async function doRefresh(userId: number): Promise<BrokerSnapshot> {
   for (const p of providers) {
-    if (!p.available()) continue;
+    if (!p.available(userId)) continue;
     try {
-      const snap = await p.fetchSnapshot();
+      const snap = await p.fetchSnapshot(userId);
       // Merge YAML context: theses onto positions, watchlist union, equity fallback.
       if (p.name !== "manual") {
         const yaml = loadPortfolio();
@@ -33,31 +37,41 @@ async function doRefresh(): Promise<BrokerSnapshot> {
           if (t) h.thesis = t;
         }
         snap.watchlist = [...new Set([...snap.watchlist, ...yaml.watchlist])];
-        if (snap.account.equity == null) snap.account.equity = loadRiskConfig().account_equity;
+        if (snap.account.equity == null) snap.account.equity = loadRiskConfigFor(userId).account_equity;
       }
-      cached = snap;
+      cached.set(userId, snap);
       console.log(
-        `[broker] snapshot via ${snap.source}: ${snap.holdings.length} positions, ${snap.watchlist.length} watched, ` +
+        `[broker] snapshot via ${snap.source} (user ${userId}): ${snap.holdings.length} positions, ${snap.watchlist.length} watched, ` +
         `${snap.openOrders.length} open orders${snap.account.equity != null ? `, equity $${snap.account.equity.toLocaleString()}` : ""}`
       );
       return snap;
     } catch (err) {
-      console.error(`[broker] ${p.name} failed, trying next provider:`, err);
+      console.error(`[broker] ${p.name} failed for user ${userId}, trying next provider:`, err);
     }
   }
   // yamlProvider never throws, but keep a hard fallback anyway.
-  cached = await yamlProvider.fetchSnapshot();
-  return cached;
+  const snap = await yamlProvider.fetchSnapshot(userId);
+  cached.set(userId, snap);
+  return snap;
 }
 
-export function brokerSnapshot(): BrokerSnapshot | null {
-  return cached;
+export function brokerSnapshot(userId: number): BrokerSnapshot | null {
+  return cached.get(userId) ?? null;
 }
 
 // Sync portfolio view for everything that previously called loadPortfolio().
-export function currentPortfolio(): Portfolio {
-  if (cached) return { holdings: cached.holdings, watchlist: cached.watchlist };
+export function currentPortfolio(userId: number): Portfolio {
+  const snap = cached.get(userId);
+  if (snap) return { holdings: snap.holdings, watchlist: snap.watchlist };
   return loadPortfolio();
+}
+
+// Per-user risk settings (target R:R etc. layer on in a later phase), falling
+// back to the shared portfolio.yaml risk: block until a user sets their own.
+export function loadRiskConfigFor(userId: number): RiskConfig {
+  const row = getRiskPrefs(userId);
+  if (row) return row;
+  return loadRiskConfig();
 }
 
 export interface SizingPlan {
@@ -72,9 +86,9 @@ export interface SizingPlan {
 
 // Risk-first position sizing: risk a fixed % of equity between entry and stop,
 // capped by the max single-position share of the account.
-export function positionSizing(entry: number, stop: number): SizingPlan {
-  const risk = loadRiskConfig();
-  const equity = cached?.account.equity ?? risk.account_equity;
+export function positionSizing(userId: number, entry: number, stop: number): SizingPlan {
+  const risk = loadRiskConfigFor(userId);
+  const equity = cached.get(userId)?.account.equity ?? risk.account_equity;
   const perShareRisk = Math.abs(entry - stop);
   if (!equity || !perShareRisk || !Number.isFinite(perShareRisk)) {
     return {
@@ -108,15 +122,16 @@ export function positionSizing(entry: number, stop: number): SizingPlan {
 }
 
 // Compact text block for AI prompts.
-export function accountContextText(): string {
-  if (!cached) return "ACCOUNT: no broker snapshot yet (manual YAML portfolio in use).";
-  const a = cached.account;
+export function accountContextText(userId: number): string {
+  const snap = cached.get(userId);
+  if (!snap) return "ACCOUNT: no broker snapshot yet (manual YAML portfolio in use).";
+  const a = snap.account;
   const lines = [
-    `ACCOUNT (source: ${cached.source}, as of ${new Date(cached.asOf * 1000).toISOString().slice(0, 16)} UTC):`,
+    `ACCOUNT (source: ${snap.source}, as of ${new Date(snap.asOf * 1000).toISOString().slice(0, 16)} UTC):`,
     `- equity: ${a.equity != null ? "$" + a.equity.toLocaleString() : "unknown"}, cash: ${a.cash != null ? "$" + a.cash.toLocaleString() : "unknown"}, buying power: ${a.buying_power != null ? "$" + a.buying_power.toLocaleString() : "unknown"}`,
   ];
-  if (cached.openOrders.length) {
-    lines.push(`- open orders: ${cached.openOrders.map((o) => `${o.side} ${o.qty} ${o.ticker} (${o.type}${o.limit_price ? ` @$${o.limit_price}` : ""})`).join("; ")}`);
+  if (snap.openOrders.length) {
+    lines.push(`- open orders: ${snap.openOrders.map((o) => `${o.side} ${o.qty} ${o.ticker} (${o.type}${o.limit_price ? ` @$${o.limit_price}` : ""})`).join("; ")}`);
   }
   return lines.join("\n");
 }

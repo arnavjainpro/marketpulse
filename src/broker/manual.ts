@@ -2,12 +2,12 @@
 // imports (POST /api/broker/import or the dashboard's Import panel — the
 // universal fallback for brokers without an API link: export/paste positions).
 import { loadPortfolio, loadRiskConfig } from "../config";
-import { getSetting, setSetting } from "../db";
+import { getSettingFor, setSettingFor } from "../db";
 import type { BrokerProvider, BrokerSnapshot, BrokerOrder } from "./types";
 
 export const yamlProvider: BrokerProvider = {
   name: "manual",
-  available: () => true,
+  available: () => true, // shared fallback, same portfolio.yaml for every user
   async fetchSnapshot(): Promise<BrokerSnapshot> {
     const p = loadPortfolio();
     const risk = loadRiskConfig();
@@ -30,7 +30,7 @@ export interface ImportPayload {
   account?: { equity?: number; cash?: number; buying_power?: number };
 }
 
-export function saveImport(payload: ImportPayload): BrokerSnapshot {
+export function saveImport(userId: number, payload: ImportPayload): BrokerSnapshot {
   const holdings = (payload.positions ?? [])
     .map((p) => ({
       ticker: String(p.ticker ?? p.symbol ?? "").toUpperCase().trim(),
@@ -61,18 +61,18 @@ export function saveImport(payload: ImportPayload): BrokerSnapshot {
       buying_power: payload.account?.buying_power != null ? Number(payload.account.buying_power) : null,
     },
   };
-  setSetting("broker_import", JSON.stringify(snapshot));
+  setSettingFor(userId, "broker_import", JSON.stringify(snapshot));
   return snapshot;
 }
 
-export function clearImport() {
-  setSetting("broker_import", "");
+export function clearImport(userId: number) {
+  setSettingFor(userId, "broker_import", "");
 }
 
 export const importProvider: BrokerProvider = {
   name: "import",
-  available: () => !!getSetting("broker_import", ""),
-  async fetchSnapshot(): Promise<BrokerSnapshot> {
-    return JSON.parse(getSetting("broker_import", "{}")) as BrokerSnapshot;
+  available: (userId: number) => !!getSettingFor(userId, "broker_import", ""),
+  async fetchSnapshot(userId: number): Promise<BrokerSnapshot> {
+    return JSON.parse(getSettingFor(userId, "broker_import", "{}")) as BrokerSnapshot;
   },
 };

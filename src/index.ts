@@ -23,11 +23,19 @@ if (!config.finnhubKey) {
   process.exit(1);
 }
 
+// Background monitoring (detectors, triage, scheduled briefings, sweep) is a
+// single shared pipeline, not fanned out per signed-in user — it watches one
+// account's holdings/watchlist. That account is whoever signed up first (user
+// id 1, the original single-user data's new owner). Other users get the
+// interactive features (validate/generate/intraday/chat, their own linked
+// broker) but not their own independent background event monitoring.
+const PRIMARY_USER_ID = 1;
+
 // Broker snapshot first: positions/watchlist may come from a linked account
 // (Robinhood), a prior JSON import, or portfolio.yaml — everything downstream
-// reads currentPortfolio() so it always sees the freshest view.
-await refreshBroker();
-const bootTickers = allTickers(currentPortfolio());
+// reads currentPortfolio(PRIMARY_USER_ID) so it always sees the freshest view.
+await refreshBroker(PRIMARY_USER_ID);
+const bootTickers = allTickers(currentPortfolio(PRIMARY_USER_ID));
 console.log(`[marketpulse] monitoring ${bootTickers.length} tickers: ${bootTickers.join(", ")}`);
 
 // Circuit breaker trips fire an immediate CRITICAL alert on every channel.
@@ -42,7 +50,7 @@ setTripHandler(async (name, count, windowSec) => {
 
 // No-token severity heuristic used when live AI updates are paused.
 function heuristicSeverity(event: RawEvent): { severity: "critical" | "high" | "info"; rationale: string } {
-  const held = currentPortfolio().holdings.some((h) => h.ticker === event.ticker);
+  const held = currentPortfolio(PRIMARY_USER_ID).holdings.some((h) => h.ticker === event.ticker);
   const kind = event.kind;
   if (kind === "death_cross") return { severity: "high", rationale: "AI paused — death cross on held position (rule-based)." };
   if (kind === "market_mover") return { severity: "info", rationale: "AI paused — abnormal mover promoted to monitoring (rule-based)." };
@@ -55,7 +63,7 @@ function heuristicSeverity(event: RawEvent): { severity: "critical" | "high" | "
 }
 
 async function processEvent(event: RawEvent) {
-  const portfolio = currentPortfolio();
+  const portfolio = currentPortfolio(PRIMARY_USER_ID);
   let triage;
   let signal = null;
 
@@ -92,7 +100,7 @@ async function processEvent(event: RawEvent) {
 
 async function runDetectors() {
   const phase = marketPhase();
-  const tickers = allTickers(currentPortfolio());
+  const tickers = allTickers(currentPortfolio(PRIMARY_USER_ID));
   for (const t of tickers) {
     try {
       const events: RawEvent[] = [];
@@ -171,7 +179,7 @@ function scheduleBriefings() {
     lastBriefingDay[kind] = today;
     try {
       console.log(`[briefing] generating ${kind} briefing`);
-      const content = await generateBriefing(kind, currentPortfolio());
+      const content = await generateBriefing(kind, currentPortfolio(PRIMARY_USER_ID));
       broadcast("briefing", { kind, content });
       // no notification — briefings live on the dashboard; alerts are reserved for buy/sell advice
     } catch (err) {
@@ -188,7 +196,7 @@ function scheduleSweep() {
     try {
       const universe = scanUniverse();
       if (!universe.length) return;
-      const watched = new Set(allTickers(currentPortfolio()));
+      const watched = new Set(allTickers(currentPortfolio(PRIMARY_USER_ID)));
       const events = await sweepIndex(universe, watched);
       for (const e of events) await processEvent(e);
     } catch (err) {
@@ -208,7 +216,7 @@ function scheduleScreener() {
     try {
       await refreshMarketContext();
       broadcast("market", {});
-      const events = await runScan(currentPortfolio());
+      const events = await runScan(currentPortfolio(PRIMARY_USER_ID));
       for (const e of events) await processEvent(e);
       broadcast("market", {}); // breadth updates after the scan completes
     } catch (err) {
@@ -237,7 +245,7 @@ function scheduleMarketContext() {
 function scheduleUniverse() {
   setInterval(async () => {
     try {
-      const scan = await refreshUniverse(currentPortfolio());
+      const scan = await refreshUniverse(currentPortfolio(PRIMARY_USER_ID));
       await loadCikMap(scan);
     } catch (err) {
       console.error("[universe]", err);
@@ -252,7 +260,7 @@ function scheduleBroker() {
   const tick = async () => {
     let source = "manual";
     try {
-      const snap = await refreshBroker();
+      const snap = await refreshBroker(PRIMARY_USER_ID);
       source = snap.source;
       broadcast("broker", { source });
     } catch (err) {
@@ -266,7 +274,7 @@ function scheduleBroker() {
 
 function scheduleDailyStats() {
   const refresh = async () => {
-    for (const t of allTickers(currentPortfolio())) {
+    for (const t of allTickers(currentPortfolio(PRIMARY_USER_ID))) {
       try {
         await refreshDailyStats(t);
         await Bun.sleep(1100);
@@ -298,7 +306,7 @@ setTestEventHandler(async (body) => {
 setBriefingHandler(async () => {
   const kind = etNow().mins < 13 * 60 ? "open" : "close";
   console.log(`[briefing] on-demand ${kind} briefing requested`);
-  const content = await generateBriefing(kind, currentPortfolio());
+  const content = await generateBriefing(kind, currentPortfolio(PRIMARY_USER_ID));
   broadcast("briefing", { kind, content });
   return content;
 });
@@ -307,7 +315,7 @@ setBriefingHandler(async () => {
 
 // Universe first (sector metadata + scan list), then CIK map so EDGAR lookups
 // work for any promoted mover across the whole universe.
-const universeList = await refreshUniverse(currentPortfolio());
+const universeList = await refreshUniverse(currentPortfolio(PRIMARY_USER_ID));
 await loadCikMap(universeList);
 startServer();
 startTradeStream(bootTickers);
@@ -319,5 +327,5 @@ scheduleSweep();
 scheduleMarketContext();
 scheduleUniverse();
 scheduleBroker();
-startCacheHeartbeat(currentPortfolio());
+startCacheHeartbeat(currentPortfolio(PRIMARY_USER_ID));
 console.log(`[marketpulse] running — market is currently ${marketPhase()}`);

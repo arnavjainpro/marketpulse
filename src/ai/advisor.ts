@@ -8,6 +8,7 @@ import { snapshot } from "../engine/technicals";
 import { marketContextText } from "../engine/market";
 import { accountContextText } from "../broker";
 import { cachedQuote, fetchCompanyNews } from "../ingest/finnhub";
+import { journalContextText } from "./journal";
 import { claudeQueue } from "./queue";
 import { opusBreaker } from "./breaker";
 
@@ -49,10 +50,14 @@ function tickersInQuestion(question: string, portfolio: Portfolio): string[] {
   return allTickers(portfolio).filter((t) => new RegExp(`\\b${t}\\b`).test(q));
 }
 
-async function buildMarketContext(portfolio: Portfolio, question: string): Promise<string> {
+async function buildMarketContext(userId: number, portfolio: Portfolio, question: string): Promise<string> {
   const lines: string[] = [];
 
-  lines.push(marketContextText(), "", accountContextText(), "");
+  lines.push(marketContextText(), "", accountContextText(userId), "");
+  // Past-trade journal, scoped to a ticker if the question names exactly one.
+  const askedTickers = tickersInQuestion(question, portfolio);
+  const journal = journalContextText(userId, askedTickers.length === 1 ? askedTickers[0] : undefined);
+  if (journal) lines.push(journal, "");
   lines.push("CURRENT PRICES & TECHNICALS:");
   for (const t of allTickers(portfolio)) {
     const stats = db.query(`SELECT prev_close FROM daily_stats WHERE ticker = ?`).get(t) as { prev_close: number } | null;
@@ -116,6 +121,7 @@ async function buildMarketContext(portfolio: Portfolio, question: string): Promi
 }
 
 export async function askAdvisor(
+  userId: number,
   question: string,
   history: ChatTurn[],
   portfolio: Portfolio
@@ -125,7 +131,7 @@ export async function askAdvisor(
   }
 
   const trimmedHistory = history.slice(-10); // cap context growth
-  const marketContext = await buildMarketContext(portfolio, question);
+  const marketContext = await buildMarketContext(userId, portfolio, question);
   const response = await claudeQueue(() =>
     client.messages.create({
       model: config.modelDeep,

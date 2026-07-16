@@ -23,6 +23,7 @@ export interface RiskConfig {
   account_equity: number | null;
   max_risk_per_trade_pct: number; // % of equity risked between entry and stop
   max_position_pct: number;       // % of equity in any single position
+  target_rr_ratio: number;        // minimum R:R the trader wants for a "strong" idea rating
 }
 
 const ROOT = join(import.meta.dir, "..");
@@ -52,6 +53,7 @@ export function loadRiskConfig(): RiskConfig {
     account_equity: raw.account_equity != null ? Number(raw.account_equity) : null,
     max_risk_per_trade_pct: Number(raw.max_risk_per_trade_pct ?? 1),
     max_position_pct: Number(raw.max_position_pct ?? 20),
+    target_rr_ratio: Number(raw.target_rr_ratio ?? 2),
   };
 }
 
@@ -61,6 +63,7 @@ export interface UniverseFilters {
   min_price: number;
   min_volume: number;   // most recent session share volume
   max_stocks: number;   // cap, ranked by dollar volume (S&P 500 + portfolio always kept)
+  concurrency: number;  // parallel Yahoo candle fetches during a scan
 }
 
 export function loadUniverseFilters(): UniverseFilters {
@@ -73,6 +76,7 @@ export function loadUniverseFilters(): UniverseFilters {
     min_price: Number(process.env.UNIVERSE_MIN_PRICE ?? raw.min_price ?? 3),
     min_volume: Number(process.env.UNIVERSE_MIN_VOLUME ?? raw.min_volume ?? 300_000),
     max_stocks: Number(process.env.UNIVERSE_MAX_STOCKS ?? raw.max_stocks ?? 1500),
+    concurrency: Math.max(1, Number(process.env.UNIVERSE_CONCURRENCY ?? raw.concurrency ?? 6)),
   };
 }
 

@@ -1,9 +1,10 @@
-import { db, aiLive, setAiLive, getSetting } from "../db";
+import { db, aiLive, setAiLive } from "../db";
 import { config, marketPhase, nextMarketTransition } from "../config";
 import { cachedQuote, wsStatus } from "../ingest/finnhub";
 import { opusBreaker, haikuBreaker } from "../ai/breaker";
 import { askAdvisor, type ChatTurn } from "../ai/advisor";
-import { validateIdea, pickCandidates, recentIdeas, type IdeaReport } from "../ai/validator";
+import { validateIdea, pickCandidates, recentIdeas, type IdeaReport, type IdeaFilters } from "../ai/validator";
+import { universeMeta } from "../ingest/universe";
 import { analyzeIntraday, manageTrade, type IntradayRequest, type FollowupRequest } from "../ai/intraday";
 import { parseStrategy } from "../ai/strategy";
 import { runBacktest, stressBacktest, walkForward, type StrategySpec } from "../engine/backtest";
@@ -12,9 +13,14 @@ import { getScreenerRows, sectorBoards } from "../engine/screener";
 import { scoreTicker } from "../engine/ticker";
 import { listAlerts, createAlert, deleteAlert, type AlertKind } from "../engine/alerts";
 import { getMarketSnapshot } from "../engine/market";
-import { currentPortfolio, brokerSnapshot, refreshBroker } from "../broker";
+import { currentPortfolio, brokerSnapshot, refreshBroker, loadRiskConfigFor } from "../broker";
+import { getRiskPrefs, setRiskPrefs } from "../db";
 import { saveImport, clearImport, type ImportPayload } from "../broker/manual";
+import { getBrokerLink } from "../db";
 import { allTickers } from "../config";
+import { logOutcome, listOutcomes, deleteOutcome } from "../ai/journal";
+import { hashPassword, verifyPassword, createUser, findUserByEmail, findUserById, createSession, destroySession } from "../auth";
+import { userIdFromRequest, sessionTokenFromRequest, sessionCookieHeader, clearCookieHeader } from "../auth/middleware";
 import { join } from "path";
 
 // ── SSE hub ──────────────────────────────────────────────────────────────────
@@ -57,8 +63,60 @@ export function startServer() {
       const url = new URL(req.url);
 
       if (url.pathname === "/" || url.pathname === "/index.html") {
+        // SPA shell always serves; the frontend itself shows a login screen if
+        // GET /api/auth/me comes back 401.
         return new Response(Bun.file(join(import.meta.dir, "public/index.html")));
       }
+
+      if (url.pathname === "/api/auth/signup" && req.method === "POST") {
+        try {
+          const body = (await req.json()) as { email?: string; password?: string };
+          const email = String(body.email ?? "").trim().toLowerCase();
+          const password = String(body.password ?? "");
+          if (!email || !email.includes("@")) return Response.json({ ok: false, error: "invalid email" }, { status: 400 });
+          if (password.length < 8) return Response.json({ ok: false, error: "password must be at least 8 characters" }, { status: 400 });
+          if (findUserByEmail(email)) return Response.json({ ok: false, error: "an account with that email already exists" }, { status: 409 });
+          const userId = createUser(email, await hashPassword(password));
+          const token = createSession(userId);
+          return Response.json({ ok: true, email }, { headers: { "Set-Cookie": sessionCookieHeader(token) } });
+        } catch (err) {
+          return Response.json({ ok: false, error: String(err) }, { status: 400 });
+        }
+      }
+
+      if (url.pathname === "/api/auth/login" && req.method === "POST") {
+        try {
+          const body = (await req.json()) as { email?: string; password?: string };
+          const email = String(body.email ?? "").trim().toLowerCase();
+          const password = String(body.password ?? "");
+          const user = findUserByEmail(email);
+          if (!user || !(await verifyPassword(password, user.password_hash))) {
+            return Response.json({ ok: false, error: "invalid email or password" }, { status: 401 });
+          }
+          const token = createSession(user.id);
+          return Response.json({ ok: true, email: user.email }, { headers: { "Set-Cookie": sessionCookieHeader(token) } });
+        } catch (err) {
+          return Response.json({ ok: false, error: String(err) }, { status: 400 });
+        }
+      }
+
+      if (url.pathname === "/api/auth/logout" && req.method === "POST") {
+        const token = sessionTokenFromRequest(req);
+        if (token) destroySession(token);
+        return Response.json({ ok: true }, { headers: { "Set-Cookie": clearCookieHeader() } });
+      }
+
+      if (url.pathname === "/api/auth/me") {
+        const userId = userIdFromRequest(req);
+        if (!userId) return Response.json({ ok: false }, { status: 401 });
+        const user = findUserById(userId);
+        if (!user) return Response.json({ ok: false }, { status: 401 });
+        return Response.json({ ok: true, userId: user.id, email: user.email });
+      }
+
+      // Everything below is per-user data — require a valid session.
+      const userId = userIdFromRequest(req);
+      if (!userId) return Response.json({ ok: false, error: "not authenticated" }, { status: 401 });
 
       if (url.pathname === "/api/stream") {
         const id = nextClientId++;
@@ -81,7 +139,7 @@ export function startServer() {
       }
 
       if (url.pathname === "/api/state") {
-        const portfolio = currentPortfolio();
+        const portfolio = currentPortfolio(userId);
         const events = db
           .query(
             `SELECT e.*, s.action, s.conviction, s.plain_headline, s.thesis, s.invalidation, s.portfolio_impact
@@ -92,7 +150,7 @@ export function startServer() {
         const briefing = db
           .query(`SELECT * FROM briefings ORDER BY ts DESC LIMIT 1`)
           .get();
-        const broker = brokerSnapshot();
+        const broker = brokerSnapshot(userId);
         return Response.json({
           portfolio, events, briefing, marketPhase: marketPhase(), marketClock: nextMarketTransition(),
           aiLive: aiLive(),
@@ -108,7 +166,7 @@ export function startServer() {
 
       // Ranked screener results (pure quant — no AI cost to view)
       if (url.pathname === "/api/screener") {
-        return Response.json({ rows: getScreenerRows(currentPortfolio()) });
+        return Response.json({ rows: getScreenerRows(currentPortfolio(userId)) });
       }
 
       // On-demand score + news for ANY ticker (search / ⌘K detail panel).
@@ -118,22 +176,23 @@ export function startServer() {
         return Response.json(outcome.data);
       }
 
-      // Price / score alerts
+      // Price / score alerts (per-user; the background evaluator fires them all
+      // to the shared notification channel).
       if (url.pathname === "/api/alerts" && req.method === "GET") {
-        return Response.json({ alerts: listAlerts() });
+        return Response.json({ alerts: listAlerts(userId) });
       }
       if (url.pathname === "/api/alerts" && req.method === "POST") {
         try {
           const { ticker, kind, threshold } = (await req.json().catch(() => ({}))) as
             { ticker?: string; kind?: AlertKind; threshold?: number };
           if (!ticker || !kind) return Response.json({ error: "ticker and kind required" }, { status: 400 });
-          return Response.json({ alert: await createAlert(ticker, kind, Number(threshold)) });
+          return Response.json({ alert: await createAlert(userId, ticker, kind, Number(threshold)) });
         } catch (err) {
           return Response.json({ error: err instanceof Error ? err.message : "Bad alert" }, { status: 400 });
         }
       }
       if (url.pathname === "/api/alerts" && req.method === "DELETE") {
-        deleteAlert(Number(url.searchParams.get("id")));
+        deleteAlert(userId, Number(url.searchParams.get("id")));
         return Response.json({ ok: true });
       }
 
@@ -141,13 +200,13 @@ export function startServer() {
       if (url.pathname === "/api/market") {
         return Response.json({
           snapshot: getMarketSnapshot(),
-          boards: sectorBoards(currentPortfolio()),
+          boards: sectorBoards(currentPortfolio(userId)),
         });
       }
 
       // Recent validated ideas (structured reports)
       if (url.pathname === "/api/ideas") {
-        return Response.json({ ideas: recentIdeas(20) });
+        return Response.json({ ideas: recentIdeas(userId, 20) });
       }
 
       // Validate one idea — long, short, or auto (user-initiated, always allowed)
@@ -157,7 +216,7 @@ export function startServer() {
           const ticker = String(body.ticker ?? "").toUpperCase().trim();
           if (!ticker) return Response.json({ ok: false, error: "no ticker" }, { status: 400 });
           const direction = body.direction === "long" || body.direction === "short" ? body.direction : "auto";
-          const report = await validateIdea(ticker, direction, currentPortfolio(), {
+          const report = await validateIdea(userId, ticker, direction, currentPortfolio(userId), {
             notes: body.notes, options: !!body.options, source: "validate",
           });
           if ("error" in report) return Response.json({ ok: false, error: report.error }, { status: 422 });
@@ -174,16 +233,23 @@ export function startServer() {
         if (generateInFlight) return Response.json({ ok: false, error: "already generating" }, { status: 429 });
         generateInFlight = true;
         try {
-          const body = (await req.json().catch(() => ({}))) as { count?: number };
+          const body = (await req.json().catch(() => ({}))) as { count?: number; filters?: IdeaFilters };
           const count = Math.min(Math.max(Number(body.count ?? 4), 1), 6);
-          const portfolio = currentPortfolio();
-          const candidates = pickCandidates(portfolio, count);
+          const portfolio = currentPortfolio(userId);
+          const filters: IdeaFilters | undefined = body.filters
+            ? {
+                sectors: Array.isArray(body.filters.sectors) ? body.filters.sectors.map(String).slice(0, 20) : undefined,
+                minScore: Number.isFinite(Number(body.filters.minScore)) ? Math.min(Math.max(Number(body.filters.minScore), 50), 100) : undefined,
+                direction: body.filters.direction === "long" || body.filters.direction === "short" ? body.filters.direction : undefined,
+              }
+            : undefined;
+          const candidates = pickCandidates(portfolio, count, filters);
           if (!candidates.length) {
-            return Response.json({ ok: true, reports: [], note: "No setup-grade candidates in the latest scan (nothing scored ≥68 with a clear direction). That is a valid answer — don't force trades." });
+            return Response.json({ ok: true, reports: [], note: "No setup-grade candidates match the current filters in the latest scan. That is a valid answer — don't force trades." });
           }
           const reports: IdeaReport[] = [];
           for (const c of candidates) {
-            const r = await validateIdea(c.ticker, c.direction, portfolio, { source: "generate" });
+            const r = await validateIdea(userId, c.ticker, c.direction, portfolio, { source: "generate" });
             if (!("error" in r)) reports.push(r);
           }
           return Response.json({ ok: true, reports });
@@ -199,7 +265,7 @@ export function startServer() {
       if (url.pathname === "/api/intraday/analyze" && req.method === "POST") {
         try {
           const body = (await req.json()) as IntradayRequest;
-          const plan = await analyzeIntraday(body, currentPortfolio());
+          const plan = await analyzeIntraday(userId, body, currentPortfolio(userId));
           if ("error" in plan) return Response.json({ ok: false, error: plan.error }, { status: 422 });
           return Response.json({ ok: true, plan });
         } catch (err) {
@@ -245,7 +311,7 @@ export function startServer() {
       if (url.pathname === "/api/intraday/followup" && req.method === "POST") {
         try {
           const body = (await req.json()) as FollowupRequest;
-          const out = await manageTrade(body, currentPortfolio());
+          const out = await manageTrade(userId, body, currentPortfolio(userId));
           if ("error" in out) return Response.json({ ok: false, error: out.error }, { status: 422 });
           return Response.json({ ok: true, answer: out.answer });
         } catch (err) {
@@ -256,33 +322,86 @@ export function startServer() {
 
       // Broker status / refresh / manual import fallback
       if (url.pathname === "/api/broker/status") {
-        const s = brokerSnapshot();
+        const s = brokerSnapshot(userId);
         return Response.json({
           snapshot: s ? { source: s.source, asOf: s.asOf, positions: s.holdings.length, watchlist: s.watchlist.length, openOrders: s.openOrders, account: s.account } : null,
-          robinhoodLinked: !!getSetting("robinhood_auth", ""),
+          robinhoodLinked: getBrokerLink(userId)?.provider === "robinhood",
         });
       }
       if (url.pathname === "/api/broker/refresh" && req.method === "POST") {
-        const snap = await refreshBroker();
+        const snap = await refreshBroker(userId);
         return Response.json({ ok: true, source: snap.source, positions: snap.holdings.length });
       }
       if (url.pathname === "/api/broker/import" && req.method === "POST") {
         try {
           const payload = (await req.json()) as ImportPayload;
-          saveImport(payload);
-          const snap = await refreshBroker();
+          saveImport(userId, payload);
+          const snap = await refreshBroker(userId);
           return Response.json({ ok: true, source: snap.source, positions: snap.holdings.length });
         } catch (err) {
           return Response.json({ ok: false, error: String(err) }, { status: 400 });
         }
       }
       if (url.pathname === "/api/broker/import/clear" && req.method === "POST") {
-        clearImport();
-        const snap = await refreshBroker();
+        clearImport(userId);
+        const snap = await refreshBroker(userId);
         return Response.json({ ok: true, source: snap.source });
       }
 
-      // Master switch for automatic AI spend (triage/analysis/scheduled briefings)
+      // Trade-outcome journal: log how closed trades went; feeds AI prompts as context.
+      if (url.pathname === "/api/journal/outcome" && req.method === "POST") {
+        try {
+          const body = (await req.json()) as any;
+          const ticker = String(body.ticker ?? "").toUpperCase().trim();
+          const direction = body.direction === "short" ? "short" : "long";
+          const outcome = ["win", "loss", "breakeven"].includes(body.outcome) ? body.outcome : null;
+          if (!ticker) return Response.json({ ok: false, error: "no ticker" }, { status: 400 });
+          if (!outcome) return Response.json({ ok: false, error: "outcome must be win, loss, or breakeven" }, { status: 400 });
+          const num = (v: unknown) => (v == null || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
+          const id = logOutcome(userId, {
+            ticker, direction, outcome,
+            idea_id: num(body.idea_id), entry_price: num(body.entry_price), exit_price: num(body.exit_price),
+            pnl_pct: num(body.pnl_pct), notes: String(body.notes ?? "").slice(0, 2000),
+            closed_at: num(body.closed_at) ?? undefined,
+          });
+          return Response.json({ ok: true, id });
+        } catch (err) {
+          return Response.json({ ok: false, error: String(err) }, { status: 400 });
+        }
+      }
+      if (url.pathname === "/api/journal") {
+        return Response.json({ outcomes: listOutcomes(userId, 50) });
+      }
+      if (url.pathname.startsWith("/api/journal/") && req.method === "DELETE") {
+        const id = Number(url.pathname.split("/").pop());
+        if (!Number.isInteger(id)) return Response.json({ ok: false, error: "bad id" }, { status: 400 });
+        return Response.json({ ok: deleteOutcome(userId, id) });
+      }
+
+      // Per-user risk preferences (equity fallback, risk %, position cap, target R:R).
+      if (url.pathname === "/api/risk-prefs") {
+        if (req.method === "PUT" || req.method === "POST") {
+          try {
+            const body = (await req.json()) as Record<string, unknown>;
+            const cur = loadRiskConfigFor(userId);
+            const num = (v: unknown, fallback: number) => (v == null || v === "" || !Number.isFinite(Number(v)) ? fallback : Number(v));
+            const prefs = {
+              account_equity: body.account_equity == null || body.account_equity === "" ? cur.account_equity : num(body.account_equity, 0),
+              max_risk_per_trade_pct: Math.min(Math.max(num(body.max_risk_per_trade_pct, cur.max_risk_per_trade_pct), 0.1), 10),
+              max_position_pct: Math.min(Math.max(num(body.max_position_pct, cur.max_position_pct), 1), 100),
+              target_rr_ratio: Math.min(Math.max(num(body.target_rr_ratio, cur.target_rr_ratio), 1), 10),
+            };
+            setRiskPrefs(userId, prefs);
+            return Response.json({ ok: true, prefs });
+          } catch (err) {
+            return Response.json({ ok: false, error: String(err) }, { status: 400 });
+          }
+        }
+        return Response.json({ prefs: loadRiskConfigFor(userId), customized: !!getRiskPrefs(userId) });
+      }
+
+      // Master switch for automatic AI spend (triage/analysis/scheduled briefings).
+      // Global, not per-user — background monitoring is one shared pipeline (see index.ts).
       if (url.pathname === "/api/ai-live" && req.method === "POST") {
         const body = (await req.json().catch(() => ({}))) as { on?: boolean };
         setAiLive(!!body.on);
@@ -296,7 +415,7 @@ export function startServer() {
           const body = (await req.json()) as { question?: string; history?: ChatTurn[] };
           const question = String(body.question ?? "").trim();
           if (!question) return Response.json({ ok: false, error: "empty question" }, { status: 400 });
-          const answer = await askAdvisor(question, body.history ?? [], currentPortfolio());
+          const answer = await askAdvisor(userId, question, body.history ?? [], currentPortfolio(userId));
           return Response.json({ ok: true, answer });
         } catch (err) {
           console.error("[server] /api/ask failed:", err);
@@ -312,7 +431,7 @@ export function startServer() {
       }
 
       if (url.pathname === "/api/quotes") {
-        const portfolio = currentPortfolio();
+        const portfolio = currentPortfolio(userId);
         const out: Record<string, any> = {};
         await Promise.all(
           allTickers(portfolio).map(async (t) => {
@@ -322,6 +441,34 @@ export function startServer() {
           })
         );
         return Response.json(out);
+      }
+
+      // Stock detail page bundle: quote + screener row + universe meta + spark
+      // series + recent idea reports, in one call (no client-side waterfall).
+      if (url.pathname.startsWith("/api/stock/")) {
+        const ticker = decodeURIComponent(url.pathname.split("/").pop() ?? "").toUpperCase().trim();
+        if (!/^[A-Z][A-Z0-9.\-]{0,9}$/.test(ticker)) return Response.json({ ok: false, error: "bad ticker" }, { status: 400 });
+        const meta = universeMeta(ticker);
+        const row = db.query(`SELECT * FROM screener WHERE ticker = ?`).get(ticker) as any;
+        let quote: any = null;
+        try { quote = await cachedQuote(ticker); } catch {}
+        let spark: { timestamps: number[]; closes: number[] } | null = null;
+        try {
+          const c = await fetchDailyCandles(ticker, "1y", 30);
+          if (c) spark = { timestamps: c.timestamps.slice(-120), closes: c.closes.slice(-120) };
+        } catch {}
+        if (!meta && !row && !quote?.c && !spark) {
+          return Response.json({ ok: false, error: `No data found for "${ticker}" — check the symbol.` }, { status: 404 });
+        }
+        const ideaRows = db
+          .query(`SELECT ts, source, report FROM ideas WHERE user_id = ? AND ticker = ? AND source != 'intraday' ORDER BY ts DESC LIMIT 5`)
+          .all(userId, ticker) as any[];
+        const held = currentPortfolio(userId).holdings.find((h) => h.ticker === ticker) ?? null;
+        return Response.json({
+          ok: true, ticker, meta, quote, spark, held,
+          screener: row ? { ...row, indicators: JSON.parse(row.indicators) } : null,
+          ideas: ideaRows.map((r) => ({ ...(JSON.parse(r.report)), ts: r.ts, source: r.source })),
+        });
       }
 
       // On-demand briefing (also generated automatically at 9:00 / 16:15 ET).

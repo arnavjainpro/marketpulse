@@ -13,11 +13,13 @@ import { config, type Portfolio } from "../config";
 import { db } from "../db";
 import { fetchDailyCandles } from "../ingest/yahoo";
 import { fetchCompanyNews, fetchNextEarnings, cachedQuote } from "../ingest/finnhub";
-import { fetchOptionsSummary, optionsContextText } from "../ingest/options";
+import { fetchOptionsSummary, optionsContextText, type OptionsSummary } from "../ingest/options";
+import { stressStructure, type Leg } from "../engine/optionsMath";
 import { universeMeta, sectorEtf } from "../ingest/universe";
 import { computeIndicators, scoreLong, scoreShort, directionOf, type Indicators, type ScreenRow, getScreenerRows } from "../engine/screener";
 import { benchmarkCandles, refreshMarketContext, getMarketSnapshot, marketContextText } from "../engine/market";
-import { positionSizing, accountContextText, type SizingPlan } from "../broker";
+import { positionSizing, accountContextText, loadRiskConfigFor, type SizingPlan } from "../broker";
+import { journalContextText } from "./journal";
 import { claudeQueue } from "./queue";
 import { opusBreaker } from "./breaker";
 
@@ -62,12 +64,26 @@ export interface IdeaReport {
   exit_plan: string;
   warnings: string[];
   options_view?: {
-    stance: "calls" | "puts" | "spread" | "neutral" | "avoid";
-    strike_range: string;
-    expiry_range: string;
+    // The AI picks a structure from the full menu and proposes concrete legs;
+    // maxLoss/maxGain/breakevens are computed server-side (Black-Scholes),
+    // never taken on the model's word — same pattern as the trade frame.
+    strategy:
+      | "long_call" | "long_put"
+      | "vertical_call_debit" | "vertical_call_credit"
+      | "vertical_put_debit" | "vertical_put_credit"
+      | "straddle" | "strangle" | "iron_condor"
+      | "covered_call" | "cash_secured_put" | "calendar"
+      | "neutral" | "avoid";
+    legs: Leg[];
+    rationale: string;
     iv_context: string;
-    upside_risk: string;
-    downside_risk: string;
+    pricing?: {
+      entryCost: number;      // net debit(+)/credit(−), dollars
+      maxLoss: number;
+      maxGain: number;
+      breakevens: number[];
+      note: string;
+    };
   };
 }
 
@@ -132,16 +148,39 @@ const IDEA_SCHEMA = {
     warnings: { type: "array", items: { type: "string" }, description: "Material risks: earnings proximity, crowded trade, thin liquidity, news conflict, momentum-only, etc." },
     options_view: {
       type: "object",
-      description: "Only when options data was provided in the input.",
+      description: "Only when options data was provided in the input. Propose ONE concrete structure with real legs from the strike ladder; max loss/gain/breakevens are computed by the server, not by you.",
       properties: {
-        stance: { type: "string", enum: ["calls", "puts", "spread", "neutral", "avoid"] },
-        strike_range: { type: "string" },
-        expiry_range: { type: "string" },
-        iv_context: { type: "string" },
-        upside_risk: { type: "string" },
-        downside_risk: { type: "string" },
+        strategy: {
+          type: "string",
+          enum: [
+            "long_call", "long_put",
+            "vertical_call_debit", "vertical_call_credit",
+            "vertical_put_debit", "vertical_put_credit",
+            "straddle", "strangle", "iron_condor",
+            "covered_call", "cash_secured_put", "calendar",
+            "neutral", "avoid",
+          ],
+        },
+        legs: {
+          type: "array",
+          description: "Every leg of the structure. Strikes and expiries MUST come from the provided chain ladder. Empty array only for strategy neutral/avoid.",
+          items: {
+            type: "object",
+            properties: {
+              action: { type: "string", enum: ["buy", "sell"] },
+              right: { type: "string", enum: ["call", "put"] },
+              strike: { type: "number" },
+              expiry: { type: "string", description: "ISO date YYYY-MM-DD, from the chain data" },
+              quantity: { type: "number", description: "contracts (×100 shares); usually 1" },
+            },
+            required: ["action", "right", "strike", "expiry", "quantity"],
+            additionalProperties: false,
+          },
+        },
+        rationale: { type: "string", description: "Why THIS structure fits the thesis and the IV regime, vs the alternatives on the menu." },
+        iv_context: { type: "string", description: "IV level read + crush/theta risk in plain terms." },
       },
-      required: ["stance", "strike_range", "expiry_range", "iv_context", "upside_risk", "downside_risk"],
+      required: ["strategy", "legs", "rationale", "iv_context"],
       additionalProperties: false,
     },
   },
@@ -155,10 +194,10 @@ const IDEA_SCHEMA = {
 // Stable rubric — byte-identical across calls for prompt-cache hits.
 const VALIDATOR_SYSTEM = `You are the idea-validation engine of a trading decision-support system for one self-directed trader. You receive one candidate trade idea (long or short) with pre-computed technical evidence, support/resistance levels, relative strength, sector rotation, market regime, news headlines, earnings timing, and a risk-first trade frame. Produce a structured, conservative validation.
 
-Rating rubric — apply it strictly:
-- "strong": at least three INDEPENDENT confirmations (e.g. trend structure + volume-confirmed level break + relative strength + supportive catalyst), a clear invalidation level, risk/reward ≥ 2:1 to the first target, market/sector context not fighting the trade, and no unresolved news conflict.
-- "moderate": two solid confirmations and acceptable risk/reward, but a missing leg (no catalyst, neutral sector, or R:R between 1.5 and 2).
-- "weak": one factor doing all the work, conflicted evidence, poor entry location (extended/chased), or R:R < 1.5.
+Rating rubric — apply it strictly. The context provides a TARGET RISK/REWARD block with this trader's numeric R:R thresholds; apply those exact numbers wherever this rubric references the R:R bar:
+- "strong": at least three INDEPENDENT confirmations (e.g. trend structure + volume-confirmed level break + relative strength + supportive catalyst), a clear invalidation level, risk/reward at or above the trader's stated target to the first target, market/sector context not fighting the trade, and no unresolved news conflict.
+- "moderate": two solid confirmations and acceptable risk/reward, but a missing leg (no catalyst, neutral sector, or R:R in the trader's stated moderate band below target).
+- "weak": one factor doing all the work, conflicted evidence, poor entry location (extended/chased), or R:R below the trader's stated weak threshold.
 - "reject": no edge, structure contradicts the direction, news contradicts the setup without a repricing case, illiquid, or the trade only works in a narrow scenario that current regime makes unlikely.
 
 Hard rules:
@@ -170,6 +209,7 @@ Hard rules:
 - Ground every number in the provided data. Do not invent prices, levels, or news. If a needed input is missing, say so and be more conservative.
 - The trade frame provided (entry/stop/targets) is a starting point computed from ATR and levels — refine it with judgment, but keep stops at structurally meaningful levels and state the R:R math.
 - Respect the market regime: longs in a risk-off tape and shorts in a strong uptrend need extra evidence; say whether the idea survives a regime flip in stress_tests.
+- If a TRADER'S PAST-TRADE JOURNAL block is provided and it shows a recurring mistake relevant to this setup (e.g. repeatedly chasing breakouts without volume confirmation, repeatedly losing on this same ticker, cutting winners early), call it out explicitly in warnings and let it inform the plan — that history is real, not hypothetical.
 - If the honest answer is "no trade", return direction "no_trade" with rating "reject" — do not manufacture a plan.
 - Plain English throughout; explain any technical term in the same sentence. This is decision support, not licensed financial advice; the trader decides.`;
 
@@ -189,6 +229,7 @@ export interface IdeaContext {
   frame: { direction: string; entry: number; stop: number; t1: number; t2: number; rr: number } | null;
   sizing: SizingPlan | null;
   optionsText: string | null;
+  optionsSummary: OptionsSummary | null; // raw chain kept for server-side leg pricing
 }
 
 // Deterministic risk-first trade frame from ATR + swing levels. The AI refines
@@ -212,6 +253,7 @@ function tradeFrame(ind: Indicators, direction: "long" | "short") {
 }
 
 export async function gatherIdeaContext(
+  userId: number,
   ticker: string,
   requestedDirection: "long" | "short" | "auto",
   withOptions: boolean
@@ -263,9 +305,13 @@ export async function gatherIdeaContext(
 
   const earnings = await fetchNextEarnings(ticker);
   const frame = tradeFrame(ind, dir);
-  const sizing = positionSizing(frame.entry, frame.stop);
+  const sizing = positionSizing(userId, frame.entry, frame.stop);
   let optionsText: string | null = null;
-  if (withOptions) optionsText = optionsContextText(await fetchOptionsSummary(ticker));
+  let optionsSummary: OptionsSummary | null = null;
+  if (withOptions) {
+    optionsSummary = await fetchOptionsSummary(ticker);
+    optionsText = optionsContextText(optionsSummary);
+  }
 
   return {
     ticker,
@@ -283,15 +329,19 @@ export async function gatherIdeaContext(
     frame,
     sizing,
     optionsText,
+    optionsSummary,
   };
 }
 
-function contextToPrompt(ctx: IdeaContext, portfolio: Portfolio, userNotes?: string): string {
+function contextToPrompt(userId: number, ctx: IdeaContext, portfolio: Portfolio, userNotes?: string): string {
   const i = ctx.ind;
   const held = portfolio.holdings.find((h) => h.ticker === ctx.ticker);
   const snap = getMarketSnapshot();
   const secRot = snap?.sectors.find((s) => s.sector === ctx.sector);
   const fmt = (v: number | null | undefined, dec = 2) => (v != null ? v.toFixed(dec) : "n/a");
+  // Numeric R:R thresholds live here, NOT in the system prompt — the system
+  // block stays byte-identical across users so prompt-cache hits survive.
+  const targetRR = loadRiskConfigFor(userId).target_rr_ratio;
 
   return [
     `IDEA TO VALIDATE: ${ctx.ticker} (${ctx.name}) — ${ctx.requestedDirection === "auto" ? `direction AUTO (quant lean: ${ctx.quantDirection})` : ctx.requestedDirection.toUpperCase()}`,
@@ -320,6 +370,8 @@ function contextToPrompt(ctx: IdeaContext, portfolio: Portfolio, userNotes?: str
     ``,
     `EARNINGS: ${ctx.earnings ? `next report ${ctx.earnings.date} (${ctx.earnings.daysAway} days away${ctx.earnings.hour ? ", " + ctx.earnings.hour : ""}) — flag if inside the holding period.` : "no scheduled report found in the next ~70 days."}`,
     ``,
+    `TARGET RISK/REWARD: this trader's minimum R:R for a "strong" rating is ${targetRR.toFixed(1)}:1 to the first target; the "moderate" band runs down to ${Math.max(1, targetRR - 0.5).toFixed(1)}:1; anything below ${Math.max(1, targetRR - 0.5).toFixed(1)}:1 caps the rating at "weak" on the risk/reward leg.`,
+    ``,
     `RISK-FIRST TRADE FRAME (deterministic starting point from ATR + swing levels — refine with judgment):`,
     ctx.frame
       ? `${ctx.frame.direction.toUpperCase()}: entry ~$${fmt(ctx.frame.entry)}, stop $${fmt(ctx.frame.stop)}, T1 $${fmt(ctx.frame.t1)}, T2 $${fmt(ctx.frame.t2)}, R:R to T1 ≈ ${fmt(ctx.frame.rr, 1)}:1`
@@ -327,15 +379,45 @@ function contextToPrompt(ctx: IdeaContext, portfolio: Portfolio, userNotes?: str
     ctx.sizing
       ? `SIZING MATH: ${ctx.sizing.accountEquity ? `equity $${ctx.sizing.accountEquity.toLocaleString()}, max risk ${ctx.sizing.riskPct}% = $${ctx.sizing.riskDollars}, suggested ~${ctx.sizing.shares} shares (~$${ctx.sizing.notional}). ${ctx.sizing.note}` : ctx.sizing.note}`
       : "",
-    accountContextText(),
+    accountContextText(userId),
+    journalContextText(userId, ctx.ticker),
     held ? `POSITION: trader already holds ${held.shares} shares @ $${held.cost_basis}${held.thesis ? ` — thesis: ${held.thesis}` : ""}.` : `POSITION: trader does not hold ${ctx.ticker}.`,
-    ctx.optionsText ? `\n${ctx.optionsText}\nInclude an options_view in your output: pick calls/puts/spread/neutral/avoid for this thesis, suggest strike and expiry ranges from the chain data, and spell out premium risk (IV crush, theta decay) in plain terms.` : "",
+    ctx.optionsText
+      ? `\n${ctx.optionsText}\nInclude an options_view in your output. Consider the FULL strategy menu — long call/put, vertical debit/credit spreads, straddle, strangle, iron condor, covered call, cash-secured put, calendar — and pick the ONE structure that best fits both the thesis and the IV regime: sell premium (credit spreads, iron condor, covered call, CSP) when IV is elevated; buy premium (long options, debit spreads) when IV is low and a real move is expected; straddle/strangle only for a genuine big-move-either-way thesis; iron condor for a range-bound thesis; covered call / cash-secured put only when it fits an existing or intended share position. Do NOT default to plain calls/puts if a defined-risk structure fits better. Propose concrete legs (action/right/strike/expiry/quantity) using ONLY strikes and expiries from the chain data above — max loss, max gain, and breakevens will be computed deterministically from your legs, so make them real. If options genuinely add nothing here, use strategy "neutral" or "avoid" with an empty legs array and say why. Spell out premium risk (IV crush, theta decay) in plain terms in iv_context.`
+      : "",
   ]
     .filter((l) => l !== "")
     .join("\n");
 }
 
+// Price the AI's proposed option legs deterministically (Black-Scholes stress),
+// so the max loss / max gain / breakevens the trader sees are computed, never
+// model-authored — the options twin of the deterministic tradeFrame().
+function priceOptionsView(report: IdeaReport, ctx: IdeaContext) {
+  const ov = report.options_view;
+  if (!ov?.legs?.length || ov.strategy === "neutral" || ov.strategy === "avoid") return;
+  try {
+    const spot = ctx.optionsSummary?.spot ?? ctx.price;
+    const legExpiry = ov.legs[0].expiry;
+    const expiries = ctx.optionsSummary?.expiries ?? [];
+    const baseIv =
+      expiries.find((e) => e.expiry === legExpiry && e.atmIv != null)?.atmIv ??
+      expiries.find((e) => e.atmIv != null)?.atmIv ?? 0.3;
+    const st = stressStructure(ov.legs as Leg[], spot, baseIv);
+    ov.pricing = {
+      entryCost: Math.round(st.entryCost * 100) / 100,
+      maxLoss: Math.round(st.maxLoss * 100) / 100,
+      maxGain: Math.round(st.maxGain * 100) / 100,
+      breakevens: st.breakevens.map((b) => Math.round(b * 100) / 100),
+      note: st.note,
+    };
+  } catch (err) {
+    console.error(`[validator] options pricing failed for ${ctx.ticker}:`, err);
+  }
+}
+
 export async function validateIdea(
+  userId: number,
   ticker: string,
   requestedDirection: "long" | "short" | "auto",
   portfolio: Portfolio,
@@ -343,7 +425,7 @@ export async function validateIdea(
 ): Promise<IdeaReport | { error: string }> {
   if (!opusBreaker.allow()) return { error: "AI circuit breaker is tripped — reset it from the dashboard status bar." };
 
-  const ctx = await gatherIdeaContext(ticker, requestedDirection, !!opts.options);
+  const ctx = await gatherIdeaContext(userId, ticker, requestedDirection, !!opts.options);
   if ("error" in ctx) return ctx;
 
   try {
@@ -354,13 +436,14 @@ export async function validateIdea(
         thinking: { type: "adaptive" },
         system: [{ type: "text", text: VALIDATOR_SYSTEM, cache_control: { type: "ephemeral" } }],
         output_config: { format: { type: "json_schema", schema: IDEA_SCHEMA } },
-        messages: [{ role: "user", content: contextToPrompt(ctx, portfolio, opts.notes) }],
+        messages: [{ role: "user", content: contextToPrompt(userId, ctx, portfolio, opts.notes) }],
       })
     );
     const text = response.content.find((b) => b.type === "text");
     const report = { ticker: ctx.ticker, ...(JSON.parse(text!.text) as Omit<IdeaReport, "ticker">) };
-    db.query(`INSERT INTO ideas (ts, ticker, direction, rating, confidence, source, report) VALUES (unixepoch(), ?, ?, ?, ?, ?, ?)`)
-      .run(ctx.ticker, report.direction, report.rating, report.confidence, opts.source ?? "validate", JSON.stringify(report));
+    priceOptionsView(report, ctx);
+    db.query(`INSERT INTO ideas (ts, ticker, direction, rating, confidence, source, report, user_id) VALUES (unixepoch(), ?, ?, ?, ?, ?, ?, ?)`)
+      .run(ctx.ticker, report.direction, report.rating, report.confidence, opts.source ?? "validate", JSON.stringify(report), userId);
     return report;
   } catch (err) {
     console.error(`[validator] ${ticker} failed:`, err);
@@ -368,15 +451,26 @@ export async function validateIdea(
   }
 }
 
+// Optional narrowing for generation — mirrors the dashboard's filter panel.
+export interface IdeaFilters {
+  sectors?: string[];                    // exact sector names; empty/absent = all
+  minScore?: number;                     // floor for the directional score (default 68)
+  direction?: "long" | "short" | "both"; // default both
+}
+
 // Batch idea generation: strongest screener confluences, both directions,
 // sector-diversified (max 2 per sector per direction), capped for cost.
-export function pickCandidates(portfolio: Portfolio, count: number): { ticker: string; direction: "long" | "short" }[] {
+export function pickCandidates(portfolio: Portfolio, count: number, filters?: IdeaFilters): { ticker: string; direction: "long" | "short" }[] {
   const rows = getScreenerRows(portfolio);
   const regime = getMarketSnapshot()?.regime;
+  const minScore = filters?.minScore ?? 68;
+  const sectorSet = filters?.sectors?.length ? new Set(filters.sectors) : null;
+  const dirWant = filters?.direction === "long" || filters?.direction === "short" ? filters.direction : null;
   const picks: { ticker: string; direction: "long" | "short"; score: number; sector: string }[] = [];
   for (const r of rows) {
-    if (r.direction === "long" && r.long_score >= 68) picks.push({ ticker: r.ticker, direction: "long", score: r.long_score, sector: r.sector });
-    else if (r.direction === "short" && r.short_score >= 68) picks.push({ ticker: r.ticker, direction: "short", score: r.short_score, sector: r.sector });
+    if (sectorSet && !sectorSet.has(r.sector)) continue;
+    if (r.direction === "long" && dirWant !== "short" && r.long_score >= minScore) picks.push({ ticker: r.ticker, direction: "long", score: r.long_score, sector: r.sector });
+    else if (r.direction === "short" && dirWant !== "long" && r.short_score >= minScore) picks.push({ ticker: r.ticker, direction: "short", score: r.short_score, sector: r.sector });
   }
   // Risk-off tape: prefer shorts/defensives by nudging short scores up the sort.
   picks.sort((a, b) => (b.score + (regime?.riskOff && b.direction === "short" ? 5 : 0)) - (a.score + (regime?.riskOff && a.direction === "short" ? 5 : 0)));
@@ -392,8 +486,8 @@ export function pickCandidates(portfolio: Portfolio, count: number): { ticker: s
   return out;
 }
 
-export function recentIdeas(limit = 20): (IdeaReport & { ts: number; source: string })[] {
+export function recentIdeas(userId: number, limit = 20): (IdeaReport & { ts: number; source: string })[] {
   // Intraday plans live in the same table but have a different shape — excluded here.
-  const rows = db.query(`SELECT ts, source, report FROM ideas WHERE source != 'intraday' ORDER BY ts DESC LIMIT ?`).all(limit) as any[];
+  const rows = db.query(`SELECT ts, source, report FROM ideas WHERE user_id = ? AND source != 'intraday' ORDER BY ts DESC LIMIT ?`).all(userId, limit) as any[];
   return rows.map((r) => ({ ...(JSON.parse(r.report) as IdeaReport), ts: r.ts, source: r.source }));
 }
