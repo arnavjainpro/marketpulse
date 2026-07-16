@@ -759,14 +759,12 @@ const runTickerSearch = debounce(async (raw) => {
   tickerResult.innerHTML = renderTickerDetail(data);
   const sp = tickerResult.querySelector(".tm-spark");
   if (sp && data.indicators?.spark) sparkSvg(sp, data.indicators.spark, true);
-  loadAlertList(data.ticker);
 }, 250);
 tickerSearch.addEventListener("input", (e) => runTickerSearch(e.target.value));
 
-/* ── alerts inside the detail panel (create / list / delete) ── */
+/* ── alerts inside the stock page (create / list / delete) ── */
 const KIND_LABEL = { price_above: "Price >", price_below: "Price <", score_gte: "Score ≥" };
-async function loadAlertList(ticker) {
-  const box = tickerResult.querySelector(".tm-alert-box");
+async function loadAlertList(ticker, box) {
   if (!box) return;
   let alerts = [];
   try { alerts = (await (await fetch("/api/alerts")).json()).alerts || []; } catch { return; }
@@ -778,7 +776,7 @@ async function loadAlertList(ticker) {
         <button class="del" data-alert-del="${a.id}" title="delete alert">×</button>
       </div>`).join("");
 }
-tickerResult.addEventListener("click", async (e) => {
+document.addEventListener("click", async (e) => {
   const fullBtn = e.target.closest("[data-full-page]");
   if (fullBtn) { closeTickerModal(); showPane("stock", fullBtn.dataset.fullPage); return; }
   const createBtn = e.target.closest('[data-alert-action="create"]');
@@ -793,10 +791,10 @@ tickerResult.addEventListener("click", async (e) => {
     const res = await (await fetch("/api/alerts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ticker, kind, threshold }) })).json();
     if (res.error) { msg.textContent = res.error; msg.classList.add("err"); }
     else { msg.classList.remove("err"); msg.textContent = "Alert set — you'll get notified when it crosses."; }
-    loadAlertList(ticker);
+    loadAlertList(ticker, box);
   } else if (delBtn) {
     await fetch(`/api/alerts?id=${delBtn.dataset.alertDel}`, { method: "DELETE" });
-    if (box) loadAlertList(box.dataset.ticker);
+    if (box) loadAlertList(box.dataset.ticker, box);
   }
 });
 
@@ -817,9 +815,6 @@ function renderTickerDetail(d) {
       <div class="stat"><div class="k">RSI (14d)</div><div class="v">${f(i.rsi14, 0)}</div></div>
       <div class="stat"><div class="k">vs S&amp;P (1m)</div><div class="v">${i.rsSpy1m != null ? signed(i.rsSpy1m, 1) + "pp" : "—"}</div></div>
     </div>` : "";
-  const news = d.news?.length
-    ? `<div class="tm-news">${d.news.map((n) => `<a href="${esc(safeUrl(n.url))}" target="_blank" rel="noopener">${esc(n.headline)}<span class="src"> · ${esc(n.source)}</span></a>`).join("")}</div>`
-    : "";
   return `
     <div class="tm-head"><span class="tm-sym">${esc(d.ticker)}</span>${d.name ? `<span class="tm-name">${esc(d.name)}</span>` : ""}${d.sector ? `<span class="chip calm sm">${esc(d.sector)}</span>` : ""}</div>
     <div class="tm-price">${priceStr}</div>
@@ -827,12 +822,20 @@ function renderTickerDetail(d) {
     <div>${scoreLine}</div>
     ${d.note ? `<div class="tm-note">${esc(d.note)}</div>` : ""}
     ${stats}
-    ${news}
     <div class="tm-actions" id="tm-actions">
       <button class="advise-btn" data-full-page="${esc(d.ticker)}">Full analysis →</button>
-      <a class="advise-btn ghost" href="${tvLink(d.ticker)}" target="_blank" rel="noopener" style="text-decoration:none">Open in TradingView ↗</a>
     </div>
-    <div class="tm-alert-box" data-ticker="${esc(d.ticker)}">
+    <div class="tm-hint" style="margin-top:8px">Enter ↵ or Full analysis opens the full page with news, TradingView and alerts.</div>`;
+}
+
+function newsListHtml(news) {
+  if (!news?.length) return "";
+  return `<div class="tm-news">${news.map((n) => `<a href="${esc(safeUrl(n.url))}" target="_blank" rel="noopener">${esc(n.headline)}<span class="src"> · ${esc(n.source)}</span></a>`).join("")}</div>`;
+}
+
+function alertBoxHtml(ticker, price) {
+  return `
+    <div class="tm-alert-box" data-ticker="${esc(ticker)}">
       <div class="klabel" style="margin-top:14px">Set an alert</div>
       <div class="tm-actions" style="margin-top:6px">
         <select class="alert-kind">
@@ -840,7 +843,7 @@ function renderTickerDetail(d) {
           <option value="price_below">Price below</option>
           <option value="score_gte">Score ≥</option>
         </select>
-        <input class="alert-threshold" type="number" step="any" value="${d.price != null ? Number(d.price).toFixed(2) : 60}" style="width:96px">
+        <input class="alert-threshold" type="number" step="any" value="${price != null ? Number(price).toFixed(2) : 60}" style="width:96px">
         <button class="advise-btn" data-alert-action="create">🔔 Create</button>
       </div>
       <div class="tm-alert-msg"></div>
@@ -926,7 +929,7 @@ function statusChip(ticker) {
 }
 
 // Plain-English factor sentences + pro stat grid for one ticker
-function factorDetail(ticker) {
+function factorDetail(ticker, { actions = true } = {}) {
   const sc = screener[ticker];
   if (!sc) return `<p class="empty">No scan data yet for ${esc(ticker)}.</p>`;
   const i = sc.indicators;
@@ -960,10 +963,10 @@ function factorDetail(ticker) {
       <div class="stat"><div class="k">Structure</div><div class="v" style="font-size:12px">${esc((i.structure || "—").replace("_", " "))}</div></div>
       <div class="stat"><div class="k">Volume trend</div><div class="v">${f(i.volTrend)}×</div></div>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    ${actions ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <button class="advise-btn" data-validate="${esc(ticker)}" data-direction="auto">Validate as a trade idea</button>
       <a class="advise-btn ghost" href="${tvLink(ticker)}" target="_blank" rel="noopener" style="text-decoration:none">Open in TradingView ↗</a>
-    </div>`;
+    </div>` : ""}`;
 }
 
 // Which expandable rows/sectors are open, keyed by a stable id (ticker or
@@ -1609,17 +1612,21 @@ async function renderStockPage(ticker) {
         <span style="font-size:12px;color:var(--faint)">scored ${new Date(r.updated_at * 1000).toLocaleString()}</span>
       </div>
       <div class="card" style="padding:12px 16px" id="stock-factors"></div>` : `<p class="empty">Not scored by the screener (outside the scan universe or too little history).</p>`}
-    <div style="margin:14px 0">
+    <div style="margin:14px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <button class="advise-btn" data-validate="${esc(ticker)}" style="margin-top:0">✦ Validate this ticker (~30s)</button>
-      <label class="checkline" style="display:inline-flex;margin-left:10px"><input type="checkbox" id="stock-opts"> include options strategy</label>
+      <label class="checkline" style="display:inline-flex"><input type="checkbox" id="stock-opts"> include options strategy</label>
+      <a class="advise-btn ghost" href="${tvLink(ticker)}" target="_blank" rel="noopener" style="text-decoration:none">Open in TradingView ↗</a>
     </div>
     <div id="stock-report-area"></div>
+    ${data.news?.length ? `<h2 style="margin-top:18px">Recent news</h2>${newsListHtml(data.news)}` : ""}
+    ${alertBoxHtml(ticker, q?.c)}
     ${data.ideas?.length ? `<h2 style="margin-top:18px">Past analyses</h2><div id="stock-past"></div>` : ""}`;
   if (data.spark?.closes) sparkSvg($("#stock-spark"), data.spark.closes, true);
   if (r) {
     screener[ticker] = r; // make factorDetail work for off-universe lookups too
-    $("#stock-factors").innerHTML = factorDetail(ticker);
+    $("#stock-factors").innerHTML = factorDetail(ticker, { actions: false });
   }
+  loadAlertList(ticker, page.querySelector(".tm-alert-box"));
   const past = $("#stock-past");
   if (past) for (const rep of data.ideas) showReport(rep, past);
 }
