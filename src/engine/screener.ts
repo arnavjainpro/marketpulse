@@ -357,8 +357,16 @@ export function sectorBoards(portfolio: Portfolio): SectorBoard[] {
   return boards;
 }
 
+// True while a full universe scan is fetching from Yahoo. The on-demand
+// /api/ticker path checks this and backs off, so ⌘K browsing can't race the
+// ~2400 paced scan fetches into 429s that stall both.
+let scanRunning = false;
+export const isScanRunning = () => scanRunning;
+
 // Full universe scan. Returns pipeline events for newly-formed setups.
 export async function runScan(portfolio: Portfolio): Promise<RawEvent[]> {
+  scanRunning = true;
+  try {
   // Benchmarks must be loaded for RS/beta math — refresh if the cache is cold.
   if (!benchmarkCandles("SPY")) await refreshMarketContext();
   const spyCloses = benchmarkCandles("SPY")?.closes ?? null;
@@ -463,4 +471,7 @@ export async function runScan(portfolio: Portfolio): Promise<RawEvent[]> {
   }
   console.log(`[screener] scan complete: ${scanned}/${tickers.length} scored, ${events.length} new setups`);
   return events;
+  } finally {
+    scanRunning = false;
+  }
 }

@@ -145,6 +145,19 @@ CREATE TABLE IF NOT EXISTS ideas (
   report TEXT NOT NULL           -- full JSON IdeaReport
 );
 
+CREATE TABLE IF NOT EXISTS alerts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL DEFAULT 1,  -- owner; the global evaluator fires them all to the shared notify channel
+  ticker TEXT NOT NULL,
+  kind TEXT NOT NULL,            -- price_above | price_below | score_gte
+  threshold REAL NOT NULL,
+  last_value REAL,              -- last observed value; seeds crossing detection
+  active INTEGER NOT NULL DEFAULT 1,
+  created_ts INTEGER NOT NULL,
+  last_fired_ts INTEGER,
+  UNIQUE(user_id, ticker, kind, threshold)   -- double-click "create alert" = one row, not two
+);
+
 CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts DESC);
 CREATE INDEX IF NOT EXISTS idx_bars_ticker_ts ON bars(ticker, ts DESC);
 CREATE INDEX IF NOT EXISTS idx_ideas_ts ON ideas(ts DESC);
@@ -160,6 +173,12 @@ for (const col of ["long_score REAL", "short_score REAL", "direction TEXT", "sec
     db.exec(`ALTER TABLE screener ADD COLUMN ${col}`);
   } catch {}
 }
+// Migration: alerts become per-user (owner scoping for the ⌘K alert manager).
+// Only matters for a DB that ran the pre-merge global-alerts build; a fresh
+// alerts table is already created with user_id above. Existing rows adopt user 1.
+try {
+  db.exec(`ALTER TABLE alerts ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1`);
+} catch {}
 // Migration: settings becomes per-user (composite user_id+key PK). Pre-existing
 // rows (all global before multi-user existed) are kept under user_id=0.
 {
