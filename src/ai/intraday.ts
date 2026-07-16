@@ -203,7 +203,7 @@ function sessionStats(bars: IntradayBars) {
   };
 }
 
-async function buildDataContext(req: IntradayRequest): Promise<{ text: string; ticker: string }> {
+async function buildDataContext(userId: number, req: IntradayRequest): Promise<{ text: string; ticker: string }> {
   const swing = req.mode === "swing";
   const ticker = (req.ticker ?? "").toUpperCase().trim();
   if (!ticker) {
@@ -213,7 +213,7 @@ async function buildDataContext(req: IntradayRequest): Promise<{ text: string; t
         "NO TICKER PROVIDED — screenshot-only analysis. Read the symbol/timeframe off the chart if visible.",
         "",
         marketContextText(),
-        accountContextText(),
+        accountContextText(userId),
       ].join("\n"),
     };
   }
@@ -301,7 +301,7 @@ async function buildDataContext(req: IntradayRequest): Promise<{ text: string; t
     const dAtr = atr(daily.highs, daily.lows, daily.closes, 14);
     if (dAtr) {
       const stopDist = dAtr * 0.35; // typical intraday stop ≈ a fraction of the daily range
-      const sz = positionSizing(px, px - stopDist);
+      const sz = positionSizing(userId, px, px - stopDist);
       lines.push(
         ``,
         `SIZING MATH (example with a ${fmt(stopDist)}$ ≈ 0.35×dailyATR stop): ` +
@@ -311,7 +311,7 @@ async function buildDataContext(req: IntradayRequest): Promise<{ text: string; t
       );
     }
   }
-  lines.push(accountContextText());
+  lines.push(accountContextText(userId));
 
   if (req.options || swing) {
     lines.push(``, optionsContextText(await fetchOptionsSummary(ticker)),
@@ -337,14 +337,14 @@ function parseImage(image: string): { media_type: "image/png" | "image/jpeg" | "
   return null;
 }
 
-export async function analyzeIntraday(req: IntradayRequest, portfolio: Portfolio): Promise<IntradayPlan | { error: string }> {
+export async function analyzeIntraday(userId: number, req: IntradayRequest, portfolio: Portfolio): Promise<IntradayPlan | { error: string }> {
   if (!opusBreaker.allow()) return { error: "AI circuit breaker is tripped — reset it from the dashboard status bar." };
   // Normalize to a labeled image list (legacy single `image` still works). Cap
   // at 4 (1D/1W/1M charts + an optional options-chain screenshot).
   const imageList = (req.images?.length ? req.images : req.image ? [{ label: "", data: req.image }] : []).slice(0, 4);
   if (!req.ticker && !imageList.length) return { error: "provide a ticker, a chart screenshot, or both" };
 
-  const { ticker, text } = await buildDataContext(req);
+  const { ticker, text } = await buildDataContext(userId, req);
   const held = portfolio.holdings.find((h) => h.ticker === ticker);
 
   const content: Anthropic.ContentBlockParam[] = [];
@@ -390,8 +390,8 @@ export async function analyzeIntraday(req: IntradayRequest, portfolio: Portfolio
         console.error(`[intraday] stress attach failed for ${ticker}:`, e);
       }
     }
-    db.query(`INSERT INTO ideas (ts, ticker, direction, rating, confidence, source, report) VALUES (unixepoch(), ?, ?, ?, ?, 'intraday', ?)`)
-      .run(ticker, plan.direction, plan.setup_quality === "no_trade" ? "reject" : plan.setup_quality, plan.confidence, JSON.stringify(plan));
+    db.query(`INSERT INTO ideas (ts, ticker, direction, rating, confidence, source, report, user_id) VALUES (unixepoch(), ?, ?, ?, ?, 'intraday', ?, ?)`)
+      .run(ticker, plan.direction, plan.setup_quality === "no_trade" ? "reject" : plan.setup_quality, plan.confidence, JSON.stringify(plan), userId);
     return plan;
   } catch (err) {
     console.error(`[intraday] ${ticker} failed:`, err);
@@ -414,12 +414,12 @@ export interface FollowupRequest {
 
 const MANAGE_SYSTEM = `You are managing a live trade with the trader. They already have a plan (given below) and are now asking what to do as the trade unfolds. Give direct, decisive, practical guidance — hold / trim / add / exit, where to move the stop or target, whether to roll or close an options position — grounded in the CURRENT data and any new screenshot they attached. Reference their original plan and its invalidation. Plain prose, no JSON, no preamble. Be concise. If the situation is genuinely unclear, say what you'd watch for rather than guessing. You are decision support, not licensed advice.`;
 
-export async function manageTrade(req: FollowupRequest, portfolio: Portfolio): Promise<{ answer: string } | { error: string }> {
+export async function manageTrade(userId: number, req: FollowupRequest, portfolio: Portfolio): Promise<{ answer: string } | { error: string }> {
   if (!opusBreaker.allow()) return { error: "AI circuit breaker is tripped — reset it from the dashboard status bar." };
   const question = String(req.question ?? "").trim();
   if (!question) return { error: "empty question" };
 
-  const { ticker, text } = await buildDataContext({ ticker: req.ticker, mode: req.mode, options: req.mode === "swing" });
+  const { ticker, text } = await buildDataContext(userId, { ticker: req.ticker, mode: req.mode, options: req.mode === "swing" });
   const held = portfolio.holdings.find((h) => h.ticker === ticker);
 
   const content: Anthropic.ContentBlockParam[] = [];

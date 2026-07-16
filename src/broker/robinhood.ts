@@ -10,7 +10,7 @@
 //   password grant for an account, the linker reports it and the user falls
 //   back to the existing manual import. Upgrade path: SnapTrade (official
 //   Robinhood read access) drops in behind this same BrokerProvider interface.
-import { getSetting, setSetting } from "../db";
+import { getBrokerLink, setBrokerLink, clearBrokerLink } from "../db";
 import type { BrokerProvider, BrokerSnapshot, BrokerOrder } from "./types";
 import type { Holding } from "../config";
 
@@ -51,20 +51,20 @@ export interface RhAuth {
   expires_at: number; // unix seconds
 }
 
-export function loadAuth(): RhAuth | null {
-  const raw = getSetting("robinhood_auth", "");
-  if (!raw) return null;
+export function loadAuth(userId: number): RhAuth | null {
+  const row = getBrokerLink(userId);
+  if (!row || row.provider !== "robinhood") return null;
   try {
-    return JSON.parse(raw) as RhAuth;
+    return JSON.parse(row.auth_json) as RhAuth;
   } catch {
     return null;
   }
 }
-export function saveAuth(a: RhAuth) {
-  setSetting("robinhood_auth", JSON.stringify(a));
+export function saveAuth(userId: number, a: RhAuth) {
+  setBrokerLink(userId, "robinhood", JSON.stringify(a));
 }
-export function clearAuth() {
-  setSetting("robinhood_auth", "");
+export function clearAuth(userId: number) {
+  clearBrokerLink(userId);
 }
 
 export function newDeviceToken(): string {
@@ -162,7 +162,7 @@ export function toAuth(json: any, deviceToken: string): RhAuth {
   };
 }
 
-async function refreshAccess(a: RhAuth): Promise<RhAuth> {
+async function refreshAccess(userId: number, a: RhAuth): Promise<RhAuth> {
   const { status, json } = await requestToken({
     client_id: CLIENT_ID,
     grant_type: "refresh_token",
@@ -173,48 +173,50 @@ async function refreshAccess(a: RhAuth): Promise<RhAuth> {
   });
   if (status !== 200 || !json.access_token) throw new Error(`robinhood token refresh failed (${status})`);
   const next = { ...toAuth(json, a.device_token), refresh_token: json.refresh_token ?? a.refresh_token };
-  saveAuth(next);
+  saveAuth(userId, next);
   return next;
 }
 
 // ── authenticated GETs + pagination ─────────────────────────────────────────
-let authHeader = "";
-async function rhGet(url: string): Promise<any> {
+// authHeader is passed explicitly (not a module global) since multiple users'
+// requests can be in flight concurrently, each with their own bearer token.
+async function rhGet(url: string, authHeader: string): Promise<any> {
   const res = await fetch(url, { headers: { ...HEADERS, Authorization: authHeader }, signal: AbortSignal.timeout(20_000) });
   if (res.status === 401) throw Object.assign(new Error("robinhood 401"), { code: 401 });
   if (!res.ok) throw new Error(`robinhood GET ${url} → ${res.status}`);
   return res.json();
 }
-async function rhList(url: string): Promise<any[]> {
+async function rhList(url: string, authHeader: string): Promise<any[]> {
   const out: any[] = [];
   let next: string | null = url;
   while (next) {
-    const page = await rhGet(next);
+    const page = await rhGet(next, authHeader);
     out.push(...(page.results ?? []));
     next = page.next ?? null;
   }
   return out;
 }
 
-// Instrument-URL → symbol, cached (positions reference instruments by URL).
+// Instrument-URL → symbol, cached (positions reference instruments by URL —
+// this mapping is Robinhood-global public metadata, safe to share across users).
 const symbolCache = new Map<string, string>();
-async function instrumentSymbol(url: string): Promise<string> {
+async function instrumentSymbol(url: string, authHeader: string): Promise<string> {
   if (symbolCache.has(url)) return symbolCache.get(url)!;
-  const sym = String((await rhGet(url)).symbol ?? "").toUpperCase();
+  const sym = String((await rhGet(url, authHeader)).symbol ?? "").toUpperCase();
   symbolCache.set(url, sym);
   return sym;
 }
 
-async function pullSnapshot(): Promise<BrokerSnapshot> {
+async function pullSnapshot(authHeader: string): Promise<BrokerSnapshot> {
   const holdings: Holding[] = [];
 
   // Equities — priced by the app's existing quote feed, so no market_value here.
-  const positions = await rhList(`${API}/positions/?nonzero=true`);
+  const positions = await rhList(`${API}/positions/?nonzero=true`, authHeader);
   for (const p of positions) {
     const qty = Number(p.quantity);
     if (!qty) continue;
     holdings.push({
-      ticker: await instrumentSymbol(p.instrument),
+      ticker: await instrumentSymbol(p.instrument, authHeader),
       shares: qty,
       cost_basis: Number(p.average_buy_price) || 0,
       asset_class: "equity",
@@ -222,15 +224,15 @@ async function pullSnapshot(): Promise<BrokerSnapshot> {
   }
 
   // Options — carry their own market value (can't be quoted by ticker).
-  const optPositions = await rhList(`${API}/options/positions/?nonzero=true`);
+  const optPositions = await rhList(`${API}/options/positions/?nonzero=true`, authHeader);
   for (const op of optPositions) {
     const qty = Number(op.quantity);
     if (!qty) continue;
-    const inst = await rhGet(op.option);
+    const inst = await rhGet(op.option, authHeader);
     const sign = op.type === "short" ? -1 : 1;
     let mark = Number(op.average_price) / 100 || 0; // fallback to basis
     try {
-      const md = await rhGet(`${API}/marketdata/options/?instruments=${encodeURIComponent(op.option)}`);
+      const md = await rhGet(`${API}/marketdata/options/?instruments=${encodeURIComponent(op.option)}`, authHeader);
       const px = Number(md.results?.[0]?.adjusted_mark_price);
       if (px) mark = px;
     } catch {}
@@ -252,8 +254,8 @@ async function pullSnapshot(): Promise<BrokerSnapshot> {
   // Crypto — nummus holdings + forex mark price.
   try {
     const [cryptoHoldings, pairs] = await Promise.all([
-      rhList(`${NUMMUS}/holdings/`),
-      rhGet(`${NUMMUS}/currency_pairs/`).then((r) => r.results ?? []),
+      rhList(`${NUMMUS}/holdings/`, authHeader),
+      rhGet(`${NUMMUS}/currency_pairs/`, authHeader).then((r) => r.results ?? []),
     ]);
     const pairId = new Map<string, string>(); // currency code → pair id
     for (const cp of pairs) pairId.set(String(cp.asset_currency?.code), String(cp.id));
@@ -265,7 +267,7 @@ async function pullSnapshot(): Promise<BrokerSnapshot> {
       const id = pairId.get(code);
       if (id) {
         try {
-          const q = await rhGet(`${API}/marketdata/forex/quotes/${id}/`);
+          const q = await rhGet(`${API}/marketdata/forex/quotes/${id}/`, authHeader);
           mark = Number(q.mark_price) || 0;
         } catch {}
       }
@@ -285,8 +287,8 @@ async function pullSnapshot(): Promise<BrokerSnapshot> {
   // Account equity + open orders.
   let account = { equity: null as number | null, cash: null as number | null, buying_power: null as number | null };
   try {
-    const portfolios = await rhList(`${API}/portfolios/`);
-    const acc = (await rhList(`${API}/accounts/`))[0] ?? {};
+    const portfolios = await rhList(`${API}/portfolios/`, authHeader);
+    const acc = (await rhList(`${API}/accounts/`, authHeader))[0] ?? {};
     const pf = portfolios[0] ?? {};
     account = {
       equity: Number(pf.extended_hours_equity ?? pf.equity) || null,
@@ -298,11 +300,11 @@ async function pullSnapshot(): Promise<BrokerSnapshot> {
   const openOrders: BrokerOrder[] = [];
   try {
     const OPEN = new Set(["queued", "confirmed", "partially_filled", "unconfirmed", "pending"]);
-    const orders = await rhList(`${API}/orders/`);
+    const orders = await rhList(`${API}/orders/`, authHeader);
     for (const o of orders.slice(0, 100)) {
       if (!OPEN.has(String(o.state))) continue;
       openOrders.push({
-        ticker: await instrumentSymbol(o.instrument),
+        ticker: await instrumentSymbol(o.instrument, authHeader),
         side: o.side === "sell" ? "sell" : "buy",
         qty: Number(o.quantity) || 0,
         type: String(o.type ?? "market"),
@@ -325,20 +327,20 @@ async function pullSnapshot(): Promise<BrokerSnapshot> {
 
 export const robinhoodProvider: BrokerProvider = {
   name: "robinhood",
-  available: () => !!loadAuth(),
-  async fetchSnapshot(): Promise<BrokerSnapshot> {
-    let a = loadAuth();
+  available: (userId: number) => !!loadAuth(userId),
+  async fetchSnapshot(userId: number): Promise<BrokerSnapshot> {
+    let a = loadAuth(userId);
     if (!a) throw new Error("robinhood not linked");
-    if (Date.now() / 1000 >= a.expires_at) a = await refreshAccess(a);
-    authHeader = `Bearer ${a.access_token}`;
+    if (Date.now() / 1000 >= a.expires_at) a = await refreshAccess(userId, a);
+    let authHeader = `Bearer ${a.access_token}`;
     try {
-      return await pullSnapshot();
+      return await pullSnapshot(authHeader);
     } catch (e: any) {
       // One re-auth attempt on 401, then let the provider loop fall through.
       if (e?.code === 401) {
-        a = await refreshAccess(loadAuth()!);
+        a = await refreshAccess(userId, loadAuth(userId)!);
         authHeader = `Bearer ${a.access_token}`;
-        return await pullSnapshot();
+        return await pullSnapshot(authHeader);
       }
       throw e;
     }

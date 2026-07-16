@@ -9,7 +9,8 @@ filters:
   min_market_cap: 300000000   # $300M — includes real small-caps, skips micro-caps
   min_price: 3                # avoid penny-stock data quality / borrow problems
   min_volume: 300000          # shares/day — enough liquidity to actually trade
-  max_stocks: 1500            # scan size cap (full scan ≈ 10-12 min, every 6h)
+  max_stocks: 3000            # scan size cap (≈4-5 min at concurrency 6, every 6h; ~7000 = whole market ≈ 8-9 min)
+  concurrency: 6              # parallel Yahoo fetches; auto-throttles to 2 if Yahoo starts failing
 
 # Extra tickers to force into the scan even if they fail the filters above
 # (your holdings and watchlist are always included automatically).
