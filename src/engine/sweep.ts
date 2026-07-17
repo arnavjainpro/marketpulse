@@ -35,7 +35,7 @@ interface Mover {
 async function fetchBatchChanges(symbols: string[]): Promise<Mover[]> {
   const url = `https://query1.finance.yahoo.com/v8/finance/spark?symbols=${symbols.join(",")}&range=1d&interval=30m`;
   try {
-    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 (Macintosh) MarketPulse personal-use" } });
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 (Macintosh) sharpEdge personal-use" } });
     if (!res.ok) return [];
     // Response is a flat object keyed by symbol:
     // { AAPL: { close: [...], previousClose, chartPreviousClose, ... }, ... }

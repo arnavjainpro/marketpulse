@@ -1,5 +1,5 @@
 // SEC EDGAR filings poller. Free, no API key. SEC requires a descriptive User-Agent.
-const UA = "MarketPulse personal-use arnavjainone@gmail.com";
+const UA = "sharpEdge personal-use arnavjainone@gmail.com";
 
 // Material form types worth alerting on.
 const MATERIAL_FORMS = new Set([

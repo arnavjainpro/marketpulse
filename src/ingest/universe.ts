@@ -52,7 +52,7 @@ export const normalizeSymbol = (s: string) => s.trim().toUpperCase().replace(/[.
 
 async function fetchNasdaq(path: string): Promise<any[]> {
   const res = await fetch(`https://api.nasdaq.com/api/screener/${path}?tableonly=true&limit=0&download=true`, {
-    headers: { "User-Agent": "Mozilla/5.0 (Macintosh) MarketPulse personal-use", Accept: "application/json" },
+    headers: { "User-Agent": "Mozilla/5.0 (Macintosh) sharpEdge personal-use", Accept: "application/json" },
     signal: AbortSignal.timeout(60_000),
   });
   if (!res.ok) throw new Error(`nasdaq ${path} ${res.status}`);

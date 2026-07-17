@@ -37,14 +37,14 @@ const PRIMARY_USER_ID = 1;
 // reads currentPortfolio(PRIMARY_USER_ID) so it always sees the freshest view.
 await refreshBroker(PRIMARY_USER_ID);
 const bootTickers = allTickers(currentPortfolio(PRIMARY_USER_ID));
-console.log(`[marketpulse] monitoring ${bootTickers.length} tickers: ${bootTickers.join(", ")}`);
+console.log(`[sharpEdge] monitoring ${bootTickers.length} tickers: ${bootTickers.join(", ")}`);
 
 // Circuit breaker trips fire an immediate CRITICAL alert on every channel.
 setTripHandler(async (name, count, windowSec) => {
   const msg = `Circuit Breaker Tripped — ${name} hit ${count} calls in ${windowSec}s. AI halted to prevent spend. Monitoring continues; reset from the dashboard.`;
   broadcast("health", { breakerTripped: name });
-  await notifyMac("🚨 MarketPulse: AI HALTED", msg);
-  if (telegramEnabled()) await notifyTelegram(`🚨 *MarketPulse: AI HALTED*\n\n${msg}`);
+  await notifyMac("🚨 sharpEdge: AI HALTED", msg);
+  if (telegramEnabled()) await notifyTelegram(`🚨 *sharpEdge: AI HALTED*\n\n${msg}`);
 });
 
 // ── Pipeline: event → triage → (analysis) → notify → broadcast ──────────────
@@ -349,4 +349,4 @@ scheduleUniverse();
 scheduleBroker();
 scheduleInsights();
 startCacheHeartbeat(currentPortfolio(PRIMARY_USER_ID));
-console.log(`[marketpulse] running — market is currently ${marketPhase()}`);
+console.log(`[sharpEdge] running — market is currently ${marketPhase()}`);

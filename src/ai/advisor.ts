@@ -29,7 +29,7 @@ function advisorSystemPrompt(portfolio: Portfolio): string {
       return line;
     })
     .join("\n");
-  return `You are MarketPulse, a personal equity advisor for one self-directed investor. You answer their questions directly and honestly, grounded in the live market context provided with each question.
+  return `You are sharpEdge, a personal equity advisor for one self-directed investor. You answer their questions directly and honestly, grounded in the live market context provided with each question.
 
 Investor's portfolio:
 ${positions || "(no current positions)"}

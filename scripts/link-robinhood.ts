@@ -1,6 +1,6 @@
 // One-time interactive Robinhood login. Obtains OAuth tokens and stores them in
 // the settings table so the running server can refresh them non-interactively.
-// Run: `bun run link:robinhood`  (read-only access — MarketPulse never trades).
+// Run: `bun run link:robinhood`  (read-only access — sharpEdge never trades).
 //
 // ponytail: MFA/device-approval flow is best-effort and cannot be tested here.
 //   If Robinhood rejects the password grant for your account, use the dashboard's
@@ -16,11 +16,11 @@ function ask(q: string): string {
   return a.trim();
 }
 
-// Which MarketPulse account (sign up in the dashboard first) this link belongs to.
-const mpEmail = ask("MarketPulse account email (sign up in the dashboard first if you haven't): ");
+// Which sharpEdge account (sign up in the dashboard first) this link belongs to.
+const mpEmail = ask("sharpEdge account email (sign up in the dashboard first if you haven't): ");
 const mpUser = findUserByEmail(mpEmail);
 if (!mpUser) {
-  console.error(`\n✗ No MarketPulse account for "${mpEmail}". Sign up at the dashboard first, then re-run this.`);
+  console.error(`\n✗ No sharpEdge account for "${mpEmail}". Sign up at the dashboard first, then re-run this.`);
   process.exit(1);
 }
 const userId = mpUser.id;
