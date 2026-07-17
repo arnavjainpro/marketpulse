@@ -4,11 +4,11 @@ import { join } from "path";
 
 export interface Holding {
   ticker: string;
-  shares: number;       // shares; contracts for options; coin qty for crypto
+  shares: number;       // shares; contracts for options
   cost_basis: number;
   thesis?: string;      // why you own it — lets the AI judge "thesis broken vs. just drifting"
-  asset_class?: "equity" | "option" | "crypto"; // default equity
-  market_value?: number; // broker-provided current value — options/crypto can't be quoted by ticker
+  asset_class?: "equity" | "option"; // default equity — this is an equity/options tool, crypto isn't supported
+  market_value?: number; // broker-provided current value — options can't be quoted by ticker
   option?: { type: "call" | "put"; strike: number; expiry: string; underlying: string };
 }
 

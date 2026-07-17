@@ -2,7 +2,7 @@
 // one-shot JSON import > portfolio.yaml. YAML theses are merged onto broker
 // positions by ticker either way, so "why you own it" survives auto-linking.
 import { loadPortfolio, loadRiskConfig, type Portfolio, type RiskConfig } from "../config";
-import { getRiskPrefs } from "../db";
+import { getRiskPrefs, getSettingFor, setSettingFor } from "../db";
 import { yamlProvider, importProvider } from "./manual";
 import { robinhoodProvider } from "./robinhood";
 import type { BrokerSnapshot } from "./types";
@@ -23,6 +23,18 @@ export async function refreshBroker(userId: number): Promise<BrokerSnapshot> {
   return p;
 }
 
+// Equity override + watchlist-edit overlays. Applied on every path that
+// returns a snapshot to the caller — including the stale-fallback path below
+// — so a just-saved Settings/watchlist change is never silently absent from
+// a response just because the live provider happened to fail on that poll.
+function applyOverlays(userId: number, snap: BrokerSnapshot): BrokerSnapshot {
+  const manualEquity = getRiskPrefs(userId)?.account_equity;
+  if (manualEquity != null) snap.account.equity = manualEquity;
+  const wp = watchlistPrefs(userId);
+  snap.watchlist = [...new Set([...snap.watchlist, ...wp.add])].filter((t) => !wp.remove.includes(t));
+  return snap;
+}
+
 async function doRefresh(userId: number): Promise<BrokerSnapshot> {
   for (const p of providers) {
     if (!p.available(userId)) continue;
@@ -39,6 +51,7 @@ async function doRefresh(userId: number): Promise<BrokerSnapshot> {
         snap.watchlist = [...new Set([...snap.watchlist, ...yaml.watchlist])];
         if (snap.account.equity == null) snap.account.equity = loadRiskConfigFor(userId).account_equity;
       }
+      applyOverlays(userId, snap);
       cached.set(userId, snap);
       console.log(
         `[broker] snapshot via ${snap.source} (user ${userId}): ${snap.holdings.length} positions, ${snap.watchlist.length} watched, ` +
@@ -46,17 +59,56 @@ async function doRefresh(userId: number): Promise<BrokerSnapshot> {
       );
       return snap;
     } catch (err) {
-      console.error(`[broker] ${p.name} failed for user ${userId}, trying next provider:`, err);
+      console.error(`[broker] ${p.name} failed for user ${userId}:`, err);
+      // A transient failure of a live provider must NOT downgrade the cached
+      // snapshot to a lower-priority source — options/positions would silently
+      // vanish from the dashboard until the next successful poll. Serve the
+      // last good snapshot instead; stale beats wrong-source.
+      const prev = cached.get(userId);
+      if (prev) {
+        applyOverlays(userId, prev); // reapply in case Settings/watchlist changed since prev was cached
+        console.warn(`[broker] keeping previous ${prev.source} snapshot (as of ${new Date(prev.asOf * 1000).toISOString().slice(0, 16)})`);
+        return prev;
+      }
     }
   }
   // yamlProvider never throws, but keep a hard fallback anyway.
   const snap = await yamlProvider.fetchSnapshot(userId);
+  applyOverlays(userId, snap);
   cached.set(userId, snap);
   return snap;
 }
 
 export function brokerSnapshot(userId: number): BrokerSnapshot | null {
   return cached.get(userId) ?? null;
+}
+
+// ── UI watchlist edits (persisted per user, merged onto every snapshot) ─────
+// add[] = tickers starred in the UI; remove[] = tickers explicitly unstarred,
+// which also suppresses broker/YAML-sourced entries.
+function watchlistPrefs(userId: number): { add: string[]; remove: string[] } {
+  try {
+    const raw = JSON.parse(getSettingFor(userId, "watchlist_prefs", "{}"));
+    return { add: Array.isArray(raw.add) ? raw.add : [], remove: Array.isArray(raw.remove) ? raw.remove : [] };
+  } catch {
+    return { add: [], remove: [] };
+  }
+}
+
+export async function updateWatchlist(userId: number, rawTicker: string, action: "add" | "remove"): Promise<string[]> {
+  const ticker = rawTicker.trim().toUpperCase();
+  if (!/^[A-Z][A-Z0-9.\-]{0,9}$/.test(ticker)) throw new Error("bad ticker");
+  const wp = watchlistPrefs(userId);
+  if (action === "add") {
+    wp.add = [...new Set([...wp.add, ticker])].slice(0, 50);
+    wp.remove = wp.remove.filter((t) => t !== ticker);
+  } else {
+    wp.add = wp.add.filter((t) => t !== ticker);
+    wp.remove = [...new Set([...wp.remove, ticker])].slice(0, 100);
+  }
+  setSettingFor(userId, "watchlist_prefs", JSON.stringify(wp));
+  const snap = await refreshBroker(userId); // re-merge so the change is visible immediately
+  return snap.watchlist;
 }
 
 // Sync portfolio view for everything that previously called loadPortfolio().

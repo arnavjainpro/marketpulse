@@ -4,7 +4,9 @@
 // a false→true transition AFTER creation — an alert created while the condition
 // is already true stays silent until the value dips out and crosses back in.
 // This is why last_value is seeded at creation and persisted (survives restart).
-// Fire-once: on firing, the alert deactivates (active=0); re-arm = re-create.
+// Fire-once by default: on firing, the alert deactivates (active=0); re-arm =
+// re-create. Recurring alerts (the `recurring` flag) stay armed instead —
+// they re-fire on each fresh crossing without ever needing to be re-created.
 //
 // Coverage: the detector loop (runDetectors) only fetches quotes for
 // portfolio+watchlist+dynamic tickers, so the alert evaluator fetches quotes for
@@ -28,6 +30,7 @@ export interface AlertRow {
   active: number;
   created_ts: number;
   last_fired_ts: number | null;
+  recurring: number; // 1 = re-arms after firing (fires again on the next fresh crossing)
 }
 
 export const MAX_ALERT_TICKERS = 20;
@@ -64,7 +67,7 @@ export function activeAlertTickerCount(userId: number): number {
   return (db.query(`SELECT COUNT(DISTINCT ticker) n FROM alerts WHERE active = 1 AND user_id = ?`).get(userId) as any).n;
 }
 
-export async function createAlert(userId: number, rawTicker: string, kind: AlertKind, threshold: number): Promise<AlertRow> {
+export async function createAlert(userId: number, rawTicker: string, kind: AlertKind, threshold: number, recurring = false): Promise<AlertRow> {
   const ticker = rawTicker.trim().toUpperCase();
   if (!ticker) throw new Error("Ticker required");
   if (!["price_above", "price_below", "score_gte"].includes(kind)) throw new Error("Bad alert kind");
@@ -87,11 +90,11 @@ export async function createAlert(userId: number, rawTicker: string, kind: Alert
   else { try { const q = await cachedQuote(ticker); seed = q?.c ?? null; } catch { /* seed stays null */ } }
 
   db.query(
-    `INSERT INTO alerts (user_id, ticker, kind, threshold, last_value, active, created_ts)
-     VALUES (?, ?, ?, ?, ?, 1, unixepoch())
+    `INSERT INTO alerts (user_id, ticker, kind, threshold, last_value, active, created_ts, recurring)
+     VALUES (?, ?, ?, ?, ?, 1, unixepoch(), ?)
      ON CONFLICT(user_id, ticker, kind, threshold)
-       DO UPDATE SET active = 1, last_value = excluded.last_value, last_fired_ts = NULL`
-  ).run(userId, ticker, kind, threshold, seed);
+       DO UPDATE SET active = 1, last_value = excluded.last_value, last_fired_ts = NULL, recurring = excluded.recurring`
+  ).run(userId, ticker, kind, threshold, seed, recurring ? 1 : 0);
   return db.query(`SELECT * FROM alerts WHERE user_id = ? AND ticker = ? AND kind = ? AND threshold = ?`).get(userId, ticker, kind, threshold) as AlertRow;
 }
 
@@ -99,7 +102,7 @@ export async function createAlert(userId: number, rawTicker: string, kind: Alert
 const lastOffUniverseEval = new Map<string, number>();
 
 function alertMessage(a: AlertRow, cur: number): string {
-  if (a.kind === "score_gte") return `📈 ${a.ticker} MarketPulse score crossed ${a.threshold} (now ${cur.toFixed(0)})`;
+  if (a.kind === "score_gte") return `📈 ${a.ticker} sharpEdge score crossed ${a.threshold} (now ${cur.toFixed(0)})`;
   const dir = a.kind === "price_above" ? "rose above" : "fell below";
   return `🔔 ${a.ticker} ${dir} $${a.threshold} (now $${cur.toFixed(2)})`;
 }
@@ -114,7 +117,7 @@ async function deliver(text: string): Promise<void> {
   // per delivery. It is NOT a silent no-op. Telegram is the real channel here.
   const results = await Promise.allSettled([
     telegramEnabled() ? notifyTelegram(text) : Promise.resolve(),
-    notifyMac("MarketPulse alert", text),
+    notifyMac("sharpEdge alert", text),
   ]);
   for (const r of results) {
     if (r.status === "rejected") console.error("[alerts] notify failed:", r.reason);
@@ -123,9 +126,13 @@ async function deliver(text: string): Promise<void> {
 
 function processObservation(a: AlertRow, cur: number): void {
   if (shouldFire(a.kind, a.last_value, cur, a.threshold)) {
-    db.query(`UPDATE alerts SET active = 0, last_value = ?, last_fired_ts = unixepoch() WHERE id = ?`).run(cur, a.id);
-    console.log(`[alerts] FIRED #${a.id} ${a.ticker} ${a.kind} ${a.threshold} → ${cur}`);
-    void deliver(alertMessage(a, cur));
+    // Recurring alerts stay armed: last_value keeps updating, so the crossing
+    // logic naturally requires the value to leave the zone before it can fire
+    // again — no spam while the condition stays true.
+    db.query(`UPDATE alerts SET active = ?, last_value = ?, last_fired_ts = unixepoch() WHERE id = ?`)
+      .run(a.recurring ? 1 : 0, cur, a.id);
+    console.log(`[alerts] FIRED #${a.id} ${a.ticker} ${a.kind} ${a.threshold} → ${cur}${a.recurring ? " (recurring, re-armed)" : ""}`);
+    void deliver(alertMessage(a, cur) + (a.recurring ? " ↻ re-armed" : ""));
   } else {
     db.query(`UPDATE alerts SET last_value = ? WHERE id = ?`).run(cur, a.id);
   }
@@ -184,11 +191,11 @@ if (import.meta.main) {
   assert(!shouldFire("score_gte", 65, 70, 60), "score already-above: silent");
 
   // fire-once + created-while-true, over a synthetic series (mirrors processObservation state)
-  const simulate = (kind: AlertKind, threshold: number, seed: number | null, series: number[]) => {
+  const simulate = (kind: AlertKind, threshold: number, seed: number | null, series: number[], recurring = false) => {
     let prev = seed, fires = 0, active = true;
     for (const cur of series) {
       if (!active) break;
-      if (shouldFire(kind, prev, cur, threshold)) { fires++; active = false; }
+      if (shouldFire(kind, prev, cur, threshold)) { fires++; active = recurring; }
       prev = cur;
     }
     return fires;
@@ -196,6 +203,13 @@ if (import.meta.main) {
   assert(simulate("price_above", 100, 95, [96, 98, 101, 105, 99, 102]) === 1, "fires once then deactivates");
   assert(simulate("price_above", 100, 105, [106, 108, 112]) === 0, "created-while-true stays silent");
   assert(simulate("price_above", 100, 105, [98, 96, 103]) === 1, "re-crosses after dipping out: fires");
+
+  // recurring: mirrors processObservation's `active: a.recurring ? 1 : 0` — stays
+  // armed after firing, but the crossing logic still requires leaving the zone
+  // first, so a value that stays above threshold must NOT fire twice in a row.
+  assert(simulate("price_above", 100, 95, [105, 108, 112], true) === 1, "recurring: no repeat fire while still above");
+  assert(simulate("price_above", 100, 95, [105, 98, 106, 96, 104], true) === 3, "recurring: fires again on each fresh crossing");
+  assert(simulate("price_above", 100, 95, [105, 98, 106], false) === 1, "non-recurring: retires after first fire even if it would cross again");
 
   console.log("alerts self-check: OK");
 }
