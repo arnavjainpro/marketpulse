@@ -14,6 +14,7 @@ import { generateBriefing } from "./ai/briefing";
 import { setTripHandler } from "./ai/breaker";
 import { startCacheHeartbeat } from "./ai/heartbeat";
 import { refreshBroker, currentPortfolio } from "./broker";
+import { refreshEarnings, checkOptionExpiries } from "./engine/insights";
 import { notifyMac } from "./notify/macos";
 import { notifyTelegram, telegramEnabled } from "./notify/telegram";
 import { startServer, broadcast, setTestEventHandler, setBriefingHandler } from "./server/server";
@@ -272,6 +273,25 @@ function scheduleBroker() {
   setTimeout(tick, 60_000);
 }
 
+// Insights: upcoming-earnings cache + options expiry warnings. Twice a day is
+// plenty — earnings dates and days-to-expiry move on a daily clock.
+function scheduleInsights() {
+  const tick = async () => {
+    try {
+      const portfolio = currentPortfolio(PRIMARY_USER_ID);
+      await checkOptionExpiries(portfolio);
+      const held = portfolio.holdings.filter((h) => (h.asset_class ?? "equity") === "equity").map((h) => h.ticker);
+      await refreshEarnings([...new Set(held)]);
+      console.log(`[insights] tick done — ${portfolio.holdings.filter((h) => h.asset_class === "option").length} options checked, earnings refreshed for ${held.length} tickers`);
+      broadcast("broker", { source: "insights" }); // nudge the dashboard to re-pull state (earnings chips)
+    } catch (err) {
+      console.error("[insights]", err);
+    }
+  };
+  setTimeout(tick, 90_000); // after the boot broker snapshot settles
+  setInterval(tick, 12 * 3600_000);
+}
+
 function scheduleDailyStats() {
   const refresh = async () => {
     for (const t of allTickers(currentPortfolio(PRIMARY_USER_ID))) {
@@ -327,5 +347,6 @@ scheduleSweep();
 scheduleMarketContext();
 scheduleUniverse();
 scheduleBroker();
+scheduleInsights();
 startCacheHeartbeat(currentPortfolio(PRIMARY_USER_ID));
 console.log(`[marketpulse] running — market is currently ${marketPhase()}`);
