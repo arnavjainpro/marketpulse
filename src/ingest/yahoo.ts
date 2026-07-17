@@ -2,7 +2,7 @@
 // Daily OHLCV feeds the screener (cross math, ATR, support/resistance);
 // intraday bars feed the intraday analyzer. Polite pacing + 429 backoff.
 
-const UA = { "User-Agent": "Mozilla/5.0 (Macintosh) MarketPulse personal-use" };
+const UA = { "User-Agent": "Mozilla/5.0 (Macintosh) sharpEdge personal-use" };
 
 export interface DailyCandles {
   ticker: string;

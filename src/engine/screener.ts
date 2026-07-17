@@ -379,6 +379,10 @@ export async function runScan(portfolio: Portfolio): Promise<RawEvent[]> {
   console.log(`[screener] scanning ${tickers.length} tickers, concurrency ${concurrency} (~${Math.max(1, Math.round((tickers.length * 0.4) / 60 / concurrency))} min)`);
   const events: RawEvent[] = [];
   let scanned = 0;
+  // Why scanned < tickers.length: no_data = Yahoo returned nothing (delisted,
+  // renamed, or throttled); short_history = candles exist but under the ~1y the
+  // indicator math needs; error = fetch/scoring threw.
+  const skips = { no_data: 0, short_history: 0, error: 0 };
 
   const upsert = db.query(
     `INSERT INTO screener (ticker, score, long_score, short_score, direction, sector, cross_status, indicators, updated_at)
@@ -407,12 +411,12 @@ export async function runScan(portfolio: Portfolio): Promise<RawEvent[]> {
   let recentFailures = 0; // rolling penalty: +1 per null fetch, -1 (floor 0) per success
   const scanOne = async (t: string) => {
     const candles = await fetchDailyCandles(t);
-    if (!candles) { recentFailures++; return; }
+    if (!candles) { recentFailures++; skips.no_data++; return; }
     recentFailures = Math.max(0, recentFailures - 1);
     const sector = sectors.get(t) ?? "Unknown";
     const sectorCloses = benchmarkCandles(sectorEtf(sector))?.closes ?? null;
     const ind = computeIndicators(candles, spyCloses, sectorCloses);
-    if (!ind) return;
+    if (!ind) { skips.short_history++; return; }
     const longScore = scoreLong(ind);
     const shortScore = scoreShort(ind);
     const direction = directionOf(longScore, shortScore);
@@ -447,6 +451,7 @@ export async function runScan(portfolio: Portfolio): Promise<RawEvent[]> {
           await scanOne(t);
         } catch (err) {
           recentFailures++;
+          skips.error++;
           console.error(`[screener] ${t}:`, err);
         }
         await Bun.sleep(180); // be polite to Yahoo
@@ -469,7 +474,11 @@ export async function runScan(portfolio: Portfolio): Promise<RawEvent[]> {
     const pruned = db.query(`DELETE FROM screener WHERE updated_at < unixepoch() - 172800 RETURNING ticker`).all().length;
     if (pruned) console.log(`[screener] pruned ${pruned} stale rows (out of universe >48h)`);
   }
-  console.log(`[screener] scan complete: ${scanned}/${tickers.length} scored, ${events.length} new setups`);
+  const skipped = tickers.length - scanned;
+  const skipDetail = skipped
+    ? ` (skipped ${skipped}: ${skips.no_data} no Yahoo data — delisted/renamed/throttled, ${skips.short_history} under ~1y history, ${skips.error} errors, ${skipped - skips.no_data - skips.short_history - skips.error} unstarted)`
+    : "";
+  console.log(`[screener] scan complete: ${scanned}/${tickers.length} scored${skipDetail}, ${events.length} new setups`);
   return events;
   } finally {
     scanRunning = false;

@@ -10,7 +10,8 @@ import { accountContextText } from "../broker";
 import { cachedQuote, fetchCompanyNews } from "../ingest/finnhub";
 import { journalContextText } from "./journal";
 import { claudeQueue } from "./queue";
-import { opusBreaker } from "./breaker";
+import { opusBreaker, haikuBreaker } from "./breaker";
+import { getScreenerRows } from "../engine/screener";
 
 const client = new Anthropic();
 
@@ -28,7 +29,7 @@ function advisorSystemPrompt(portfolio: Portfolio): string {
       return line;
     })
     .join("\n");
-  return `You are MarketPulse, a personal equity advisor for one self-directed investor. You answer their questions directly and honestly, grounded in the live market context provided with each question.
+  return `You are sharpEdge, a personal equity advisor for one self-directed investor. You answer their questions directly and honestly, grounded in the live market context provided with each question.
 
 Investor's portfolio:
 ${positions || "(no current positions)"}
@@ -155,4 +156,79 @@ export async function askAdvisor(
   );
 
   return response.content.find((b) => b.type === "text")?.text ?? "(no answer)";
+}
+
+// One-tap news digest for a ticker: last 7 days of headlines → a few plain-
+// English bullets on the fast model (pennies per call, user-initiated).
+export async function summarizeTickerNews(ticker: string): Promise<string> {
+  if (!haikuBreaker.allow()) throw new Error("AI circuit breaker is tripped — reset it from the status bar.");
+  const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  const news = (await fetchCompanyNews(ticker, iso(Date.now() - 7 * 86400_000), iso(Date.now()))).slice(0, 15);
+  if (!news.length) return `No news found for ${ticker} in the last 7 days.`;
+  const items = news
+    .map((n) => `- [${iso(n.datetime * 1000)}] ${n.headline} (${n.source})${n.summary ? ` — ${n.summary.slice(0, 200)}` : ""}`)
+    .join("\n");
+  const response = await claudeQueue(() =>
+    client.messages.create({
+      model: config.modelFast,
+      max_tokens: 600,
+      messages: [{
+        role: "user",
+        content: `Summarize this week's news for ${ticker} for a self-directed investor. 3-5 short bullets: what happened, what matters for the stock, and overall sentiment (positive/negative/mixed). Skip fluff and duplicate stories. Headlines:\n\n${items}`,
+      }],
+    })
+  );
+  return response.content.find((b) => b.type === "text")?.text ?? "(no summary)";
+}
+
+// Portfolio health check: deterministic evidence (positions, screener scores,
+// sector concentration, regime) → deep-model rundown with a 0-100 score,
+// pros, and cons. Markdown out; the frontend renders it as-is.
+export async function scorePortfolio(userId: number, portfolio: Portfolio): Promise<string> {
+  if (!opusBreaker.allow()) throw new Error("AI circuit breaker is tripped — reset it from the status bar.");
+  const rows = new Map(getScreenerRows(portfolio).map((r) => [r.ticker, r]));
+  const lines: string[] = ["POSITIONS:"];
+  for (const h of portfolio.holdings) {
+    const cls = h.asset_class ?? "equity";
+    let line = `- ${h.ticker} (${cls}): ${h.shares} ${cls === "option" ? "contracts" : "shares"} @ $${h.cost_basis} cost`;
+    if (h.market_value != null) line += `, market value $${Math.round(h.market_value).toLocaleString()}`;
+    else {
+      try { const q = await cachedQuote(h.ticker); line += `, now $${q.c} (${q.dp?.toFixed(1)}% today), value $${Math.round(q.c * h.shares).toLocaleString()}`; } catch {}
+    }
+    const r = rows.get(h.ticker);
+    if (r) line += ` — sector ${r.sector}, long score ${r.long_score}/100, short score ${r.short_score}/100`;
+    if (h.thesis) line += `\n  thesis: ${h.thesis}`;
+    lines.push(line);
+  }
+  if (!portfolio.holdings.length) lines.push("(no positions)");
+  lines.push("", marketContextText(), "", accountContextText(userId));
+
+  const response = await claudeQueue(() =>
+    client.messages.create({
+      model: config.modelDeep,
+      max_tokens: 1600,
+      thinking: { type: "adaptive" },
+      messages: [{
+        role: "user",
+        content: `${lines.join("\n")}
+
+---
+Grade this portfolio like a conservative risk manager. Respond in markdown, exactly this structure:
+
+## Portfolio score: N/100
+One-sentence verdict.
+
+**Pros** — 3-5 bullets (what's working: diversification, alignment with regime/rotation, quality of setups held, cash buffer...)
+
+**Cons** — 3-5 bullets (concentration, correlated bets, positions fighting the market regime, weak-scoring holdings, missing hedges, oversized options exposure...)
+
+**Biggest risk** — one bullet, the single thing most likely to hurt.
+
+**Suggested next steps** — 2-3 concrete, optional actions.
+
+Score honestly: 80+ means genuinely well-constructed, 50-79 solid with real issues, below 50 needs restructuring. Ground every claim in the data above; if data is missing (no equity figure, unquoted options), say so instead of guessing.`,
+      }],
+    })
+  );
+  return response.content.find((b) => b.type === "text")?.text ?? "(no analysis)";
 }

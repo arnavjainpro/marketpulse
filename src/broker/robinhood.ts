@@ -1,5 +1,5 @@
 // Robinhood read-only brokerage adapter (UNOFFICIAL private API — Robinhood
-// publishes no public API). Pulls equities, options, and crypto positions plus
+// publishes no public API). Pulls equities and options positions plus
 // account equity into the common BrokerSnapshot. READ-ONLY: it never places or
 // cancels orders. Tokens are obtained once via `bun run link:robinhood` and
 // cached in the settings table; the running server only refreshes them.
@@ -16,7 +16,6 @@ import type { Holding } from "../config";
 
 const CLIENT_ID = "c82SH0WZOsabOXGP2sxqcj34FxkvfnWRZBKlBjFS"; // Robinhood's public iOS client id
 const API = "https://api.robinhood.com";
-const NUMMUS = "https://nummus.robinhood.com";
 // Mirror robin_stocks' session headers exactly. The X-Robinhood-API-Version gate
 // is what rejects stale clients with "Update to the newest version of Robinhood";
 // bump it here if Robinhood tightens the minimum again. Default body encoding is
@@ -224,65 +223,44 @@ async function pullSnapshot(authHeader: string): Promise<BrokerSnapshot> {
   }
 
   // Options — carry their own market value (can't be quoted by ticker).
-  const optPositions = await rhList(`${API}/options/positions/?nonzero=true`, authHeader);
-  for (const op of optPositions) {
-    const qty = Number(op.quantity);
-    if (!qty) continue;
-    const inst = await rhGet(op.option, authHeader);
-    const sign = op.type === "short" ? -1 : 1;
-    let mark = Number(op.average_price) / 100 || 0; // fallback to basis
-    try {
-      const md = await rhGet(`${API}/marketdata/options/?instruments=${encodeURIComponent(op.option)}`, authHeader);
-      const px = Number(md.results?.[0]?.adjusted_mark_price);
-      if (px) mark = px;
-    } catch {}
-    holdings.push({
-      ticker: `${op.chain_symbol} ${inst.expiration_date} ${Number(inst.strike_price).toFixed(0)}${inst.type === "call" ? "C" : "P"}`,
-      shares: qty * sign,
-      cost_basis: Number(op.average_price) / 100 || 0, // per-share premium paid
-      asset_class: "option",
-      market_value: sign * qty * mark * 100,
-      option: {
-        type: inst.type === "call" ? "call" : "put",
-        strike: Number(inst.strike_price),
-        expiry: String(inst.expiration_date),
-        underlying: String(op.chain_symbol).toUpperCase(),
-      },
-    });
-  }
-
-  // Crypto — nummus holdings + forex mark price.
+  // Isolated try/catch: an options-endpoint failure must not sink the whole
+  // snapshot (which would silently fall back to YAML and hide everything).
+  // nonzero=True matches robin_stocks' exact wire format — RH's Django filter
+  // parses the Python-style capitalized boolean, and lowercase "true" has been
+  // seen to return zero rows.
   try {
-    const [cryptoHoldings, pairs] = await Promise.all([
-      rhList(`${NUMMUS}/holdings/`, authHeader),
-      rhGet(`${NUMMUS}/currency_pairs/`, authHeader).then((r) => r.results ?? []),
-    ]);
-    const pairId = new Map<string, string>(); // currency code → pair id
-    for (const cp of pairs) pairId.set(String(cp.asset_currency?.code), String(cp.id));
-    for (const h of cryptoHoldings) {
-      const qty = Number(h.quantity);
-      const code = String(h.currency?.code ?? "");
-      if (!qty || !code) continue;
-      let mark = 0;
-      const id = pairId.get(code);
-      if (id) {
-        try {
-          const q = await rhGet(`${API}/marketdata/forex/quotes/${id}/`, authHeader);
-          mark = Number(q.mark_price) || 0;
-        } catch {}
-      }
-      const cost = (h.cost_bases ?? []).reduce((s: number, c: any) => s + Number(c.direct_cost_basis ?? 0), 0);
+    const optPositions = await rhList(`${API}/options/positions/?nonzero=True`, authHeader);
+    for (const op of optPositions) {
+      const qty = Number(op.quantity);
+      if (!qty) continue;
+      const inst = await rhGet(op.option, authHeader);
+      const sign = op.type === "short" ? -1 : 1;
+      let mark = Number(op.average_price) / 100 || 0; // fallback to basis
+      try {
+        const md = await rhGet(`${API}/marketdata/options/?instruments=${encodeURIComponent(op.option)}`, authHeader);
+        const px = Number(md.results?.[0]?.adjusted_mark_price);
+        if (px) mark = px;
+      } catch {}
       holdings.push({
-        ticker: `${code}-USD`,
-        shares: qty,
-        cost_basis: qty ? cost / qty : 0,
-        asset_class: "crypto",
-        market_value: mark ? qty * mark : cost,
+        ticker: `${op.chain_symbol} ${inst.expiration_date} ${Number(inst.strike_price).toFixed(0)}${inst.type === "call" ? "C" : "P"}`,
+        shares: qty * sign,
+        cost_basis: Number(op.average_price) / 100 || 0, // per-share premium paid
+        asset_class: "option",
+        market_value: sign * qty * mark * 100,
+        option: {
+          type: inst.type === "call" ? "call" : "put",
+          strike: Number(inst.strike_price),
+          expiry: String(inst.expiration_date),
+          underlying: String(op.chain_symbol).toUpperCase(),
+        },
       });
     }
-  } catch {
-    // crypto is optional — equities/options are the important part
+  } catch (err) {
+    console.error("[robinhood] options positions fetch failed (equities still shown):", err);
   }
+
+  // Crypto is deliberately not pulled: this is an equity/options research tool,
+  // and crypto rows only cluttered the portfolio and the monitoring ticker set.
 
   // Account equity + open orders.
   let account = { equity: null as number | null, cash: null as number | null, buying_power: null as number | null };
@@ -314,6 +292,9 @@ async function pullSnapshot(authHeader: string): Promise<BrokerSnapshot> {
       });
     }
   } catch {}
+
+  const byClass = holdings.reduce((m, h) => (m[h.asset_class ?? "equity"] = (m[h.asset_class ?? "equity"] ?? 0) + 1, m), {} as Record<string, number>);
+  console.log(`[robinhood] positions: ${byClass.equity ?? 0} equities, ${byClass.option ?? 0} options`);
 
   return {
     source: "robinhood",

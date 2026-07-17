@@ -1,5 +1,20 @@
 import { Database } from "bun:sqlite";
+import { existsSync, renameSync } from "fs";
+import { join, dirname } from "path";
 import { config } from "./config";
+
+// One-time rename from the pre-rebrand filename. `new Database(..., {create:true})`
+// would otherwise silently open a fresh EMPTY database at the new path — every
+// existing user's accounts, sessions, alerts, broker links, and journal would
+// look like they vanished, with no error. Only runs if the new path doesn't
+// already exist, so it's a no-op after the first boot post-upgrade.
+{
+  const legacyPath = join(dirname(config.dbPath), "marketpulse.db");
+  if (!existsSync(config.dbPath) && existsSync(legacyPath)) {
+    renameSync(legacyPath, config.dbPath);
+    console.log(`[db] migrated ${legacyPath} → ${config.dbPath}`);
+  }
+}
 
 export const db = new Database(config.dbPath, { create: true });
 
@@ -178,6 +193,52 @@ for (const col of ["long_score REAL", "short_score REAL", "direction TEXT", "sec
 // alerts table is already created with user_id above. Existing rows adopt user 1.
 try {
   db.exec(`ALTER TABLE alerts ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1`);
+} catch {}
+// A pre-multi-user alerts table was created with UNIQUE(ticker, kind, threshold)
+// — no user_id — so createAlert's ON CONFLICT(user_id, ticker, kind, threshold)
+// errors ("does not match any PRIMARY KEY or UNIQUE constraint"), and the 3-col
+// constraint would also stop two users from setting the same alert. Table
+// constraints can't be altered in place, so rebuild into the canonical shape.
+{
+  const idx = db.query(`PRAGMA index_list(alerts)`).all() as { name: string; unique: number }[];
+  const uniqueCols = (name: string) =>
+    (db.query(`PRAGMA index_info(${JSON.stringify(name)})`).all() as { name: string }[]).map((c) => c.name).sort().join(",");
+  const legacy = idx.some((i) => i.unique && uniqueCols(i.name) === "kind,threshold,ticker");
+  if (legacy) {
+    // Wrapped in a transaction: exec() runs each `;`-separated statement
+    // independently with no implicit transaction, so a mid-sequence failure
+    // (e.g. after the RENAME but before CREATE TABLE) would otherwise leave
+    // the DB with no `alerts` table at all until manually repaired.
+    const rebuild = db.transaction(() => {
+      db.exec(`DROP INDEX IF EXISTS idx_alerts_dedupe`);
+      db.exec(`ALTER TABLE alerts RENAME TO alerts_old`);
+      db.exec(`
+        CREATE TABLE alerts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL DEFAULT 1,
+          ticker TEXT NOT NULL,
+          kind TEXT NOT NULL,
+          threshold REAL NOT NULL,
+          last_value REAL,
+          active INTEGER NOT NULL DEFAULT 1,
+          created_ts INTEGER NOT NULL,
+          last_fired_ts INTEGER,
+          UNIQUE(user_id, ticker, kind, threshold)
+        )
+      `);
+      db.exec(`
+        INSERT INTO alerts (id, user_id, ticker, kind, threshold, last_value, active, created_ts, last_fired_ts)
+          SELECT id, user_id, ticker, kind, threshold, last_value, active, created_ts, last_fired_ts FROM alerts_old
+      `);
+      db.exec(`DROP TABLE alerts_old`);
+    });
+    rebuild();
+    console.log("[db] rebuilt alerts table with per-user unique constraint");
+  }
+}
+// Migration: recurring alerts (re-arm after firing instead of retiring).
+try {
+  db.exec(`ALTER TABLE alerts ADD COLUMN recurring INTEGER NOT NULL DEFAULT 0`);
 } catch {}
 // Migration: settings becomes per-user (composite user_id+key PK). Pre-existing
 // rows (all global before multi-user existed) are kept under user_id=0.

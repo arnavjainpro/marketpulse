@@ -4,7 +4,7 @@
 // gracefully — callers must treat null as "IV data unavailable, reason
 // qualitatively about premium risk".
 
-const UA = { "User-Agent": "Mozilla/5.0 (Macintosh) MarketPulse personal-use" };
+const UA = { "User-Agent": "Mozilla/5.0 (Macintosh) sharpEdge personal-use" };
 
 let session: { cookie: string; crumb: string; ts: number } | null = null;
 

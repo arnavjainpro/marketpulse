@@ -23,8 +23,10 @@ export const yamlProvider: BrokerProvider = {
 };
 
 // Normalized import payload — tolerant of common broker-export field names.
-// Options/crypto positions carry asset_class + market_value (and option legs
-// their contract details) so non-equity holdings survive a manual import.
+// Options positions carry asset_class + market_value (and option legs their
+// contract details) so non-equity holdings survive a manual import. Crypto
+// is not supported — a JSON import naming it fails loudly (below) rather
+// than importing a position that would then render nowhere in the UI.
 export interface ImportPayload {
   positions?: {
     ticker?: string; symbol?: string;
@@ -40,12 +42,18 @@ export interface ImportPayload {
 }
 
 export function saveImport(userId: number, payload: ImportPayload): BrokerSnapshot {
+  const cryptoTickers = (payload.positions ?? [])
+    .filter((p) => p.asset_class === "crypto")
+    .map((p) => String(p.ticker ?? p.symbol ?? "?").toUpperCase());
+  if (cryptoTickers.length) {
+    throw new Error(`Crypto isn't supported (this is an equity/options tool) — remove ${cryptoTickers.join(", ")} from the import.`);
+  }
   const holdings = (payload.positions ?? [])
     .map((p) => ({
       ticker: String(p.ticker ?? p.symbol ?? "").toUpperCase().trim(),
       shares: Number(p.shares ?? p.quantity ?? p.qty ?? 0),
       cost_basis: Number(p.cost_basis ?? p.avg_price ?? p.average_buy_price ?? 0),
-      ...(p.asset_class && p.asset_class !== "equity" ? { asset_class: p.asset_class } : {}),
+      ...(p.asset_class === "option" ? { asset_class: "option" as const } : {}),
       ...(p.market_value != null ? { market_value: Number(p.market_value) } : {}),
       ...(p.option ? { option: p.option } : {}),
     }))

@@ -2,7 +2,7 @@ import { db, aiLive, setAiLive } from "../db";
 import { config, marketPhase, nextMarketTransition } from "../config";
 import { cachedQuote, wsStatus, fetchCompanyNews } from "../ingest/finnhub";
 import { opusBreaker, haikuBreaker } from "../ai/breaker";
-import { askAdvisor, type ChatTurn } from "../ai/advisor";
+import { askAdvisor, summarizeTickerNews, scorePortfolio, type ChatTurn } from "../ai/advisor";
 import { validateIdea, pickCandidates, recentIdeas, type IdeaReport, type IdeaFilters } from "../ai/validator";
 import { universeMeta } from "../ingest/universe";
 import { analyzeIntraday, manageTrade, type IntradayRequest, type FollowupRequest } from "../ai/intraday";
@@ -13,7 +13,8 @@ import { getScreenerRows, sectorBoards } from "../engine/screener";
 import { scoreTicker } from "../engine/ticker";
 import { listAlerts, createAlert, deleteAlert, type AlertKind } from "../engine/alerts";
 import { getMarketSnapshot } from "../engine/market";
-import { currentPortfolio, brokerSnapshot, refreshBroker, loadRiskConfigFor } from "../broker";
+import { currentPortfolio, brokerSnapshot, refreshBroker, loadRiskConfigFor, updateWatchlist } from "../broker";
+import { earningsFor, ideaScoreboard } from "../engine/insights";
 import { getRiskPrefs, setRiskPrefs } from "../db";
 import { saveImport, clearImport, type ImportPayload } from "../broker/manual";
 import { getBrokerLink } from "../db";
@@ -153,6 +154,7 @@ export function startServer() {
         const broker = brokerSnapshot(userId);
         return Response.json({
           portfolio, events, briefing, marketPhase: marketPhase(), marketClock: nextMarketTransition(),
+          earnings: earningsFor(portfolio.holdings.map((h) => h.ticker)),
           aiLive: aiLive(),
           broker: broker
             ? { source: broker.source, asOf: broker.asOf, account: broker.account, openOrders: broker.openOrders }
@@ -183,10 +185,10 @@ export function startServer() {
       }
       if (url.pathname === "/api/alerts" && req.method === "POST") {
         try {
-          const { ticker, kind, threshold } = (await req.json().catch(() => ({}))) as
-            { ticker?: string; kind?: AlertKind; threshold?: number };
+          const { ticker, kind, threshold, recurring } = (await req.json().catch(() => ({}))) as
+            { ticker?: string; kind?: AlertKind; threshold?: number; recurring?: boolean };
           if (!ticker || !kind) return Response.json({ error: "ticker and kind required" }, { status: 400 });
-          return Response.json({ alert: await createAlert(userId, ticker, kind, Number(threshold)) });
+          return Response.json({ alert: await createAlert(userId, ticker, kind, Number(threshold), !!recurring) });
         } catch (err) {
           return Response.json({ error: err instanceof Error ? err.message : "Bad alert" }, { status: 400 });
         }
@@ -194,6 +196,29 @@ export function startServer() {
       if (url.pathname === "/api/alerts" && req.method === "DELETE") {
         deleteAlert(userId, Number(url.searchParams.get("id")));
         return Response.json({ ok: true });
+      }
+
+      // Watchlist edits from the UI (star/unstar). Removes also suppress
+      // broker/YAML-sourced entries.
+      if (url.pathname === "/api/watchlist" && req.method === "POST") {
+        try {
+          const body = (await req.json().catch(() => ({}))) as { ticker?: string; action?: string };
+          const action = body.action === "remove" ? "remove" : "add";
+          const watchlist = await updateWatchlist(userId, String(body.ticker ?? ""), action);
+          return Response.json({ ok: true, watchlist });
+        } catch (err) {
+          return Response.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 400 });
+        }
+      }
+
+      // Idea outcome scoreboard: replay past validated ideas against real
+      // candles — did "strong" ratings actually win? (pure math, 1h cache)
+      if (url.pathname === "/api/ideas/scoreboard") {
+        try {
+          return Response.json({ ok: true, ...(await ideaScoreboard(userId)) });
+        } catch (err) {
+          return Response.json({ ok: false, error: String(err) }, { status: 500 });
+        }
       }
 
       // Market regime + sector rotation + per-sector setup boards
@@ -387,7 +412,11 @@ export function startServer() {
             const cur = loadRiskConfigFor(userId);
             const num = (v: unknown, fallback: number) => (v == null || v === "" || !Number.isFinite(Number(v)) ? fallback : Number(v));
             const prefs = {
-              account_equity: body.account_equity == null || body.account_equity === "" ? cur.account_equity : num(body.account_equity, 0),
+              // undefined = field not sent (keep current); null or "" = explicit
+              // reset to the live broker figure; a number = manual override.
+              account_equity: body.account_equity === undefined ? cur.account_equity
+                : body.account_equity === null || body.account_equity === "" ? null
+                : num(body.account_equity, 0),
               max_risk_per_trade_pct: Math.min(Math.max(num(body.max_risk_per_trade_pct, cur.max_risk_per_trade_pct), 0.1), 10),
               max_position_pct: Math.min(Math.max(num(body.max_position_pct, cur.max_position_pct), 1), 100),
               target_rr_ratio: Math.min(Math.max(num(body.target_rr_ratio, cur.target_rr_ratio), 1), 10),
@@ -427,6 +456,29 @@ export function startServer() {
         setAiLive(!!body.on);
         console.log(`[ai] live updates ${body.on ? "ENABLED" : "PAUSED"} by user`);
         return Response.json({ ok: true, aiLive: aiLive() });
+      }
+
+      // One-tap AI news digest for a ticker (fast model, user-initiated).
+      if (url.pathname === "/api/news/summarize" && req.method === "POST") {
+        try {
+          const body = (await req.json().catch(() => ({}))) as { ticker?: string };
+          const ticker = String(body.ticker ?? "").toUpperCase().trim();
+          if (!/^[A-Z][A-Z0-9.\-]{0,9}$/.test(ticker)) return Response.json({ ok: false, error: "bad ticker" }, { status: 400 });
+          return Response.json({ ok: true, summary: await summarizeTickerNews(ticker) });
+        } catch (err) {
+          console.error("[server] news summarize failed:", err);
+          return Response.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+        }
+      }
+
+      // Portfolio health check: deep-model pros/cons rundown with a 0-100 score.
+      if (url.pathname === "/api/portfolio/score" && req.method === "POST") {
+        try {
+          return Response.json({ ok: true, analysis: await scorePortfolio(userId, currentPortfolio(userId)) });
+        } catch (err) {
+          console.error("[server] portfolio score failed:", err);
+          return Response.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+        }
       }
 
       // Conversational advisor

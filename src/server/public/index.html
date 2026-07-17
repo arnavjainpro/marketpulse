@@ -4,12 +4,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MarketPulse</title>
+  <title>sharpEdge</title>
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-    /* Design tokens from MarketPulse.dc — light-first structure preserved so the
+    /* Design tokens from the sharpEdge design system — light-first structure preserved so the
      existing theme JS (System / Light / Dark) keeps working; dark values live in
      the prefers-color-scheme + [data-theme="dark"] blocks below. */
     :root {
@@ -214,10 +214,12 @@
       flex: 0 0 auto;
     }
 
+    /* sharpEdge mark: a rotated square — a literal sharp edge — with the pulse glow. */
     .side-logo .dot {
-      width: 11px;
-      height: 11px;
-      border-radius: 50%;
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      transform: rotate(45deg);
       background: var(--green);
       box-shadow: 0 0 12px var(--green);
       animation: pulse 2.4s infinite;
@@ -426,12 +428,37 @@
       gap: 14px;
     }
 
+    /* Title + subtitle stack. min-height pins the header to the same height on
+       every tab, even if a subtitle is missing or the text wraps out. */
+    #tab-head {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: 36px;
+      min-width: 0;
+      flex-shrink: 0;
+    }
+
     #tab-title {
       font-size: 18px;
       font-weight: 800;
       letter-spacing: -.01em;
       white-space: nowrap;
-      flex-shrink: 0;
+    }
+
+    #tab-sub {
+      font-size: 11.5px;
+      color: var(--faint);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 320px;
+    }
+
+    @media (max-width: 900px) {
+      #tab-sub {
+        display: none;
+      }
     }
 
     #mkt-pill {
@@ -1350,35 +1377,80 @@
       color: var(--dim);
     }
 
-    #ideas-filters label {
+    #filters-modal label {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 6px;
       font-weight: 600;
+      margin-bottom: 8px;
     }
 
-    #ideas-filters input[type=number] {
+    #filters-modal input[type=number] {
       border: 1px solid var(--line);
       border-radius: 999px;
       padding: 4px 10px;
-      width: 64px;
+      width: 74px;
       font: 12.5px var(--sans);
       background: var(--gray-soft);
     }
 
-    #ideas-filters input[type=number]:focus {
+    #filters-modal input[type=number]:focus {
       outline: none;
       border-color: var(--brand);
       background: var(--bg);
     }
 
-    #ideas-filters select {
+    #filters-modal select {
       border: 1px solid var(--line);
       border-radius: 999px;
       padding: 4px 8px;
       font: 12.5px var(--sans);
       background: var(--gray-soft);
       color: var(--text);
+    }
+
+    #filters-modal {
+      /* explicit centering — the page's CSS reset zeroes the UA's margin:auto */
+      position: fixed;
+      inset: 0;
+      margin: auto;
+      height: fit-content;
+      max-height: calc(100vh - 48px);
+      overflow-y: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: var(--shadow);
+      padding: 18px 20px;
+      width: min(440px, calc(100vw - 32px));
+      font-size: 12.5px;
+    }
+
+    #filters-modal .flabel {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: var(--faint);
+      margin: 14px 0 8px;
+    }
+
+    #filters-modal .flabel:first-of-type {
+      margin-top: 0;
+    }
+
+    #filters-modal::backdrop {
+      background: rgba(0, 0, 0, .35);
+      backdrop-filter: blur(2px);
+    }
+
+    #filters-modal .cf-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
     }
 
     .refresh-btn {
@@ -2360,10 +2432,6 @@
       color: var(--faint);
     }
 
-    #tab-sub {
-      color: var(--dim);
-    }
-
     /* in-trade follow-up chat on a plan card */
     .followup {
       margin-top: 14px;
@@ -2442,7 +2510,7 @@
 
   <section id="auth-screen" hidden>
     <form id="auth-card">
-      <span class="wordmark">Market<span>Pulse</span></span>
+      <span class="wordmark">sharp<span>Edge</span></span>
       <p id="auth-blurb">Sign in to your account.</p>
       <input type="email" id="auth-email" placeholder="Email" autocomplete="email" required>
       <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password" required
@@ -2458,7 +2526,7 @@
       <input id="ticker-search" type="text" placeholder="Search any ticker — AAPL, NVDA, MSFT…" autocomplete="on"
         spellcheck="false" maxlength="6">
       <div id="ticker-result">
-        <div class="tm-hint">Type a symbol. You get its live price, your MarketPulse score, and recent news — jump to
+        <div class="tm-hint">Type a symbol. You get its live price, your sharpEdge score, and recent news — jump to
           the full page or TradingView.</div>
       </div>
     </div>
@@ -2469,7 +2537,7 @@
       <div class="side-logo-row">
         <a class="side-logo" id="home-link" href="#portfolio" title="Home">
           <span class="dot"></span>
-          <span class="wordmark">Market<span>Pulse</span></span>
+          <span class="wordmark">sharp<span>Edge</span></span>
         </a>
         <button id="sidebar-collapse" title="Toggle sidebar" aria-label="Toggle sidebar">«</button>
       </div>
@@ -2499,7 +2567,10 @@
 
     <div class="main-col">
       <header>
-        <div id="tab-title">Portfolio</div>
+        <div id="tab-head">
+          <div id="tab-title">Portfolio</div>
+          <div id="tab-sub"></div>
+        </div>
         <span class="spacer"></span>
         <button class="search-btn" id="search-open" aria-label="Search any ticker">
           <span class="search-ring"></span>
@@ -2515,7 +2586,6 @@
           <button class="switch" id="ai-toggle" role="switch" aria-checked="true"
             aria-label="Toggle live AI updates"><i></i></button>
         </span>
-        <button id="logout-btn" title="Sign out">Log out</button>
       </header>
       <div id="banner">AI was halted after unusually high activity to protect your API spend.<button
           id="breaker-reset">Resume</button></div>
@@ -2539,6 +2609,12 @@
             <button class="advise-btn ghost" id="import-clear" style="margin-top:6px">Clear import (back to
               YAML)</button>
           </div>
+          <div style="margin-top:12px">
+            <button class="advise-btn" id="pf-score-btn" style="margin-top:0"
+              title="AI health check: score out of 100 with pros, cons, and the biggest risk (a few cents, ~30s)">✦
+              Score my portfolio</button>
+          </div>
+          <div id="pf-score-result"></div>
         </section>
 
         <section id="advice-section" data-pane="portfolio" style="display:none">
@@ -2549,6 +2625,16 @@
         <section data-pane="portfolio">
           <h2>Your stocks</h2>
           <div class="card" id="holdings"></div>
+        </section>
+
+        <section data-pane="portfolio" id="options-section" style="display:none">
+          <h2>Your options</h2>
+          <div class="card" id="holdings-options"></div>
+        </section>
+
+        <section data-pane="portfolio" id="watchlist-section" style="display:none">
+          <h2>Watchlist</h2>
+          <div class="card" id="watchlist-card" style="padding:12px 16px;display:flex;gap:8px;flex-wrap:wrap"></div>
         </section>
 
         <section id="market-section" data-pane="market">
@@ -2593,12 +2679,24 @@
               </div>
             </div>
           </div>
-          <div id="idea-filters" class="filter-bar"></div>
           <div id="ideas-filters">
-            <label>Min score <input type="number" id="flt-score" min="50" max="100" step="1" placeholder="—"></label>
-            <label>Min cap $B <input type="number" id="flt-mcap" min="0" step="1" placeholder="—"></label>
-            <label>Custom
-              <select id="cf-metric">
+            <button class="refresh-btn" id="filters-btn" title="Open the filters panel">⚙ Filters</button>
+            <div id="active-filter-chips" class="filter-bar" style="margin:0"></div>
+            <span class="spacer"></span>
+            <button id="gen-btn"
+              title="Pick the strongest setups matching these filters and run each through full AI validation (a few cents, takes a minute or two)">✦
+              Generate ideas from filters</button>
+          </div>
+          <dialog id="filters-modal">
+            <h3 style="margin:0 0 12px">Filter ideas</h3>
+            <div class="flabel">Quick thresholds</div>
+            <label>Minimum score (0–100) <input type="number" id="flt-score" min="50" max="100" step="1"
+                placeholder="any"></label>
+            <label>Minimum market cap ($ billions) <input type="number" id="flt-mcap" min="0" step="1"
+                placeholder="any"></label>
+            <div class="flabel">Custom rule</div>
+            <div class="cf-row">
+              <select id="cf-metric" aria-label="Metric">
                 <option value="rsi14">RSI (14d)</option>
                 <option value="pctVs200">% vs 200-day</option>
                 <option value="mom1m">1-mo return %</option>
@@ -2609,21 +2707,23 @@
                 <option value="volTrend">Volume trend ×</option>
                 <option value="atrPct">ATR %</option>
                 <option value="pct52w">52-wk range %</option>
-                <option value="score">Score</option>
-                <option value="mcapB">Market cap $B</option>
               </select>
-              <select id="cf-op">
-                <option value=">">&gt;</option>
-                <option value="<">&lt;</option>
+              <select id="cf-op" aria-label="Comparison">
+                <option value=">">above</option>
+                <option value="<">below</option>
               </select>
               <input type="number" id="cf-val" step="any" placeholder="value" style="width:74px">
-              <button class="refresh-btn" id="cf-add" title="Add as a removable filter chip">+ Add filter</button>
-            </label>
-            <span class="spacer"></span>
-            <button id="gen-btn"
-              title="Pick the strongest setups matching these filters and run each through full AI validation (a few cents, takes a minute or two)">✦
-              Generate ideas from filters</button>
-          </div>
+              <button class="refresh-btn" id="cf-add" title="Add this rule as a removable filter">+ Add rule</button>
+            </div>
+            <p style="font-size:11.5px;color:var(--faint);margin:6px 0 0">e.g. “RSI (14d) below 35” for oversold names,
+              or “% vs 200-day above 0” for uptrends. Stack as many rules as you like.</p>
+            <div class="flabel">Active filters</div>
+            <div id="modal-filter-chips" class="filter-bar" style="margin:0"></div>
+            <div class="cf-row" style="margin-top:16px;justify-content:flex-end">
+              <button class="refresh-btn" id="filters-clear">Clear all</button>
+              <button class="advise-btn" id="filters-done" style="margin-top:0">Done</button>
+            </div>
+          </dialog>
           <div class="card" id="ideas">
             <div class="empty">Scanning the market… the first full scan takes several minutes after startup.</div>
           </div>
@@ -2697,14 +2797,14 @@
         </section>
 
         <section data-pane="chat">
-          <h2>Ask MarketPulse</h2>
+          <h2>Ask sharpEdge</h2>
           <div id="chat-card">
             <div id="chat-log">
               <div class="msg ai">Ask me anything about your money — “should I sell HPE?”, “what looks worth buying
                 today?”, “which sectors are leading right now?”</div>
             </div>
             <form id="chat-form">
-              <input id="chat-input" placeholder="Ask a question…" autocomplete="off" aria-label="Ask MarketPulse">
+              <input id="chat-input" placeholder="Ask a question…" autocomplete="off" aria-label="Ask sharpEdge">
               <button id="chat-send" type="submit">Ask</button>
             </form>
           </div>
@@ -2731,15 +2831,20 @@
             </svg>
             Recent activity <span id="act-count" style="margin-left:auto;font-size:12px;color:var(--faint)"></span>
           </summary>
-          <div class="inner" id="activity"></div>
+          <div class="inner">
+            <div id="act-filters" class="filter-bar" style="margin:10px 0 4px"></div>
+            <div id="activity"></div>
+          </div>
         </details>
 
         <section data-pane="settings">
           <h2>Risk settings</h2>
           <form class="settings-card" id="risk-form">
             <div class="settings-row">
-              <label>Account equity $ (fallback)<input type="number" id="rp-equity" min="0" step="100"
-                  placeholder="from broker"></label>
+              <label>Account equity $<input type="number" id="rp-equity" min="0" step="100"
+                  placeholder="auto from broker"></label>
+              <button type="button" class="refresh-btn" id="rp-equity-reset" style="align-self:flex-end"
+                title="Clear the manual value and go back to your live broker equity">Reset to broker</button>
               <label>Max risk per trade %<input type="number" id="rp-risk" min="0.1" max="10" step="0.1"></label>
               <label>Max position %<input type="number" id="rp-pos" min="1" max="100" step="1"></label>
               <label>Target risk : reward<input type="number" id="rp-rr" min="1" max="10" step="0.5"
@@ -2747,9 +2852,8 @@
               <button type="submit" class="advise-btn" style="margin-top:0">Save</button>
             </div>
             <div class="settings-msg" id="risk-msg"></div>
-            <p style="font-size:12px;color:var(--faint)">The target R:R feeds directly into idea validation: a setup
-              only rates “strong” if its reward-to-risk clears your bar. Equity is only used when no broker is linked.
-            </p>
+            <p style="font-size:12px;color:var(--faint)"><span id="equity-note"></span> The target R:R feeds directly
+              into idea validation: a setup only rates “strong” if its reward-to-risk clears your bar.</p>
           </form>
         </section>
 
@@ -2762,6 +2866,8 @@
               <label>Full name<input type="text" id="pf-name" maxlength="120" placeholder="optional"></label>
               <label>Phone<input type="tel" id="pf-phone" maxlength="32" placeholder="optional"></label>
               <button type="submit" class="advise-btn" style="margin-top:0">Save</button>
+              <button type="button" id="logout-btn" title="Sign out of this account"
+                style="margin-left:auto">Log out</button>
             </div>
             <div class="settings-msg" id="profile-msg"></div>
           </form>
@@ -2824,6 +2930,13 @@
         </section>
 
         <section data-pane="history">
+          <h2>Idea scoreboard</h2>
+          <div class="card" id="scoreboard" style="padding:12px 16px">
+            <div class="empty">Loading…</div>
+          </div>
+        </section>
+
+        <section data-pane="history">
           <h2>Past analyses</h2>
           <div id="history-ideas">
             <div class="empty">No validated ideas yet — validate a ticker or generate ideas and they'll show up here.
@@ -2831,8 +2944,7 @@
           </div>
         </section>
 
-        <p class="disclaimer"><span id="tab-sub"></span> · Decision-support tool, not licensed financial advice. Every
-          trade is your decision.</p>
+        <p class="disclaimer">Decision-support tool, not licensed financial advice. Every trade is your decision.</p>
       </main>
     </div>
   </div>
@@ -2848,8 +2960,8 @@
        pushState so the browser back button walks out of them naturally. */
     const PANES = ["portfolio", "market", "ideas", "analyze", "backtest", "chat", "activity", "history", "settings"];
     const TAB_TITLES = {
-      portfolio: "Portfolio", market: "Market Pulse", ideas: "Trade Ideas", analyze: "Analyzer",
-      backtest: "Backtest", chat: "Ask MarketPulse", activity: "Activity", history: "History", settings: "Settings"
+      portfolio: "Portfolio", market: "Market", ideas: "Trade Ideas", analyze: "Analyzer",
+      backtest: "Backtest", chat: "Ask sharpEdge", activity: "Activity", history: "History", settings: "Settings"
     };
     const TAB_SUBS = {
       portfolio: "Live positions & advice", market: "Regime, indices & sector rotation",
@@ -2876,12 +2988,12 @@
       if (!PANES.includes(name)) name = "portfolio";
       document.querySelectorAll("[data-pane]").forEach((el) => { el.hidden = el.dataset.pane !== name; });
       document.querySelectorAll("#nav button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
-      $("#tab-title").textContent = TAB_TITLES[name] || "MarketPulse";
+      $("#tab-title").textContent = TAB_TITLES[name] || "sharpEdge";
       $("#tab-sub").textContent = TAB_SUBS[name] || "";
       const badge = document.querySelector(`#nav button[data-tab="${name}"] .badge`);
       if (badge) { badge.classList.remove("show"); badge.textContent = ""; }
       if (name === "settings") { loadRiskPrefs(); loadProfile(); syncAppearanceTabs(); }
-      if (name === "history") { loadJournal(); loadPastIdeas(); }
+      if (name === "history") { loadJournal(); loadPastIdeas(); loadScoreboard(); }
       if (name === "analyze") loadAnalyzeRisk();
       if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
     }
@@ -3001,6 +3113,7 @@
         .filter((a) => a.ticker === ticker)
         .map((a) => `<div class="tm-alert-row ${a.active ? "" : "done"}">
         <span>${KIND_LABEL[a.kind] || a.kind} ${a.threshold}</span>
+        ${a.recurring ? `<span class="chip calm sm" title="re-arms after each firing">↻</span>` : ""}
         ${a.active ? "" : `<span class="chip calm sm">fired</span>`}
         <button class="del" data-alert-del="${a.id}" title="delete alert">×</button>
       </div>`).join("");
@@ -3017,7 +3130,8 @@
         const threshold = parseFloat(box.querySelector(".alert-threshold").value);
         const msg = box.querySelector(".tm-alert-msg");
         if (!Number.isFinite(threshold)) { msg.textContent = "Enter a number."; msg.classList.add("err"); return; }
-        const res = await (await fetch("/api/alerts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ticker, kind, threshold }) })).json();
+        const recurring = !!box.querySelector(".alert-recurring")?.checked;
+        const res = await (await fetch("/api/alerts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ticker, kind, threshold, recurring }) })).json();
         if (res.error) { msg.textContent = res.error; msg.classList.add("err"); }
         else { msg.classList.remove("err"); msg.textContent = "Alert set — you'll get notified when it crosses."; }
         loadAlertList(ticker, box);
@@ -3073,6 +3187,9 @@
           <option value="score_gte">Score ≥</option>
         </select>
         <input class="alert-threshold" type="number" step="any" value="${price != null ? Number(price).toFixed(2) : 60}" style="width:96px">
+        <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--dim)"
+          title="Re-arms after firing: pings again on each fresh crossing instead of retiring">
+          <input type="checkbox" class="alert-recurring"> repeat</label>
         <button class="advise-btn" data-alert-action="create">🔔 Create</button>
       </div>
       <div class="tm-alert-msg"></div>
@@ -3151,6 +3268,7 @@
     /* ── data stores ── */
     let portfolio = { holdings: [], watchlist: [] };
     let quotes = {};
+    let earnings = {};   // ticker → next earnings ISO date (holdings, ≤14d out)
     let screener = {};   // ticker -> row
     let events = [];
     let market = null;   // { snapshot, boards }
@@ -3242,8 +3360,9 @@
       if (!portfolio.holdings.length) return;
       let value = 0, day = 0, cost = 0, prev = 0;
       for (const h of portfolio.holdings) {
+        if (h.asset_class === "crypto") continue; // unsupported; new imports reject it, but pre-existing stored imports may still have one
         const q = quotes[h.ticker];
-        // Options/crypto (and any broker-priced position) carry their own market value.
+        // Options (and any broker-priced position) carry their own market value.
         if (h.market_value != null) {
           value += h.market_value;
           cost += h.shares * h.cost_basis * (h.asset_class === "option" ? 100 : 1);
@@ -3314,6 +3433,23 @@
       loadState();
     });
 
+    /* ── portfolio score: AI pros/cons rundown ── */
+    $("#pf-score-btn").addEventListener("click", async () => {
+      const btn = $("#pf-score-btn"), box = $("#pf-score-result");
+      btn.disabled = true;
+      const orig = btn.textContent;
+      btn.textContent = "Scoring your portfolio… (~30s)";
+      try {
+        const res = await (await fetch("/api/portfolio/score", { method: "POST" })).json();
+        if (res.ok) {
+          box.innerHTML = `<div class="report"><button class="close-report" title="dismiss">×</button><div class="pf-score-md"></div></div>`;
+          renderMd(box.querySelector(".pf-score-md"), res.analysis);
+          box.querySelector(".close-report").addEventListener("click", () => { box.innerHTML = ""; });
+        } else box.innerHTML = `<div class="empty">Scoring failed: ${esc(res.error)}</div>`;
+      } catch (e) { box.innerHTML = `<div class="empty">Scoring failed: ${esc(String(e))}</div>`; }
+      finally { btn.disabled = false; btn.textContent = orig; }
+    });
+
     /* ── advice cards ── */
     const ACTION_LABEL = { buy: ["Buy idea", "buy"], add: ["Buy idea", "buy"], sell: ["Sell alert", "sell"], trim: ["Sell alert", "sell"] };
     function renderAdvice() {
@@ -3352,26 +3488,41 @@
       }
     }
 
-    /* ── your stocks ── */
-    function renderHoldings() {
-      const card = $("#holdings");
-      card.innerHTML = "";
-      for (const h of portfolio.holdings) {
-        const q = quotes[h.ticker];
-        const [chipLabel, chipTone] = statusChip(h.ticker);
-        const wrap = document.createElement("div");
-        const cls = h.asset_class || "equity";
-        const unit = cls === "option" ? "contract" : cls === "crypto" ? "unit" : "share";
-        const mult = cls === "option" ? 100 : 1;
-        // Options/crypto carry their own market value; equities are quote-priced.
-        const value = h.market_value != null ? h.market_value : q ? q.c * h.shares : null;
-        const gain = h.market_value != null ? h.market_value - h.cost_basis * h.shares * mult : q ? (q.c - h.cost_basis) * h.shares : 0;
-        const priceCell = h.market_value != null ? money(h.market_value) : q ? money(q.c) : "—";
-        wrap.innerHTML = `
+    /* ── your stocks & options (crypto is not shown — equity/options tool) ── */
+    function holdingRow(h) {
+      const q = quotes[h.ticker];
+      const isOpt = h.asset_class === "option";
+      const [chipLabel, chipTone] = statusChip(isOpt && h.option ? h.option.underlying : h.ticker);
+      const wrap = document.createElement("div");
+      const unit = isOpt ? "contract" : "share";
+      const mult = isOpt ? 100 : 1;
+      // Options carry their own market value; equities are quote-priced.
+      const gain = h.market_value != null ? h.market_value - h.cost_basis * h.shares * mult : q ? (q.c - h.cost_basis) * h.shares : 0;
+      const priceCell = h.market_value != null ? money(h.market_value) : q ? money(q.c) : "—";
+      const o = h.option;
+      const sym = isOpt && o ? o.underlying : h.ticker;
+      const sub = isOpt && o
+        ? `${Math.abs(h.shares)} ${h.shares < 0 ? "short " : ""}$${o.strike} ${o.type}${Math.abs(h.shares) === 1 ? "" : "s"} · exp ${o.expiry}`
+        : `${h.shares} ${unit}${Math.abs(h.shares) === 1 ? "" : "s"}`;
+      // Time-critical chips: days-to-expiry on options; earnings within a week on stocks.
+      let timeChip = "";
+      if (isOpt && o) {
+        const dte = Math.ceil((new Date(o.expiry + "T16:00:00-05:00") - Date.now()) / 86400e3);
+        const tone = dte <= 3 ? "sell" : dte <= 10 ? "warn" : "calm";
+        timeChip = `<span class="chip ${tone}" title="expires ${esc(o.expiry)}">${dte <= 0 ? "expires today" : dte + "d left"}</span>`;
+      } else if (earnings[sym]) {
+        const days = Math.ceil((new Date(earnings[sym] + "T16:00:00-05:00") - Date.now()) / 86400e3);
+        if (days >= 0 && days <= 7) {
+          const label = days === 0 ? "today" : days === 1 ? "tomorrow" : new Date(earnings[sym]).toLocaleDateString([], { weekday: "short" });
+          timeChip = `<span class="chip warn" title="earnings ${esc(earnings[sym])}">earnings ${label}</span>`;
+        }
+      }
+      wrap.innerHTML = `
       <button class="rowbtn" aria-expanded="false">
         ${chevSvg}
-        <div class="tick-name"><div class="sym">${esc(h.ticker)}${cls !== "equity" ? ` <span class="chip calm sm">${cls}</span>` : ""}</div><div class="sub">${h.shares} ${unit}${Math.abs(h.shares) === 1 ? "" : "s"}</div></div>
+        <div class="tick-name"><div class="sym">${esc(sym)}</div><div class="sub">${esc(sub)}</div></div>
         <svg class="mini-spark" preserveAspectRatio="none"></svg>
+        ${timeChip}
         <span class="chip ${chipTone}">${chipLabel}</span>
         <div class="row-price">
           <div class="px">${priceCell}</div>
@@ -3379,14 +3530,44 @@
         </div>
       </button>
       <div class="detail">
-        <p>You hold ${h.shares} ${unit}${Math.abs(h.shares) === 1 ? "" : "s"} at a cost of ${money(h.cost_basis)} each — ${gain >= 0 ? "up" : "down"} <b class="${gain >= 0 ? "up" : "down"}">${money(Math.abs(gain))}</b> overall.</p>
-        ${factorDetail(h.ticker)}
+        <p>You hold ${Math.abs(h.shares)} ${unit}${Math.abs(h.shares) === 1 ? "" : "s"} at a cost of ${money(h.cost_basis)} each — ${gain >= 0 ? "up" : "down"} <b class="${gain >= 0 ? "up" : "down"}">${money(Math.abs(gain))}</b> overall.</p>
+        ${factorDetail(sym)}
       </div>`;
-        wrap.querySelector(".rowbtn").addEventListener("click", () => toggleRow(wrap));
-        sparkSvg(wrap.querySelector(".mini-spark"), screener[h.ticker]?.indicators?.spark);
-        card.appendChild(wrap);
-      }
+      wrap.querySelector(".rowbtn").addEventListener("click", () => toggleRow(wrap));
+      sparkSvg(wrap.querySelector(".mini-spark"), screener[sym]?.indicators?.spark);
+      return wrap;
     }
+    function renderHoldings() {
+      const stocks = portfolio.holdings.filter((h) => (h.asset_class ?? "equity") === "equity");
+      const options = portfolio.holdings.filter((h) => h.asset_class === "option");
+      const card = $("#holdings");
+      card.innerHTML = "";
+      for (const h of stocks) card.appendChild(holdingRow(h));
+      if (!stocks.length) card.innerHTML = `<div class="empty">No stock positions.</div>`;
+      $("#options-section").style.display = options.length ? "" : "none";
+      const oCard = $("#holdings-options");
+      oCard.innerHTML = "";
+      for (const h of options) oCard.appendChild(holdingRow(h));
+    }
+
+    /* ── watchlist (starred in the UI; merged with broker/YAML lists) ── */
+    function renderWatchlist() {
+      const list = portfolio.watchlist || [];
+      $("#watchlist-section").style.display = list.length ? "" : "none";
+      $("#watchlist-card").innerHTML = list.map((t) => `
+        <span class="filter-chip on" style="display:inline-flex;gap:6px;align-items:center">
+          <a href="#stock/${esc(t)}" style="color:inherit;text-decoration:none;font-weight:700">${esc(t)}</a>
+          ${quotes[t]?.c ? `<span style="font-weight:400">${money(quotes[t].c)}</span>` : ""}
+          <button data-watch-remove="${esc(t)}" title="Remove from watchlist" style="border:none;background:none;cursor:pointer;color:inherit;padding:0">×</button>
+        </span>`).join("");
+    }
+    document.addEventListener("click", async (e) => {
+      const rm = e.target.closest("[data-watch-remove]");
+      if (!rm) return;
+      rm.disabled = true;
+      await fetch("/api/watchlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ticker: rm.dataset.watchRemove, action: "remove" }) });
+      loadState();
+    });
 
     /* ── market pulse ── */
     const SECTOR_STATE_TONE = { leading: "buy", improving: "info", weakening: "warn", lagging: "sell" };
@@ -3437,14 +3618,9 @@
       </tr>
       <tr class="sector-detail" data-sector-detail="${idx}" style="display:${openRows.has("sector:" + bd.sector) ? "" : "none"}">
         <td colspan="7">
-          <div class="setup-chips" style="margin-bottom:6px">
-            <span style="font-size:11px;color:var(--faint);font-weight:700">LONGS</span>
-            ${bd.longs.map((l) => `<button class="setup-chip" data-validate="${esc(l.ticker)}" data-direction="long">${esc(l.ticker)} ${l.long_score}${l.held ? " ·held" : ""}</button>`).join("") || `<span style="font-size:12px;color:var(--faint)">none setup-grade</span>`}
-          </div>
-          <div class="setup-chips">
-            <span style="font-size:11px;color:var(--faint);font-weight:700">SHORTS</span>
-            ${bd.shorts.map((s) => `<button class="setup-chip s" data-validate="${esc(s.ticker)}" data-direction="short">${esc(s.ticker)} ${s.short_score}${s.held ? " ·HELD⚠" : ""}</button>`).join("") || `<span style="font-size:12px;color:var(--faint)">none (structure gate not met)</span>`}
-          </div>
+          ${bd.longs.length + bd.shorts.length
+          ? `<button class="linkish" data-goto-ideas="${esc(bd.sector)}" style="font-size:12.5px">${bd.longs.length} long / ${bd.shorts.length} short setup${bd.longs.length + bd.shorts.length === 1 ? "" : "s"} — view tickers &amp; validate in Ideas →</button>`
+          : `<span style="font-size:12px;color:var(--faint)">No setup-grade names in this sector right now.</span>`}
         </td>
       </tr>`;
       }).join("");
@@ -3460,17 +3636,9 @@
       });
     }
 
-    /* ── idea filters: one-tap metric chips + numeric score/cap thresholds, both
-       client-side; plus a collapsible sector tree. Chip + collapse state persist. ── */
-    const FILTERS = [
-      { id: "above200", label: "Above 200-day", test: (i) => !!i && i.pctVs200 > 0 },
-      { id: "volrising", label: "Volume rising", test: (i) => !!i && i.volTrend > 1.15 },
-      { id: "beatspy", label: "Beating S&P", test: (i) => !!i && (i.rsSpy1m ?? 0) > 2 },
-      { id: "oversold", label: "Oversold (RSI<35)", test: (i) => !!i && i.rsi14 != null && i.rsi14 < 35 },
-      { id: "score70", label: "Score ≥ 70", test: (i, item, isLong) => (isLong ? item.long_score : item.short_score) >= 70 },
-    ];
-    // Custom user-built filters: metric + operator + value, rendered as removable
-    // chips alongside the built-ins. Per-browser (localStorage) like the chips.
+    /* ── idea filters: everything lives in the ⚙ Filters dialog — numeric
+       score/cap thresholds plus custom metric rules, all client-side and
+       persisted per-browser. Active rules render as removable chips. ── */
     const CUSTOM_METRICS = {
       rsi14: { label: "RSI", get: (i) => i?.rsi14 },
       pctVs200: { label: "% vs 200-day", get: (i) => i?.pctVs200 },
@@ -3488,9 +3656,7 @@
     // Corrupt localStorage must not throw at top level — that would blank the whole
     // dashboard with no recovery path. Bad JSON just means "no saved preference".
     const readStoredSet = (key) => { try { return new Set(JSON.parse(localStorage.getItem(key) || "[]")); } catch { return new Set(); } };
-    const activeFilters = readStoredSet("ideaFilters");
     const collapsedSectors = readStoredSet("collapsedSectors");
-    const saveFilters = () => localStorage.setItem("ideaFilters", JSON.stringify([...activeFilters]));
     const saveCollapsed = () => localStorage.setItem("collapsedSectors", JSON.stringify([...collapsedSectors]));
     let customFilters = [];
     try {
@@ -3498,11 +3664,16 @@
       if (Array.isArray(raw)) customFilters = raw.filter((f) => f && CUSTOM_METRICS[f.metric] && (f.op === ">" || f.op === "<") && Number.isFinite(f.value));
     } catch { }
     const saveCustomFilters = () => localStorage.setItem("customIdeaFilters", JSON.stringify(customFilters));
-    // Numeric thresholds (min score / min market cap) layer on top of the chips.
-    const numFilters = { minScore: null, minCapB: null };
-    const anyFilterActive = () => activeFilters.size > 0 || customFilters.length > 0 || numFilters.minScore != null || numFilters.minCapB != null;
+    // Numeric thresholds (min score / min market cap) layer on top of the rules.
+    let numFilters = { minScore: null, minCapB: null };
+    try {
+      const raw = JSON.parse(localStorage.getItem("ideaNumFilters") || "{}");
+      if (Number.isFinite(raw.minScore)) numFilters.minScore = raw.minScore;
+      if (Number.isFinite(raw.minCapB)) numFilters.minCapB = raw.minCapB;
+    } catch { }
+    const saveNumFilters = () => localStorage.setItem("ideaNumFilters", JSON.stringify(numFilters));
+    const anyFilterActive = () => customFilters.length > 0 || numFilters.minScore != null || numFilters.minCapB != null;
     function passesFilters(item, i, isLong) {
-      for (const f of FILTERS) if (activeFilters.has(f.id) && !f.test(i, item, isLong)) return false;
       for (const cf of customFilters) {
         const v = CUSTOM_METRICS[cf.metric]?.get(i, item, isLong);
         if (v == null || !(cf.op === ">" ? v > cf.value : v < cf.value)) return false;
@@ -3515,30 +3686,49 @@
       }
       return true;
     }
-    function renderFilterBar() {
-      $("#idea-filters").innerHTML = FILTERS
-        .map((f) => `<button class="filter-chip ${activeFilters.has(f.id) ? "on" : ""}" data-filter="${f.id}">${f.label}</button>`)
-        .join("")
-        + customFilters
-          .map((cf, idx) => `<button class="filter-chip on" data-cfilter="${idx}" title="Remove this filter">${esc(CUSTOM_METRICS[cf.metric].label)} ${cf.op} ${cf.value} ×</button>`)
-          .join("");
+    // Active-rule chips render in the bar AND inside the dialog; removing works
+    // from either place. The ⚙ button shows how many rules are live.
+    function filterChipsHtml() {
+      const chips = [];
+      if (numFilters.minScore != null) chips.push(`<button class="filter-chip on" data-nfilter="minScore" title="Remove">Score ≥ ${numFilters.minScore} ×</button>`);
+      if (numFilters.minCapB != null) chips.push(`<button class="filter-chip on" data-nfilter="minCapB" title="Remove">Cap ≥ $${numFilters.minCapB}B ×</button>`);
+      chips.push(...customFilters.map((cf, idx) =>
+        `<button class="filter-chip on" data-cfilter="${idx}" title="Remove this filter">${esc(CUSTOM_METRICS[cf.metric].label)} ${cf.op} ${cf.value} ×</button>`));
+      return chips.join("");
     }
-    $("#idea-filters").addEventListener("click", (e) => {
+    function renderFilterBar() {
+      const html = filterChipsHtml();
+      $("#active-filter-chips").innerHTML = html;
+      $("#modal-filter-chips").innerHTML = html || `<span style="color:var(--faint)">No filters active — everything setup-grade shows.</span>`;
+      const n = customFilters.length + (numFilters.minScore != null) + (numFilters.minCapB != null);
+      $("#filters-btn").textContent = n ? `⚙ Filters (${n})` : "⚙ Filters";
+    }
+    // Chip removal, delegated at document level so bar + dialog share it.
+    document.addEventListener("click", (e) => {
+      const nbtn = e.target.closest("[data-nfilter]");
+      if (nbtn) {
+        numFilters[nbtn.dataset.nfilter] = null;
+        saveNumFilters();
+        $(nbtn.dataset.nfilter === "minScore" ? "#flt-score" : "#flt-mcap").value = "";
+        renderFilterBar(); renderIdeas();
+        return;
+      }
       const cbtn = e.target.closest("[data-cfilter]");
       if (cbtn) {
         customFilters.splice(+cbtn.dataset.cfilter, 1);
         saveCustomFilters();
-        renderFilterBar();
-        renderIdeas();
-        return;
+        renderFilterBar(); renderIdeas();
       }
-      const btn = e.target.closest("[data-filter]");
-      if (!btn) return;
-      const id = btn.dataset.filter;
-      activeFilters.has(id) ? activeFilters.delete(id) : activeFilters.add(id);
-      saveFilters();
-      renderFilterBar();
-      renderIdeas();
+    });
+    $("#filters-btn").addEventListener("click", () => $("#filters-modal").showModal());
+    $("#filters-done").addEventListener("click", () => $("#filters-modal").close());
+    $("#filters-modal").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+    $("#filters-clear").addEventListener("click", () => {
+      customFilters = [];
+      numFilters = { minScore: null, minCapB: null };
+      saveCustomFilters(); saveNumFilters();
+      $("#flt-score").value = ""; $("#flt-mcap").value = "";
+      renderFilterBar(); renderIdeas();
     });
     $("#cf-add").addEventListener("click", () => {
       const metric = $("#cf-metric").value;
@@ -3551,8 +3741,10 @@
       renderFilterBar();
       renderIdeas();
     });
-    $("#flt-score").addEventListener("input", (e) => { numFilters.minScore = e.target.value === "" ? null : +e.target.value; renderIdeas(); });
-    $("#flt-mcap").addEventListener("input", (e) => { numFilters.minCapB = e.target.value === "" ? null : +e.target.value; renderIdeas(); });
+    $("#flt-score").addEventListener("input", (e) => { numFilters.minScore = e.target.value === "" ? null : +e.target.value; saveNumFilters(); renderFilterBar(); renderIdeas(); });
+    $("#flt-mcap").addEventListener("input", (e) => { numFilters.minCapB = e.target.value === "" ? null : +e.target.value; saveNumFilters(); renderFilterBar(); renderIdeas(); });
+    $("#flt-score").value = numFilters.minScore ?? "";
+    $("#flt-mcap").value = numFilters.minCapB ?? "";
     renderFilterBar();
 
     /* ── trade ideas (by sector, long/short tabs) ── */
@@ -3628,6 +3820,17 @@
         card.appendChild(groupBox);
       }
     }
+
+    // Market tab sector rows link here instead of duplicating the ticker lists:
+    // expand that sector in Ideas and jump to the tab.
+    document.addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-goto-ideas]");
+      if (!btn) return;
+      collapsedSectors.delete(btn.dataset.gotoIdeas);
+      saveCollapsed();
+      renderIdeas();
+      location.hash = "#ideas";
+    });
 
     $("#ideas-tabs").addEventListener("click", (ev) => {
       const btn = ev.target.closest("[data-tab]");
@@ -3818,6 +4021,35 @@
     }
 
     /* ── history: past validated ideas ── */
+    /* ── idea scoreboard: did past ratings actually win? ── */
+    async function loadScoreboard() {
+      const box = $("#scoreboard");
+      try {
+        const d = await (await fetch("/api/ideas/scoreboard")).json();
+        if (!d.ok) { box.innerHTML = `<div class="empty">${esc(d.error || "Scoreboard unavailable.")}</div>`; return; }
+        if (!d.rows.length) {
+          box.innerHTML = `<div class="empty">No trackable ideas yet — validate a few and check back. Ideas are replayed against real prices: stop hit = loss, first target hit = win.</div>`;
+          return;
+        }
+        const pct = (r) => r.wins + r.losses ? `${Math.round(r.wins / (r.wins + r.losses) * 100)}%` : "—";
+        box.innerHTML = `
+          <table class="sectors" style="width:100%">
+            <tr><th>Rating</th><th>Direction</th><th>Wins</th><th>Losses</th><th>Still open</th><th>Hit rate</th></tr>
+            ${d.rows.map((r) => `<tr>
+              <td><span class="rbadge ${esc(r.rating)}" style="font-size:11px;padding:2px 10px">${esc(r.rating)}</span></td>
+              <td>${esc(r.direction)}</td>
+              <td class="up">${r.wins}</td>
+              <td class="down">${r.losses}</td>
+              <td>${r.open}</td>
+              <td style="font-weight:700">${pct(r)}</td>
+            </tr>`).join("")}
+          </table>
+          <p style="font-size:11.5px;color:var(--faint);margin:8px 0 0">Last 120 days of validated ideas, replayed against real daily candles from the validation date: stop hit first = loss, first target hit = win (same-bar ties count as losses). ${d.skipped ? `${d.skipped} of ${d.total} ideas had no parseable price levels and were skipped.` : ""} Refreshes hourly.</p>`;
+      } catch (e) {
+        box.innerHTML = `<div class="empty">Could not load the scoreboard.</div>`;
+      }
+    }
+
     async function loadPastIdeas() {
       const box = $("#history-ideas");
       try {
@@ -3919,8 +4151,32 @@
         $("#rp-risk").value = prefs.max_risk_per_trade_pct;
         $("#rp-pos").value = prefs.max_position_pct;
         $("#rp-rr").value = prefs.target_rr_ratio;
+        const manual = prefs.account_equity;
+        const brokerEq = brokerInfo?.account?.equity;
+        $("#rp-equity-reset").style.display = manual != null ? "" : "none";
+        $("#equity-note").innerHTML = manual != null
+          ? `Manual equity of <b>${money(manual)}</b> overrides your live broker figure for position sizing (useful when you only trade a slice of the account). “Reset to broker” goes back to the live value.`
+          : brokerEq != null
+            ? `Equity is <b>${money(brokerEq)}</b>, live from your ${brokerInfo.source === "robinhood" ? "linked Robinhood account" : "imported positions"}. Type a value above to size against a different bankroll instead.`
+            : `No broker linked — position sizing uses the value you set above. Link Robinhood or import positions (Portfolio tab) to keep it live.`;
       } catch { }
     }
+    async function saveEquityAnd(prefsBody) {
+      await fetch("/api/risk-prefs", {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(prefsBody),
+      });
+      // The override is applied when the broker snapshot is built — rebuild it
+      // now so the dashboard equity updates immediately, not on the next poll.
+      await fetch("/api/broker/refresh", { method: "POST" });
+      await loadState();
+      await loadRiskPrefs();
+    }
+    $("#rp-equity-reset").addEventListener("click", async () => {
+      const btn = $("#rp-equity-reset");
+      btn.disabled = true;
+      try { await saveEquityAnd({ account_equity: null }); $("#risk-msg").textContent = "Back to live broker equity."; }
+      finally { btn.disabled = false; setTimeout(() => { $("#risk-msg").textContent = ""; }, 5000); }
+    });
     $("#risk-form").addEventListener("submit", async (ev) => {
       ev.preventDefault();
       const res = await (await fetch("/api/risk-prefs", {
@@ -3934,6 +4190,9 @@
       })).json();
       const msg = $("#risk-msg");
       msg.textContent = res.ok ? "Saved — future idea validations use these settings." : `Failed: ${res.error}`;
+      if (res.ok) { // equity override applies at snapshot build — rebuild now
+        fetch("/api/broker/refresh", { method: "POST" }).then(loadState).then(loadRiskPrefs).catch(() => { });
+      }
       setTimeout(() => { msg.textContent = ""; }, 5000);
     });
 
@@ -4032,10 +4291,17 @@
     <div style="margin:14px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <button class="advise-btn" data-validate="${esc(ticker)}" style="margin-top:0">✦ Validate this ticker (~30s)</button>
       <label class="checkline" style="display:inline-flex"><input type="checkbox" id="stock-opts"> include options strategy</label>
+      <button class="advise-btn ghost" id="watch-toggle" style="margin-top:0"></button>
       <a class="advise-btn ghost" href="${tvLink(ticker)}" target="_blank" rel="noopener" style="text-decoration:none">Open in TradingView ↗</a>
     </div>
     <div id="stock-report-area"></div>
-    ${data.news?.length ? `<h2 style="margin-top:18px">Recent news</h2>${newsListHtml(data.news)}` : ""}
+    ${data.news?.length ? `
+      <div style="display:flex;gap:10px;align-items:center;margin-top:18px">
+        <h2 style="margin:0">Recent news</h2>
+        <button class="refresh-btn" id="news-sum-btn" title="AI digest of this week's headlines (pennies, ~10s)">✦ Summarize</button>
+      </div>
+      <div id="news-summary"></div>
+      ${newsListHtml(data.news)}` : ""}
     ${alertBoxHtml(ticker, q?.c)}
     ${data.ideas?.length ? `<h2 style="margin-top:18px">Past analyses</h2><div id="stock-past"></div>` : ""}`;
       const chartType = localStorage.getItem("chartType") || "line";
@@ -4046,6 +4312,33 @@
         $("#stock-factors").innerHTML = factorDetail(ticker, { actions: false });
       }
       loadAlertList(ticker, page.querySelector(".tm-alert-box"));
+      const wBtn = $("#watch-toggle");
+      const setWatchLabel = () => { wBtn.textContent = (portfolio.watchlist || []).includes(ticker) ? "★ Watching" : "☆ Watch"; };
+      setWatchLabel();
+      wBtn.addEventListener("click", async () => {
+        wBtn.disabled = true;
+        const action = (portfolio.watchlist || []).includes(ticker) ? "remove" : "add";
+        try {
+          await fetch("/api/watchlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ticker, action }) });
+          await loadState();
+        } finally { wBtn.disabled = false; setWatchLabel(); }
+      });
+      const nsBtn = $("#news-sum-btn");
+      if (nsBtn) nsBtn.addEventListener("click", async () => {
+        nsBtn.disabled = true;
+        nsBtn.textContent = "Summarizing…";
+        const box = $("#news-summary");
+        try {
+          const res = await (await fetch("/api/news/summarize", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ticker }),
+          })).json();
+          if (res.ok) {
+            box.innerHTML = `<div class="card" style="padding:12px 16px;margin:10px 0"><div class="news-sum-md"></div></div>`;
+            renderMd(box.querySelector(".news-sum-md"), res.summary);
+          } else box.innerHTML = `<div class="empty">Summary failed: ${esc(res.error)}</div>`;
+        } catch (e) { box.innerHTML = `<div class="empty">Summary failed: ${esc(String(e))}</div>`; }
+        finally { nsBtn.disabled = false; nsBtn.textContent = "✦ Summarize"; }
+      });
       const past = $("#stock-past");
       if (past) for (const rep of data.ideas) showReport(rep, past);
     }
@@ -4443,11 +4736,47 @@
         default: return e.title;
       }
     }
+    // Category filter over the event feed — the raw pipeline mixes setups,
+    // headlines, filings, and tape noise; letting the user cut it by kind is
+    // what makes the feed readable.
+    const ACT_CATS = {
+      all: { label: "All", kinds: null },
+      signals: { label: "AI signals", kinds: null, test: (e) => !!e.action },
+      setups: { label: "Setups", kinds: new Set(["golden_cross", "death_cross", "screener_pick", "screener_short"]) },
+      news: { label: "News", kinds: new Set(["news"]) },
+      filings: { label: "Filings", kinds: new Set(["filing"]) },
+      moves: { label: "Price/volume", kinds: new Set(["price_move", "volume_spike", "gap", "week52", "market_mover"]) },
+      earnings: { label: "Earnings", kinds: new Set(["earnings"]) },
+      expiry: { label: "Options expiry", kinds: new Set(["option_expiry"]) },
+    };
+    let actCat = "all", actImportantOnly = false;
+    function renderActFilters() {
+      $("#act-filters").innerHTML = Object.entries(ACT_CATS)
+        .map(([id, c]) => `<button class="filter-chip ${actCat === id ? "on" : ""}" data-act-cat="${id}">${c.label}</button>`)
+        .join("")
+        + `<button class="filter-chip ${actImportantOnly ? "on" : ""}" data-act-imp="1" style="margin-left:auto">Important only</button>`;
+    }
+    $("#act-filters").addEventListener("click", (e) => {
+      const imp = e.target.closest("[data-act-imp]");
+      if (imp) { actImportantOnly = !actImportantOnly; renderActFilters(); renderActivity(); return; }
+      const btn = e.target.closest("[data-act-cat]");
+      if (!btn) return;
+      actCat = btn.dataset.actCat;
+      renderActFilters();
+      renderActivity();
+    });
     function renderActivity() {
       const box = $("#activity");
       box.innerHTML = "";
-      $("#act-count").textContent = `${events.length} items`;
-      for (const e of events.slice(0, 60)) {
+      const cat = ACT_CATS[actCat];
+      const shown = events.filter((e) =>
+        (cat.test ? cat.test(e) : !cat.kinds || cat.kinds.has(e.kind))
+        && (!actImportantOnly || e.severity === "critical" || e.severity === "high"));
+      $("#act-count").textContent = actCat === "all" && !actImportantOnly
+        ? `${events.length} items`
+        : `${shown.length} of ${events.length} items`;
+      if (!shown.length) { box.innerHTML = `<div class="empty">Nothing in this category yet.</div>`; return; }
+      for (const e of shown.slice(0, 60)) {
         const important = e.severity === "critical" || e.severity === "high";
         const row = document.createElement("div");
         row.className = `act-row${important ? " important" : ""}`;
@@ -4458,11 +4787,13 @@
         <span class="what">${esc(plainActivity(e))}</span>
         ${important ? `<span class="chip ${e.severity === "critical" ? "sell" : "warn"}">${e.severity === "critical" ? "Important" : "Notable"}</span>` : ""}
       </button>
-      <div class="detail">${esc(e.title)}${e.triage_rationale ? `<br><span style="color:var(--faint)">${esc(e.triage_rationale)}</span>` : ""}</div>`;
+      <div class="detail">${esc(e.title)}${e.triage_rationale ? `<br><span style="color:var(--faint)">${esc(e.triage_rationale)}</span>` : ""}
+        ${e.ticker && !e.ticker.startsWith("^") ? `<br><a href="#stock/${esc(e.ticker)}" style="font-size:12px">View ${esc(e.ticker)} →</a>` : ""}</div>`;
         row.querySelector(".rowbtn").addEventListener("click", () => toggleRow(row));
         box.appendChild(row);
       }
     }
+    renderActFilters();
 
     /* ── chat ── */
     function chatAppendUser(text) {
@@ -4561,6 +4892,8 @@
       portfolio = state.portfolio;
       events = state.events;
       brokerInfo = state.broker;
+      earnings = state.earnings || {};
+      renderWatchlist();
       aiLiveState = state.aiLive !== false;
       renderAiToggle();
       renderHealth(state);

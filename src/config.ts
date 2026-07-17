@@ -4,11 +4,11 @@ import { join } from "path";
 
 export interface Holding {
   ticker: string;
-  shares: number;       // shares; contracts for options; coin qty for crypto
+  shares: number;       // shares; contracts for options
   cost_basis: number;
   thesis?: string;      // why you own it — lets the AI judge "thesis broken vs. just drifting"
-  asset_class?: "equity" | "option" | "crypto"; // default equity
-  market_value?: number; // broker-provided current value — options/crypto can't be quoted by ticker
+  asset_class?: "equity" | "option"; // default equity — this is an equity/options tool, crypto isn't supported
+  market_value?: number; // broker-provided current value — options can't be quoted by ticker
   option?: { type: "call" | "put"; strike: number; expiry: string; underlying: string };
 }
 
@@ -89,12 +89,12 @@ export const config = {
   port: Number(process.env.PORT ?? 3000),
   telegramToken: process.env.TELEGRAM_BOT_TOKEN ?? "",
   telegramChatId: process.env.TELEGRAM_CHAT_ID ?? "",
-  dbPath: join(ROOT, "data/marketpulse.db"),
+  dbPath: join(ROOT, "data/sharpedge.db"),
   // Deep-reasoning model (analysis, validation, chat) and fast triage model.
   // Sonnet 5 is ~40% cheaper than Opus 4.8 ($3/$15 vs $5/$25 per 1M tokens) and
-  // near-Opus quality on this kind of analysis. Override with MARKETPULSE_MODEL_DEEP.
-  modelDeep: process.env.MARKETPULSE_MODEL_DEEP ?? "claude-sonnet-5",
-  modelFast: process.env.MARKETPULSE_MODEL_FAST ?? "claude-haiku-4-5",
+  // near-Opus quality on this kind of analysis. Override with SHARPEDGE_MODEL_DEEP.
+  modelDeep: process.env.SHARPEDGE_MODEL_DEEP ?? "claude-sonnet-5",
+  modelFast: process.env.SHARPEDGE_MODEL_FAST ?? "claude-haiku-4-5",
 };
 
 // Eastern Time components, extracted directly from Intl parts —
