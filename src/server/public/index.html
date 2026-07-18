@@ -13,28 +13,28 @@
      existing theme JS (System / Light / Dark) keeps working; dark values live in
      the prefers-color-scheme + [data-theme="dark"] blocks below. */
     :root {
-      --bg: #f6f7f9;
+      --bg: #f4f4f2;
       --surface: #ffffff;
-      --surface-2: #f2f4f7;
-      --surface-3: #eaeef3;
-      --line: #e4e8ee;
-      --line-soft: #eef1f5;
-      --text: #0d131c;
-      --dim: #5a6675;
-      --faint: #93a0b0;
-      --green: #00a651;
-      --green-ink: #00a651;
-      --green-soft: rgba(0, 166, 81, .1);
-      --brand: #4a5670;
-      --brand-ink: #3f4a61;
-      --brand-soft: rgba(74, 86, 112, .1);
-      --red: #e0402f;
-      --red-soft: rgba(224, 64, 47, .09);
-      --amber: #b7830a;
-      --amber-soft: rgba(183, 131, 10, .12);
+      --surface-2: #f0f0ed;
+      --surface-3: #e7e7e2;
+      --line: #e3e2dd;
+      --line-soft: #eeede9;
+      --text: #16181d;
+      --dim: #5c6370;
+      --faint: #8b93a1;
+      --green: #0e9f5c;
+      --green-ink: #0b7c48;
+      --green-soft: rgba(14, 159, 92, .1);
+      --brand: #4f46e5;
+      --brand-ink: #4338ca;
+      --brand-soft: rgba(79, 70, 229, .09);
+      --red: #e5484d;
+      --red-soft: rgba(229, 72, 77, .09);
+      --amber: #b07a08;
+      --amber-soft: rgba(176, 122, 8, .12);
       --blue: #2f6fe0;
       --blue-soft: rgba(47, 111, 224, .1);
-      --shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 8px 24px -14px rgba(16, 24, 40, .18);
+      --shadow: 0 1px 2px rgba(20, 22, 26, .05), 0 6px 20px -12px rgba(20, 22, 26, .14);
       --sans: "Inter", -apple-system, system-ui, sans-serif;
       --mono: "JetBrains Mono", ui-monospace, monospace;
       /* legacy aliases → keep older CSS/JS that reference these resolving correctly */
@@ -42,7 +42,37 @@
       --hover: var(--surface-2);
       --card-alt: var(--surface-2);
       --header-bg: color-mix(in srgb, var(--bg) 86%, transparent);
-      --radius: 18px;
+      /* radius ramp — hierarchy instead of uniform rounding */
+      --radius: 12px;
+      --radius-lg: 16px;
+      --radius-sm: 8px;
+      --radius-xs: 6px;
+      /* type scale */
+      --fs-hero: 44px;
+      --fs-title: 20px;
+      --fs-h2: 16px;
+      --fs-body: 14px;
+      --fs-data: 13px;
+      --fs-meta: 12px;
+      --fs-micro: 11px;
+      --lh-tight: 1.2;
+      --lh-body: 1.5;
+      /* spacing scale */
+      --sp-1: 4px;
+      --sp-2: 8px;
+      --sp-3: 12px;
+      --sp-4: 16px;
+      --sp-5: 24px;
+      --sp-6: 32px;
+      /* elevation ramp */
+      --shadow-sm: 0 1px 2px rgba(20, 22, 26, .06);
+      --shadow-lg: 0 4px 12px rgba(20, 22, 26, .08), 0 24px 60px -24px rgba(20, 22, 26, .28);
+      /* focus ring */
+      --ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--brand);
+      /* chart tokens — single source of truth for every SVG stroke/fill */
+      --chart-up: var(--green);
+      --chart-down: var(--red);
+      --chart-ref: var(--faint);
       color-scheme: light;
     }
 
@@ -50,55 +80,61 @@
      which the toggle stamps and which must win. */
     @media (prefers-color-scheme: dark) {
       :root:not([data-theme="light"]) {
-        --bg: #080b10;
-        --surface: #0f141c;
-        --surface-2: #151c27;
-        --surface-3: #1b2432;
-        --line: #232d3c;
-        --line-soft: #1a2230;
-        --text: #eef3fa;
-        --dim: #9fabbd;
-        --faint: #6a7688;
-        --green: #00d26a;
-        --green-ink: #22e07f;
-        --green-soft: rgba(0, 210, 106, .15);
-        --brand: #5d6b8a;
-        --brand-ink: #93a1c0;
-        --brand-soft: rgba(93, 107, 138, .18);
-        --red: #ff5f5a;
-        --red-soft: rgba(255, 95, 90, .14);
-        --amber: #f6b83f;
-        --amber-soft: rgba(246, 184, 63, .14);
+        /* MUST match the :root[data-theme="dark"] block below — edit both together */
+        --bg: #0b0c0e;
+        --surface: #131519;
+        --surface-2: #1a1d23;
+        --surface-3: #22262e;
+        --line: #262a33;
+        --line-soft: #1d2027;
+        --text: #edeef2;
+        --dim: #9aa1ad;
+        --faint: #646b78;
+        --green: #2ecc7a;
+        --green-ink: #4ade95;
+        --green-soft: rgba(46, 204, 122, .14);
+        --brand: #6e63f1;
+        --brand-ink: #928af5;
+        --brand-soft: rgba(110, 99, 241, .17);
+        --red: #f16a5e;
+        --red-soft: rgba(241, 106, 94, .13);
+        --amber: #e8a33d;
+        --amber-soft: rgba(232, 163, 61, .14);
         --blue: #5b93ff;
         --blue-soft: rgba(91, 147, 255, .16);
-        --shadow: 0 1px 0 rgba(255, 255, 255, .02), 0 14px 34px -14px rgba(0, 0, 0, .7);
+        --shadow: 0 1px 0 rgba(255, 255, 255, .03), 0 12px 32px -16px rgba(0, 0, 0, .75);
+        --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+        --shadow-lg: 0 4px 12px rgba(0, 0, 0, .4), 0 24px 60px -24px rgba(0, 0, 0, .8);
         color-scheme: dark;
       }
     }
 
     :root[data-theme="dark"] {
-      --bg: #080b10;
-      --surface: #0f141c;
-      --surface-2: #151c27;
-      --surface-3: #1b2432;
-      --line: #232d3c;
-      --line-soft: #1a2230;
-      --text: #eef3fa;
-      --dim: #9fabbd;
-      --faint: #6a7688;
-      --green: #00d26a;
-      --green-ink: #22e07f;
-      --green-soft: rgba(0, 210, 106, .15);
-      --brand: #5d6b8a;
-      --brand-ink: #93a1c0;
-      --brand-soft: rgba(93, 107, 138, .18);
-      --red: #ff5f5a;
-      --red-soft: rgba(255, 95, 90, .14);
-      --amber: #f6b83f;
-      --amber-soft: rgba(246, 184, 63, .14);
+      /* MUST match the media-query block above — edit both together */
+      --bg: #0b0c0e;
+      --surface: #131519;
+      --surface-2: #1a1d23;
+      --surface-3: #22262e;
+      --line: #262a33;
+      --line-soft: #1d2027;
+      --text: #edeef2;
+      --dim: #9aa1ad;
+      --faint: #646b78;
+      --green: #2ecc7a;
+      --green-ink: #4ade95;
+      --green-soft: rgba(46, 204, 122, .14);
+      --brand: #6e63f1;
+      --brand-ink: #928af5;
+      --brand-soft: rgba(110, 99, 241, .17);
+      --red: #f16a5e;
+      --red-soft: rgba(241, 106, 94, .13);
+      --amber: #e8a33d;
+      --amber-soft: rgba(232, 163, 61, .14);
       --blue: #5b93ff;
       --blue-soft: rgba(91, 147, 255, .16);
-      --shadow: 0 1px 0 rgba(255, 255, 255, .02), 0 14px 34px -14px rgba(0, 0, 0, .7);
+      --shadow: 0 1px 0 rgba(255, 255, 255, .03), 0 12px 32px -16px rgba(0, 0, 0, .75);
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+      --shadow-lg: 0 4px 12px rgba(0, 0, 0, .4), 0 24px 60px -24px rgba(0, 0, 0, .8);
       color-scheme: dark;
     }
 
@@ -110,7 +146,7 @@
     body {
       background: var(--bg);
       color: var(--text);
-      font: 400 15px/1.55 var(--sans);
+      font: 400 14px/1.5 var(--sans);
       -webkit-font-smoothing: antialiased;
     }
 
@@ -120,9 +156,30 @@
     }
 
     :focus-visible {
-      outline: 2px solid var(--brand);
-      outline-offset: 2px;
+      outline: none;
+      box-shadow: var(--ring);
       border-radius: 4px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg)
+      }
+    }
+
+    .spinning .ic {
+      animation: spin 1s linear infinite;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+      }
     }
 
     ::-webkit-scrollbar {
@@ -151,7 +208,7 @@
     @keyframes rise {
       from {
         opacity: 0;
-        transform: translateY(8px)
+        transform: translateY(6px)
       }
 
       to {
@@ -162,6 +219,11 @@
 
     [hidden] {
       display: none !important;
+    }
+
+    .ic {
+      flex-shrink: 0;
+      vertical-align: -2px;
     }
 
     /* app shell: sidebar + main column */
@@ -177,11 +239,11 @@
       top: 0;
       height: 100vh;
       border-right: 1px solid var(--line);
-      background: var(--surface);
+      background: var(--bg);
       display: flex;
       flex-direction: column;
-      padding: 20px 14px;
-      gap: 4px;
+      padding: 18px 12px;
+      gap: 2px;
       transition: width .2s ease, padding .2s ease;
     }
 
@@ -220,8 +282,8 @@
       height: 10px;
       border-radius: 2px;
       transform: rotate(45deg);
-      background: var(--green);
-      box-shadow: 0 0 12px var(--green);
+      background: var(--brand);
+      box-shadow: 0 0 12px var(--brand);
       animation: pulse 2.4s infinite;
       flex-shrink: 0;
     }
@@ -241,7 +303,7 @@
     }
 
     .wordmark span {
-      color: var(--green-ink);
+      color: var(--brand);
     }
 
     #sidebar.collapsed .wordmark {
@@ -279,16 +341,17 @@
     #nav button {
       display: flex;
       align-items: center;
-      gap: 11px;
-      padding: 10px 12px;
-      border-radius: 10px;
+      gap: 10px;
+      padding: 7px 10px;
+      border-radius: var(--radius-xs);
       border: none;
       cursor: pointer;
-      font: 600 14px var(--sans);
+      font: 500 13px var(--sans);
       width: 100%;
       text-align: left;
       background: transparent;
       color: var(--dim);
+      transition: background .12s ease, color .12s ease;
     }
 
     #sidebar.collapsed #nav button {
@@ -301,20 +364,29 @@
     }
 
     #nav button.active {
-      background: var(--surface-2);
+      background: var(--surface);
+      box-shadow: var(--shadow-sm);
       color: var(--text);
+      font-weight: 600;
     }
 
+    /* .ndot is now the icon slot (name kept — markup/JS still reference it) */
     #nav button .ndot {
-      width: 8px;
-      height: 8px;
-      border-radius: 2px;
-      background: var(--faint);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      color: var(--faint);
       flex-shrink: 0;
     }
 
+    #nav button:hover .ndot {
+      color: var(--dim);
+    }
+
     #nav button.active .ndot {
-      background: var(--brand);
+      color: var(--brand);
     }
 
     #nav button .nlabel {
@@ -368,16 +440,16 @@
     }
 
     .side-user .av {
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-      background: var(--surface-3);
+      width: 26px;
+      height: 26px;
+      border-radius: var(--radius-xs);
+      background: var(--brand-soft);
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 700;
-      font-size: 13px;
-      color: var(--dim);
+      font-size: 12px;
+      color: var(--brand);
       flex-shrink: 0;
     }
 
@@ -440,15 +512,15 @@
     }
 
     #tab-title {
-      font-size: 18px;
-      font-weight: 800;
+      font-size: 20px;
+      font-weight: 700;
       letter-spacing: -.01em;
       white-space: nowrap;
     }
 
     #tab-sub {
-      font-size: 11.5px;
-      color: var(--faint);
+      font-size: 12px;
+      color: var(--dim);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -464,9 +536,9 @@
     #mkt-pill {
       display: flex;
       align-items: center;
-      gap: 9px;
-      padding: 7px 13px;
-      border-radius: 999px;
+      gap: 8px;
+      padding: 6px 11px;
+      border-radius: var(--radius-xs);
       border: 1px solid var(--line);
       background: var(--surface);
     }
@@ -486,8 +558,8 @@
     }
 
     #status-dot.market-closed {
-      background: var(--red);
-      box-shadow: 0 0 8px var(--red);
+      background: var(--faint);
+      box-shadow: none;
     }
 
     #status-dot.market-open {
@@ -500,8 +572,11 @@
     }
 
     #status-label {
-      font-size: 12px;
+      font-family: var(--mono);
+      font-size: 11px;
       font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
       color: var(--dim);
       white-space: nowrap;
     }
@@ -556,9 +631,9 @@
 
     .switch {
       position: relative;
-      width: 40px;
-      height: 24px;
-      border-radius: 12px;
+      width: 36px;
+      height: 20px;
+      border-radius: 10px;
       background: var(--surface-3);
       border: none;
       transition: background .2s;
@@ -572,8 +647,8 @@
       position: absolute;
       top: 2px;
       left: 2px;
-      width: 20px;
-      height: 20px;
+      width: 16px;
+      height: 16px;
       border-radius: 50%;
       background: #fff;
       transition: left .2s;
@@ -587,28 +662,31 @@
     .search-btn {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 9px;
       min-width: 220px;
-      padding: 9px 13px;
-      border-radius: 10px;
+      padding: 7px 8px 7px 11px;
+      border-radius: var(--radius-sm);
       border: 1px solid var(--line);
       background: var(--surface);
       color: var(--faint);
       font: 500 13px var(--sans);
       cursor: pointer;
+      transition: border-color .12s ease, color .12s ease;
     }
 
     .search-btn:hover {
-      border-color: var(--brand);
+      border-color: var(--faint);
       color: var(--dim);
     }
 
+    /* .search-ring is now the search-icon slot (name kept — markup references it) */
     .search-ring {
-      width: 12px;
-      height: 12px;
-      border: 1.6px solid currentColor;
-      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
       flex-shrink: 0;
+      border: none;
+      width: auto;
+      height: auto;
     }
 
     .search-label {
@@ -620,9 +698,11 @@
     .search-kbd {
       font-family: var(--mono);
       font-size: 11px;
-      border: 1px solid var(--line);
-      border-radius: 5px;
-      padding: 1px 5px;
+      background: var(--surface-2);
+      border: 1px solid var(--line-soft);
+      border-radius: var(--radius-xs);
+      padding: 2px 6px;
+      color: var(--dim);
     }
 
     .switch-wrap span {
@@ -647,11 +727,11 @@
 
     .tm-card {
       width: 100%;
-      max-width: 480px;
+      max-width: 560px;
       background: var(--surface);
       border: 1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: 0 12px 40px rgba(0, 0, 0, .25);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
       overflow: hidden;
       max-height: 80vh;
       display: flex;
@@ -662,8 +742,8 @@
       border: none;
       border-bottom: 1px solid var(--line);
       padding: 16px 18px;
-      font: 600 17px var(--sans);
-      background: var(--bg);
+      font: 600 16px var(--sans);
+      background: var(--surface);
       color: var(--text);
       text-transform: uppercase;
     }
@@ -841,15 +921,15 @@
       display: flex;
       flex-direction: column;
       gap: 28px;
-      animation: rise .35s ease;
+      animation: rise .18s ease;
     }
 
     h2 {
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: .08em;
-      color: var(--faint);
+      color: var(--dim);
       margin-bottom: 12px;
     }
 
@@ -866,19 +946,27 @@
       margin-bottom: 0;
     }
 
-    /* portfolio hero */
+    /* portfolio hero — flagship card (Stripe balance-card treatment) */
+    section#portfolio {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      padding: 24px;
+    }
+
     #portfolio-value {
-      font-size: 40px;
+      font-size: var(--fs-hero);
       font-weight: 800;
-      letter-spacing: -.03em;
+      letter-spacing: -.02em;
       font-family: var(--mono);
       font-variant-numeric: tabular-nums;
     }
 
     #portfolio-day {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
-      margin-top: 2px;
+      margin-top: 4px;
     }
 
     #portfolio-total {
@@ -896,9 +984,9 @@
     }
 
     #portfolio-spark {
-      margin-top: 14px;
+      margin-top: 16px;
       width: 100%;
-      height: 72px;
+      height: 88px;
     }
 
     #broker-line {
@@ -924,8 +1012,9 @@
     #import-panel {
       display: none;
       margin-top: 10px;
-      border: 1px solid var(--line);
-      border-radius: 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--line-soft);
+      border-radius: var(--radius-sm);
       padding: 12px;
     }
 
@@ -975,10 +1064,10 @@
       text-align: left;
       display: flex;
       align-items: center;
-      gap: 14px;
-      padding: 14px 16px;
-      border-bottom: 1px solid var(--line);
-      transition: background .15s;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line-soft);
+      transition: background .12s;
     }
 
     .card>div:last-child .rowbtn,
@@ -1053,10 +1142,13 @@
     }
 
     .chip {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
-      padding: 3px 10px;
-      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      padding: 2px 7px;
+      border-radius: var(--radius-xs);
+      border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
       white-space: nowrap;
     }
 
@@ -1086,8 +1178,8 @@
     }
 
     .chip.sm {
-      font-size: 11px;
-      padding: 2px 8px;
+      font-size: 10px;
+      padding: 1px 6px;
     }
 
     /* advice cards */
@@ -1136,8 +1228,8 @@
 
     .stat {
       background: var(--surface-2);
-      border: 1px solid var(--line);
-      border-radius: 10px;
+      border: 1px solid var(--line-soft);
+      border-radius: var(--radius-sm);
       padding: 8px 10px;
     }
 
@@ -1159,18 +1251,28 @@
 
     .advise-btn {
       margin-top: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
       background: var(--brand);
       color: #fff;
       border: none;
-      font-size: 13.5px;
+      font-size: 13px;
       font-weight: 600;
-      padding: 9px 18px;
-      border-radius: 999px;
-      transition: background .15s;
+      min-height: 32px;
+      padding: 6px 14px;
+      border-radius: var(--radius-xs);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12);
+      transition: background .12s ease, transform .06s ease;
     }
 
     .advise-btn:hover {
       background: var(--brand-ink);
+    }
+
+    .advise-btn:active {
+      transform: translateY(.5px);
     }
 
     .advise-btn:disabled {
@@ -1189,10 +1291,12 @@
 
     #auth-card {
       width: 100%;
-      max-width: 360px;
+      max-width: 380px;
+      background: var(--surface);
       border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 28px 26px;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      padding: 32px;
       display: flex;
       flex-direction: column;
       gap: 12px;
@@ -1211,10 +1315,10 @@
 
     #auth-card input {
       border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 10px 16px;
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
       font: 14px var(--sans);
-      background: var(--gray-soft);
+      background: var(--surface);
       width: 100%;
     }
 
@@ -1419,11 +1523,11 @@
       max-height: calc(100vh - 48px);
       overflow-y: auto;
       border: 1px solid var(--line);
-      border-radius: var(--radius);
+      border-radius: var(--radius-lg);
       background: var(--surface);
       color: var(--text);
-      box-shadow: var(--shadow);
-      padding: 18px 20px;
+      box-shadow: var(--shadow-lg);
+      padding: 20px 22px;
       width: min(440px, calc(100vw - 32px));
       font-size: 12.5px;
     }
@@ -1454,18 +1558,24 @@
     }
 
     .refresh-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
       border: 1px solid var(--line);
       background: none;
-      border-radius: 999px;
+      border-radius: var(--radius-xs);
       font-size: 12px;
       font-weight: 600;
-      padding: 4px 12px;
+      min-height: 28px;
+      padding: 3px 10px;
       color: var(--dim);
+      transition: background .12s ease, border-color .12s ease, color .12s ease;
     }
 
     .refresh-btn:hover {
-      border-color: var(--brand);
-      color: var(--brand-ink);
+      background: var(--surface-2);
+      border-color: var(--faint);
+      color: var(--text);
     }
 
     .refresh-btn:disabled {
@@ -1504,18 +1614,20 @@
       background: none;
       color: var(--text);
       border: 1px solid var(--line);
+      box-shadow: none;
     }
 
     .advise-btn.ghost:hover {
-      background: none;
-      border-color: var(--brand);
-      color: var(--brand-ink);
+      background: var(--surface-2);
+      border-color: var(--faint);
+      color: var(--text);
     }
 
     .empty {
       color: var(--faint);
-      font-size: 14px;
-      padding: 18px 16px;
+      font-size: 13px;
+      padding: 24px 16px;
+      text-align: center;
     }
 
     /* market pulse */
@@ -1540,7 +1652,7 @@
 
     .bench-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
       gap: 8px;
       margin-top: 12px;
     }
@@ -1634,25 +1746,35 @@
     }
 
     /* ideas */
+    /* segmented control (Linear-style): shared track, raised active segment */
     .tabbar {
-      display: flex;
-      gap: 6px;
+      display: inline-flex;
+      gap: 2px;
+      background: var(--surface-2);
+      border: 1px solid var(--line-soft);
+      border-radius: var(--radius-sm);
+      padding: 2px;
     }
 
     .tabbar button {
-      border: 1px solid var(--line);
+      border: none;
       background: none;
-      border-radius: 999px;
+      border-radius: var(--radius-xs);
       font-size: 12.5px;
       font-weight: 600;
-      padding: 5px 14px;
+      padding: 4px 12px;
       color: var(--dim);
+      transition: background .12s ease, color .12s ease;
+    }
+
+    .tabbar button:hover {
+      color: var(--text);
     }
 
     .tabbar button.active {
-      background: var(--brand);
-      border-color: var(--brand);
-      color: #fff;
+      background: var(--surface);
+      box-shadow: var(--shadow-sm);
+      color: var(--text);
     }
 
     #accent-swatches {
@@ -1706,13 +1828,17 @@
     }
 
     .filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
       font-size: 12px;
       font-weight: 600;
-      padding: 5px 11px;
-      border-radius: 999px;
+      padding: 4px 10px;
+      border-radius: var(--radius-xs);
       border: 1px solid var(--line);
       background: var(--surface-2);
       color: var(--dim);
+      transition: background .12s ease, color .12s ease;
     }
 
     .filter-chip.on {
@@ -1722,18 +1848,23 @@
     }
 
     #gen-btn {
-      border: 1px solid var(--line);
-      background: none;
-      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: none;
+      background: var(--brand);
+      border-radius: var(--radius-xs);
       font-size: 12px;
       font-weight: 600;
-      padding: 4px 12px;
-      color: var(--dim);
+      min-height: 28px;
+      padding: 3px 12px;
+      color: #fff;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12);
+      transition: background .12s ease;
     }
 
     #gen-btn:hover {
-      border-color: var(--brand);
-      color: var(--brand-ink);
+      background: var(--brand-ink);
     }
 
     #gen-btn:disabled {
@@ -1755,6 +1886,9 @@
       gap: 8px;
       align-items: center;
       flex-wrap: wrap;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--line-soft);
+      margin-bottom: 10px;
     }
 
     .report .rheadline {
@@ -1765,12 +1899,24 @@
     }
 
     .rbadge {
-      font-size: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
       font-weight: 800;
       letter-spacing: .04em;
       text-transform: uppercase;
-      padding: 4px 12px;
-      border-radius: 999px;
+      padding: 3px 10px;
+      border-radius: var(--radius-xs);
+    }
+
+    .rbadge::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
     }
 
     .rbadge.strong {
@@ -1804,23 +1950,38 @@
     .scorebar .lbl {
       display: flex;
       justify-content: space-between;
+      align-items: baseline;
       font-size: 11px;
       color: var(--dim);
       font-weight: 600;
     }
 
+    .scorebar .lbl .val {
+      font-family: var(--mono);
+      font-variant-numeric: tabular-nums;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .scorebar .lbl .val .of {
+      color: var(--faint);
+      font-weight: 500;
+    }
+
     .scorebar .track {
-      height: 5px;
-      border-radius: 3px;
+      height: 8px;
+      border-radius: var(--radius-xs);
       background: var(--gray-soft);
-      margin-top: 3px;
+      margin-top: 4px;
       overflow: hidden;
     }
 
     .scorebar .fill {
       height: 100%;
-      border-radius: 3px;
+      border-radius: var(--radius-xs);
       background: var(--green);
+      transition: width .3s ease-out;
     }
 
     .scorebar .fill.mid {
@@ -1853,10 +2014,24 @@
     }
 
     .stress .case {
-      border: 1px solid var(--line);
-      border-radius: 10px;
+      background: var(--surface-2);
+      border: none;
+      border-left: 2px solid var(--line);
+      border-radius: var(--radius-sm);
       padding: 8px 10px;
       font-size: 12.5px;
+    }
+
+    .stress .case.c-bull {
+      border-left-color: var(--green);
+    }
+
+    .stress .case.c-bear {
+      border-left-color: var(--red);
+    }
+
+    .stress .case.c-fail {
+      border-left-color: var(--amber);
     }
 
     .stress .case b {
@@ -2127,8 +2302,12 @@
 
     .eqcurve {
       width: 100%;
-      height: 120px;
+      height: 160px;
       margin-top: 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--line-soft);
+      border-radius: var(--radius-sm);
+      padding: 8px;
     }
 
     .wf-table {
@@ -2212,9 +2391,10 @@
 
     .msg.ai {
       align-self: flex-start;
-      background: var(--gray-soft);
-      padding: 10px 14px;
-      border-radius: 16px 16px 16px 4px;
+      background: none;
+      border-left: 2px solid var(--line);
+      padding: 2px 0 2px 14px;
+      border-radius: 0;
     }
 
     .msg.pending {
@@ -2426,6 +2606,80 @@
       font-size: 12.5px;
     }
 
+    /* skeleton loading shimmer */
+    .skel {
+      border-radius: var(--radius-xs);
+      background: var(--surface-2);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .skel::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text) 5%, transparent), transparent);
+      animation: shimmer 1.4s infinite;
+    }
+
+    @keyframes shimmer {
+      from {
+        transform: translateX(-100%)
+      }
+
+      to {
+        transform: translateX(100%)
+      }
+    }
+
+    .skel-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 12px 0;
+    }
+
+    /* toasts */
+    #toast-stack {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .toast {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-lg);
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      max-width: 360px;
+      animation: toast-in .16s ease;
+    }
+
+    .toast.ok .ic {
+      color: var(--green);
+    }
+
+    .toast.err .ic {
+      color: var(--red);
+    }
+
+    @keyframes toast-in {
+      from {
+        opacity: 0;
+        transform: translateY(6px)
+      }
+    }
+
     .disclaimer {
       text-align: center;
       font-size: 11.5px;
@@ -2539,7 +2793,7 @@
           <span class="dot"></span>
           <span class="wordmark">sharp<span>Edge</span></span>
         </a>
-        <button id="sidebar-collapse" title="Toggle sidebar" aria-label="Toggle sidebar">«</button>
+        <button id="sidebar-collapse" title="Toggle sidebar" aria-label="Toggle sidebar"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg></button>
       </div>
       <nav id="nav">
         <button data-tab="portfolio" class="active"><span class="ndot"></span><span
@@ -2573,7 +2827,7 @@
         </div>
         <span class="spacer"></span>
         <button class="search-btn" id="search-open" aria-label="Search any ticker">
-          <span class="search-ring"></span>
+          <span class="search-ring"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg></span>
           <span class="search-label">Search any ticker…</span>
           <span class="search-kbd" id="search-kbd">⌘K</span>
         </button>
@@ -2611,7 +2865,7 @@
           </div>
           <div style="margin-top:12px">
             <button class="advise-btn" id="pf-score-btn" style="margin-top:0"
-              title="AI health check: score out of 100 with pros, cons, and the biggest risk (a few cents, ~30s)">✦
+              title="AI health check: score out of 100 with pros, cons, and the biggest risk (a few cents, ~30s)"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 7.2L21 12l-7.2 1.8L12 21l-1.8-7.2L3 12l7.2-1.8z"/></svg>
               Score my portfolio</button>
           </div>
           <div id="pf-score-result"></div>
@@ -2640,7 +2894,7 @@
         <section id="market-section" data-pane="market">
           <h2>Market pulse</h2>
           <div id="regime-card">
-            <div class="empty">Loading market context…</div>
+            <div class="skel-rows"><div class="skel" style="height:36px"></div><div class="skel" style="height:36px"></div><div class="skel" style="height:36px"></div></div>
           </div>
         </section>
 
@@ -2649,7 +2903,7 @@
             <h2>Sectors — rotation &amp; setups</h2>
             <div style="display:flex;gap:8px;align-items:center">
               <span id="sector-meta" style="font-size:12px;color:var(--faint)"></span>
-              <button class="refresh-btn" id="market-refresh" title="Re-pull regime and sector data">↻ Refresh</button>
+              <button class="refresh-btn" id="market-refresh" title="Re-pull regime and sector data"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Refresh</button>
             </div>
           </div>
           <div class="card">
@@ -2665,7 +2919,7 @@
 
         <section id="stock-section" data-pane="stock" hidden>
           <div id="stock-page">
-            <div class="empty">Loading…</div>
+            <div class="skel-rows"><div class="skel" style="height:36px"></div><div class="skel" style="height:36px"></div><div class="skel" style="height:36px"></div></div>
           </div>
         </section>
 
@@ -2680,11 +2934,11 @@
             </div>
           </div>
           <div id="ideas-filters">
-            <button class="refresh-btn" id="filters-btn" title="Open the filters panel">⚙ Filters</button>
+            <button class="refresh-btn" id="filters-btn" title="Open the filters panel"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg> <span id="filters-btn-label">Filters</span></button>
             <div id="active-filter-chips" class="filter-bar" style="margin:0"></div>
             <span class="spacer"></span>
             <button id="gen-btn"
-              title="Pick the strongest setups matching these filters and run each through full AI validation (a few cents, takes a minute or two)">✦
+              title="Pick the strongest setups matching these filters and run each through full AI validation (a few cents, takes a minute or two)"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 7.2L21 12l-7.2 1.8L12 21l-1.8-7.2L3 12l7.2-1.8z"/></svg>
               Generate ideas from filters</button>
           </div>
           <dialog id="filters-modal">
@@ -2750,7 +3004,7 @@
             <div id="drop-zone" tabindex="0">Paste (Ctrl+V), drag &amp; drop, or click to add a chart screenshot —
               optional but the analysis always cross-checks it against live data</div>
             <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" hidden>
-            <div id="img-preview-wrap"><button id="img-clear" title="remove screenshot">×</button><img id="img-preview"
+            <div id="img-preview-wrap"><button id="img-clear" title="remove screenshot"><svg class="ic" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button><img id="img-preview"
                 alt="chart screenshot preview"></div>
             <div id="swing-slots" style="display:none">
               <div class="swing-grid">
@@ -2786,7 +3040,7 @@
             <div id="bt-drop" tabindex="0" class="dropzone">Optional: paste, drop, or click to add a chart — the setup
               will be read off it</div>
             <input type="file" id="bt-file" accept="image/png,image/jpeg,image/webp" hidden>
-            <div id="bt-img-wrap"><button id="bt-img-clear" title="remove">×</button><img id="bt-img"
+            <div id="bt-img-wrap"><button id="bt-img-clear" title="remove"><svg class="ic" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button><img id="bt-img"
                 alt="strategy chart"></div>
             <button class="advise-btn" id="bt-go" style="margin-top:0">Run backtest</button>
           </div>
@@ -2932,7 +3186,7 @@
         <section data-pane="history">
           <h2>Idea scoreboard</h2>
           <div class="card" id="scoreboard" style="padding:12px 16px">
-            <div class="empty">Loading…</div>
+            <div class="skel-rows"><div class="skel" style="height:36px"></div><div class="skel" style="height:36px"></div><div class="skel" style="height:36px"></div></div>
           </div>
         </section>
 
@@ -2952,6 +3206,83 @@
   <script>
     const $ = (s) => document.querySelector(s);
     const chevSvg = `<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 6 6 6-6 6"/></svg>`;
+
+    /* ── inline icon set (stroke-based, currentColor — no external assets).
+       icon() output is trusted static markup: never interpolate user data into it. ── */
+    const ICONS = {
+      "search": '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/>',
+      "settings": '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+      "sliders": '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+      "refresh": '<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
+      "close": '<path d="M18 6 6 18M6 6l12 12"/>',
+      "chevron-right": '<path d="m9 6 6 6-6 6"/>',
+      "chevron-down": '<path d="m6 9 6 6 6-6"/>',
+      "panel-left": '<path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/>',
+      "trend-up": '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',
+      "trend-down": '<polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/>',
+      "bell": '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+      "spark": '<path d="M12 3l1.8 7.2L21 12l-7.2 1.8L12 21l-1.8-7.2L3 12l7.2-1.8z"/>',
+      "portfolio": '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+      "market": '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+      "ideas": '<path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.4 1 2.3h6c0-.9.4-1.8 1-2.3A7 7 0 0 0 12 2z"/>',
+      "analyze": '<circle cx="12" cy="12" r="8"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>',
+      "backtest": '<path d="M10 2v6.3L4.7 18a2 2 0 0 0 1.8 3h11a2 2 0 0 0 1.8-3L14 8.3V2"/><line x1="8" y1="2" x2="16" y2="2"/><line x1="7" y1="15" x2="17" y2="15"/>',
+      "chat": '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+      "activity": '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+      "history": '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+      "plus": '<path d="M12 5v14M5 12h14"/>',
+      "trash": '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+      "check": '<polyline points="20 6 9 17 4 12"/>',
+      "alert-triangle": '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+    };
+    function icon(name, size = 16) {
+      return `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ""}</svg>`;
+    }
+    // Fill each nav button's .ndot with its tab icon (class name stays — CSS targets it).
+    document.querySelectorAll("#nav [data-tab]").forEach((b) => {
+      const d = b.querySelector(".ndot");
+      if (d) d.innerHTML = icon(b.dataset.tab, 16);
+    });
+
+    // Escapes for BOTH text and attribute context. The old textContent/innerHTML
+    // trick escaped only & < > (that's all HTML text-node serialization does), so
+    // esc() in an href="..." was an attribute breakout for any third-party string.
+    // (Declared early: a cold deep-link to #stock/X runs esc() during boot.)
+    const ESC_MAP = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ESC_MAP[c]);
+    // Escaping can't neutralise a javascript:/data: scheme — an href needs its own gate.
+    const safeUrl = (u) => (/^https?:\/\//i.test(String(u ?? "")) ? String(u) : "#");
+
+    /* ── accent palette (declared early: showPane("settings") at boot reads it) ── */
+    const ACCENTS = {
+      "Indigo": { d: ["#6e63f1", "#928af5"], l: ["#4f46e5", "#4338ca"] },
+      "Electric blue": { d: ["#4d84f7", "#7aa5ff"], l: ["#2563eb", "#1d4ed8"] },
+      "Teal": { d: ["#2dd4bf", "#5eead4"], l: ["#0d9488", "#0f766e"] },
+      "Amber": { d: ["#e8a33d", "#f5bd66"], l: ["#b45309", "#92400e"] },
+      "Graphite": { d: ["#8a93a6", "#aab3c5"], l: ["#4b5563", "#374151"] },
+    };
+    // Retired accent names from earlier releases → nearest current equivalent.
+    const ACCENT_REMAP = { "Slate": "Graphite", "Sunset amber": "Amber", "Violet": "Indigo", "Signal green": "Teal" };
+
+    /* ── skeleton + toast primitives ── */
+    function skelRows(n = 3, h = 36) {
+      return `<div class="skel-rows">${Array.from({ length: n }, () => `<div class="skel" style="height:${h}px"></div>`).join("")}</div>`;
+    }
+    function toast(msg, tone = "ok") {
+      let stack = document.getElementById("toast-stack");
+      if (!stack) {
+        stack = document.createElement("div");
+        stack.id = "toast-stack";
+        document.body.appendChild(stack);
+      }
+      while (stack.children.length >= 3) stack.firstChild.remove();
+      const t = document.createElement("div");
+      t.className = `toast ${tone === "err" ? "err" : "ok"}`;
+      t.innerHTML = `${icon(tone === "err" ? "alert-triangle" : "check", 15)}<span></span>`;
+      t.lastChild.textContent = msg;
+      stack.appendChild(t);
+      setTimeout(() => t.remove(), 3500);
+    }
     $("#search-kbd").textContent = /Mac|iPhone|iPad|iPod/i.test((navigator.platform || "") + " " + (navigator.userAgent || "")) ? "⌘K" : "Ctrl K";
 
     /* ── tab routing (native hidden + location.hash) ──
@@ -3011,7 +3342,7 @@
     /* ── sidebar collapse: persisted, opacity/max-width transitions (never display:none) ── */
     function applySidebarCollapsed(collapsed) {
       $("#sidebar").classList.toggle("collapsed", collapsed);
-      $("#sidebar-collapse").textContent = collapsed ? "»" : "«";
+      $("#sidebar-collapse").style.transform = collapsed ? "rotate(180deg)" : "";
     }
     applySidebarCollapsed(localStorage.getItem("sidebarCollapsed") === "1");
     $("#sidebar-collapse").addEventListener("click", () => {
@@ -3031,13 +3362,6 @@
     });
 
     /* ── accent: brand token only — market green/red are never overridden ── */
-    const ACCENTS = {
-      "Slate": { d: ["#5d6b8a", "#93a1c0"], l: ["#4a5670", "#3f4a61"] },
-      "Electric blue": { d: ["#3d74d6", "#6a9bff"], l: ["#2f6fe0", "#2f6fe0"] },
-      "Sunset amber": { d: ["#c98a2e", "#ffb457"], l: ["#b7730a", "#a5670a"] },
-      "Violet": { d: ["#7d63d6", "#b199ff"], l: ["#6d43e0", "#5a37c0"] },
-      "Signal green": { d: ["#00b85e", "#22e07f"], l: ["#0a8f4d", "#0a7d43"] },
-    };
     function currentIsDark() {
       const t = document.documentElement.getAttribute("data-theme");
       return t === "dark" || (!t && matchMedia("(prefers-color-scheme: dark)").matches);
@@ -3047,8 +3371,9 @@
       return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
     }
     function applyAccent() {
-      const name = localStorage.getItem("accent") || "Slate";
-      const a = ACCENTS[name] || ACCENTS.Slate;
+      const stored = localStorage.getItem("accent") || "Indigo";
+      const name = ACCENTS[stored] ? stored : (ACCENT_REMAP[stored] || "Indigo");
+      const a = ACCENTS[name] || ACCENTS["Indigo"];
       const dark = currentIsDark();
       const [g, ink] = dark ? a.d : a.l;
       const root = document.documentElement.style;
@@ -3087,7 +3412,7 @@
       const sym = raw.trim().toUpperCase();
       if (!sym) { lastTickerData = null; tickerResult.innerHTML = `<div class="tm-hint">Type a symbol…</div>`; return; }
       const seq = ++tickerSeq;
-      tickerResult.innerHTML = `<div class="tm-hint">Loading ${esc(sym)}…</div>`;
+      tickerResult.innerHTML = `<div class="tm-hint">Loading ${esc(sym)}…</div>${skelRows(3, 32)}`;
       let data;
       try {
         const res = await fetch(`/api/ticker?sym=${encodeURIComponent(sym)}`);
@@ -3113,9 +3438,9 @@
         .filter((a) => a.ticker === ticker)
         .map((a) => `<div class="tm-alert-row ${a.active ? "" : "done"}">
         <span>${KIND_LABEL[a.kind] || a.kind} ${a.threshold}</span>
-        ${a.recurring ? `<span class="chip calm sm" title="re-arms after each firing">↻</span>` : ""}
+        ${a.recurring ? `<span class="chip calm sm" title="re-arms after each firing">${icon("refresh", 10)}</span>` : ""}
         ${a.active ? "" : `<span class="chip calm sm">fired</span>`}
-        <button class="del" data-alert-del="${a.id}" title="delete alert">×</button>
+        <button class="del" data-alert-del="${a.id}" title="delete alert">${icon("close", 12)}</button>
       </div>`).join("");
     }
     document.addEventListener("click", async (e) => {
@@ -3132,11 +3457,12 @@
         if (!Number.isFinite(threshold)) { msg.textContent = "Enter a number."; msg.classList.add("err"); return; }
         const recurring = !!box.querySelector(".alert-recurring")?.checked;
         const res = await (await fetch("/api/alerts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ticker, kind, threshold, recurring }) })).json();
-        if (res.error) { msg.textContent = res.error; msg.classList.add("err"); }
-        else { msg.classList.remove("err"); msg.textContent = "Alert set — you'll get notified when it crosses."; }
+        if (res.error) { msg.textContent = res.error; msg.classList.add("err"); toast(res.error, "err"); }
+        else { msg.classList.remove("err"); msg.textContent = "Alert set — you'll get notified when it crosses."; toast(`Alert set on ${ticker}`); }
         loadAlertList(ticker, box);
       } else if (delBtn) {
         await fetch(`/api/alerts?id=${delBtn.dataset.alertDel}`, { method: "DELETE" });
+        toast("Alert deleted");
         if (box) loadAlertList(box.dataset.ticker, box);
       }
     });
@@ -3190,20 +3516,13 @@
         <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--dim)"
           title="Re-arms after firing: pings again on each fresh crossing instead of retiring">
           <input type="checkbox" class="alert-recurring"> repeat</label>
-        <button class="advise-btn" data-alert-action="create">🔔 Create</button>
+        <button class="advise-btn" data-alert-action="create">${icon("bell", 13)} Create</button>
       </div>
       <div class="tm-alert-msg"></div>
       <div class="tm-alert-list"></div>
     </div>`;
     }
 
-    // Escapes for BOTH text and attribute context. The old textContent/innerHTML
-    // trick escaped only & < > (that's all HTML text-node serialization does), so
-    // esc() in an href="..." was an attribute breakout for any third-party string.
-    const ESC_MAP = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
-    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ESC_MAP[c]);
-    // Escaping can't neutralise a javascript:/data: scheme — an href needs its own gate.
-    const safeUrl = (u) => (/^https?:\/\//i.test(String(u ?? "")) ? String(u) : "#");
     const money = (n) => n.toLocaleString("en-US", { style: "currency", currency: "USD" });
     const signed = (n, dec = 2) => `${n >= 0 ? "+" : ""}${n.toFixed(dec)}`;
     const fmtTime = (ts) => new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -3228,6 +3547,7 @@
     // market_snapshot benchmarks map (^ stripped). VIX stays — it's a regime signal.
     const INDEX_DISPLAY = [["DJI", "Dow", "DJI"], ["GSPC", "S&P 500", "SPX"], ["IXIC", "Nasdaq", "IXIC"], ["RUT", "Russell 2000", "RUT"], ["VIX", "VIX", "VIX"]];
 
+    let sparkGradSeq = 0;
     function sparkSvg(el, values, big = false) {
       if (!values || values.length < 2) { el.innerHTML = ""; return; }
       const w = 100, h = 100;
@@ -3235,8 +3555,19 @@
       const span = max - min || 1;
       const pts = values.map((v, i) => `${(i / (values.length - 1)) * w},${h - ((v - min) / span) * (h - 8) - 4}`).join(" ");
       const up = values[values.length - 1] >= values[0];
+      const stroke = up ? "var(--chart-up)" : "var(--chart-down)";
       el.setAttribute("viewBox", `0 0 ${w} ${h}`);
-      el.innerHTML = `<polyline points="${pts}" fill="none" stroke="${up ? "#00c805" : "#e64a19"}" stroke-width="${big ? 2 : 3}" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>`;
+      // big variant gets a soft gradient area fill under the line (unique id per render)
+      let fill = "";
+      if (big) {
+        const gid = `sg${++sparkGradSeq}`;
+        fill = `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="${stroke}" stop-opacity=".16"/>
+          <stop offset="1" stop-color="${stroke}" stop-opacity="0"/>
+        </linearGradient></defs>
+        <polygon points="0,${h} ${pts} ${w},${h}" fill="url(#${gid})" stroke="none"/>`;
+      }
+      el.innerHTML = `${fill}<polyline points="${pts}" fill="none" stroke="${stroke}" stroke-width="${big ? 2 : 1.5}" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>`;
     }
 
     // Hand-drawn daily candlesticks (no chart lib): one wick <line> + body <rect>
@@ -3254,7 +3585,7 @@
       let svg = "";
       for (let i = 0; i < n; i++) {
         const up = closes[i] >= opens[i];
-        const color = up ? "#00c805" : "#e64a19";
+        const color = up ? "var(--chart-up)" : "var(--chart-down)";
         const x = i * 4;
         const top = y(Math.max(opens[i], closes[i]));
         const bodyH = Math.max(0.5, Math.abs(y(opens[i]) - y(closes[i]))); // dojis stay visible
@@ -3378,7 +3709,7 @@
       $("#portfolio-value").textContent = money(value);
       const dayPct = prev ? (day / prev) * 100 : 0;
       const d = $("#portfolio-day");
-      d.textContent = `${day >= 0 ? "▲" : "▼"} ${money(Math.abs(day))} (${signed(dayPct)}%) today`;
+      d.innerHTML = `${icon(day >= 0 ? "trend-up" : "trend-down", 14)} ${money(Math.abs(day))} (${signed(dayPct)}%) today`;
       d.className = day >= 0 ? "up" : "down";
       const tot = value - cost;
       const t = $("#portfolio-total");
@@ -3424,7 +3755,7 @@
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
         })).json();
         msg.textContent = res.ok ? `Imported ${res.positions} positions (source: ${res.source}).` : `Failed: ${res.error}`;
-        if (res.ok) loadState();
+        if (res.ok) { toast(`Imported ${res.positions} positions`); loadState(); }
       } catch (e) { msg.textContent = `Invalid JSON: ${e.message}`; }
     });
     $("#import-clear").addEventListener("click", async () => {
@@ -3442,7 +3773,7 @@
       try {
         const res = await (await fetch("/api/portfolio/score", { method: "POST" })).json();
         if (res.ok) {
-          box.innerHTML = `<div class="report"><button class="close-report" title="dismiss">×</button><div class="pf-score-md"></div></div>`;
+          box.innerHTML = `<div class="report"><button class="close-report" title="dismiss">${icon("close", 12)}</button><div class="pf-score-md"></div></div>`;
           renderMd(box.querySelector(".pf-score-md"), res.analysis);
           box.querySelector(".close-report").addEventListener("click", () => { box.innerHTML = ""; });
         } else box.innerHTML = `<div class="empty">Scoring failed: ${esc(res.error)}</div>`;
@@ -3558,7 +3889,7 @@
         <span class="filter-chip on" style="display:inline-flex;gap:6px;align-items:center">
           <a href="#stock/${esc(t)}" style="color:inherit;text-decoration:none;font-weight:700">${esc(t)}</a>
           ${quotes[t]?.c ? `<span style="font-weight:400">${money(quotes[t].c)}</span>` : ""}
-          <button data-watch-remove="${esc(t)}" title="Remove from watchlist" style="border:none;background:none;cursor:pointer;color:inherit;padding:0">×</button>
+          <button data-watch-remove="${esc(t)}" title="Remove from watchlist" style="border:none;background:none;cursor:pointer;color:inherit;padding:0">${icon("close", 12)}</button>
         </span>`).join("");
     }
     document.addEventListener("click", async (e) => {
@@ -3584,7 +3915,7 @@
       <a class="idx-tile" href="${tvLink(tv)}" target="_blank" rel="noopener" title="Open ${esc(label)} on TradingView">
       <div class="stat"><div class="k">${label}</div>
       <div class="v">${k === "VIX" ? b[k].price.toFixed(1) : b[k].price.toLocaleString("en-US", { maximumFractionDigits: 2 })}</div>
-      <div style="font-size:11.5px;font-weight:600" class="${b[k].ret1d >= 0 ? "up" : "down"}">${signed(b[k].ret1d, 1)}% d · ${signed(b[k].ret1m, 1)}% m</div></div></a>`).join("")
+      <div style="font-size:11px;font-weight:600;white-space:nowrap;font-family:var(--mono)" class="${b[k].ret1d >= 0 ? "up" : "down"}">${signed(b[k].ret1d, 1)}% d · ${signed(b[k].ret1m, 1)}% m</div></div></a>`).join("")
         || `<div class="empty" style="grid-column:1/-1">Index data loads with the next market refresh.</div>`;
       card.innerHTML = `
     <div id="regime-head">
@@ -3690,10 +4021,10 @@
     // from either place. The ⚙ button shows how many rules are live.
     function filterChipsHtml() {
       const chips = [];
-      if (numFilters.minScore != null) chips.push(`<button class="filter-chip on" data-nfilter="minScore" title="Remove">Score ≥ ${numFilters.minScore} ×</button>`);
-      if (numFilters.minCapB != null) chips.push(`<button class="filter-chip on" data-nfilter="minCapB" title="Remove">Cap ≥ $${numFilters.minCapB}B ×</button>`);
+      if (numFilters.minScore != null) chips.push(`<button class="filter-chip on" data-nfilter="minScore" title="Remove">Score ≥ ${numFilters.minScore} ${icon("close", 12)}</button>`);
+      if (numFilters.minCapB != null) chips.push(`<button class="filter-chip on" data-nfilter="minCapB" title="Remove">Cap ≥ $${numFilters.minCapB}B ${icon("close", 12)}</button>`);
       chips.push(...customFilters.map((cf, idx) =>
-        `<button class="filter-chip on" data-cfilter="${idx}" title="Remove this filter">${esc(CUSTOM_METRICS[cf.metric].label)} ${cf.op} ${cf.value} ×</button>`));
+        `<button class="filter-chip on" data-cfilter="${idx}" title="Remove this filter">${esc(CUSTOM_METRICS[cf.metric].label)} ${cf.op} ${cf.value} ${icon("close", 12)}</button>`));
       return chips.join("");
     }
     function renderFilterBar() {
@@ -3701,7 +4032,7 @@
       $("#active-filter-chips").innerHTML = html;
       $("#modal-filter-chips").innerHTML = html || `<span style="color:var(--faint)">No filters active — everything setup-grade shows.</span>`;
       const n = customFilters.length + (numFilters.minScore != null) + (numFilters.minCapB != null);
-      $("#filters-btn").textContent = n ? `⚙ Filters (${n})` : "⚙ Filters";
+      $("#filters-btn-label").textContent = n ? `Filters (${n})` : "Filters";
     }
     // Chip removal, delegated at document level so bar + dialog share it.
     document.addEventListener("click", (e) => {
@@ -3843,7 +4174,7 @@
     /* ── idea report rendering ── */
     function scoreBarHtml(label, v) {
       const cls = v >= 7 ? "" : v >= 4 ? "mid" : "low";
-      return `<div class="scorebar"><div class="lbl"><span>${label}</span><span>${v}/10</span></div><div class="track"><div class="fill ${cls}" style="width:${Math.max(4, v * 10)}%"></div></div></div>`;
+      return `<div class="scorebar"><div class="lbl"><span>${label}</span><span class="val">${v}<span class="of">/10</span></span></div><div class="track"><div class="fill ${cls}" style="width:${Math.max(4, v * 10)}%"></div></div></div>`;
     }
 
     function reportCardHtml(rep) {
@@ -3853,7 +4184,7 @@
       const tp = rep.trade_plan || {};
       return `
     <div class="report">
-      <button class="close-report" title="dismiss">×</button>
+      <button class="close-report" title="dismiss">${icon("close", 12)}</button>
       <div class="rhead">
         <span style="font-weight:800;font-size:16px">${esc(rep.ticker)}</span>
         <span class="rbadge ${esc(rep.rating)}">${esc(rep.rating)}</span>
@@ -3887,10 +4218,10 @@
       <p class="kv">${esc(rep.invalidation ?? "—")}</p>
       <div class="klabel">Stress tests <span class="chip ${st.survives_risk_off ? "buy" : "sell"} sm">${st.survives_risk_off ? "survives risk-off" : "fails in risk-off"}</span></div>
       <div class="stress">
-        <div class="case"><b>Base case</b>${esc(st.base_case ?? "—")}</div>
-        <div class="case"><b>If market rallies</b>${esc(st.bull_case ?? "—")}</div>
-        <div class="case"><b>If market sells off</b>${esc(st.bear_case ?? "—")}</div>
-        <div class="case"><b>If it fails</b>${esc(st.invalidation_case ?? "—")}</div>
+        <div class="case c-base"><b>Base case</b>${esc(st.base_case ?? "—")}</div>
+        <div class="case c-bull"><b>If market rallies</b>${esc(st.bull_case ?? "—")}</div>
+        <div class="case c-bear"><b>If market sells off</b>${esc(st.bear_case ?? "—")}</div>
+        <div class="case c-fail"><b>If it fails</b>${esc(st.invalidation_case ?? "—")}</div>
       </div>
       <p class="kv" style="margin-top:6px;color:var(--dim)">${esc(st.risk_off_note ?? "")} ${esc(st.single_condition_dependency ?? "")}</p>
       <div class="klabel">Sector context</div>
@@ -4003,9 +4334,10 @@
     /* ── manual refresh buttons (same idiom as #broker-refresh) ── */
     async function withSpin(btn, fn) {
       btn.disabled = true;
-      const orig = btn.textContent;
-      btn.textContent = "↻ Refreshing…";
-      try { await fn(); } finally { btn.disabled = false; btn.textContent = orig; }
+      const orig = btn.innerHTML;
+      btn.classList.add("spinning");
+      btn.innerHTML = `${icon("refresh", 13)} Refreshing…`;
+      try { await fn(); } finally { btn.disabled = false; btn.classList.remove("spinning"); btn.innerHTML = orig; }
     }
     $("#market-refresh").addEventListener("click", () => withSpin($("#market-refresh"), () => loadScreener().then(loadMarket)));
 
@@ -4103,6 +4435,7 @@
       })).json();
       const msg = $("#profile-msg");
       msg.textContent = res.ok ? "Saved." : `Failed: ${res.error}`;
+      if (res.ok) toast("Profile saved"); else toast(`Save failed: ${res.error}`, "err");
       setTimeout(() => { msg.textContent = ""; }, 5000);
     });
 
@@ -4112,7 +4445,8 @@
       document.querySelectorAll("#theme-tabs [data-theme-opt]").forEach((b) => b.classList.toggle("active", b.dataset.themeOpt === theme));
       const chart = localStorage.getItem("chartType") || "line";
       document.querySelectorAll("#chart-tabs [data-chart-opt]").forEach((b) => b.classList.toggle("active", b.dataset.chartOpt === chart));
-      const accent = localStorage.getItem("accent") || "Slate";
+      const storedAccent = localStorage.getItem("accent") || "Indigo";
+      const accent = ACCENTS[storedAccent] ? storedAccent : (ACCENT_REMAP[storedAccent] || "Indigo");
       document.querySelectorAll("#accent-swatches [data-accent-opt]").forEach((b) => b.classList.toggle("active", b.dataset.accentOpt === accent));
     }
     $("#theme-tabs").addEventListener("click", (e) => {
@@ -4190,6 +4524,7 @@
       })).json();
       const msg = $("#risk-msg");
       msg.textContent = res.ok ? "Saved — future idea validations use these settings." : `Failed: ${res.error}`;
+      if (res.ok) toast("Risk settings saved"); else toast(`Save failed: ${res.error}`, "err");
       if (res.ok) { // equity override applies at snapshot build — rebuild now
         fetch("/api/broker/refresh", { method: "POST" }).then(loadState).then(loadRiskPrefs).catch(() => { });
       }
@@ -4215,10 +4550,11 @@
         <span class="chip ${o.direction === "long" ? "buy" : "sell"} sm">${esc(o.direction)}</span>
         <span class="chip ${tone} sm">${esc(o.outcome)}${o.pnl_pct != null ? ` ${signed(o.pnl_pct, 1)}%` : ""}</span>
         <span style="color:var(--faint);font-size:12px">${new Date(o.closed_at * 1000).toLocaleDateString()}</span>
-        <button class="del" title="delete entry">×</button>
+        <button class="del" title="delete entry">${icon("close", 12)}</button>
         ${o.notes ? `<div class="note">${esc(o.notes)}</div>` : ""}`;
           div.querySelector(".del").addEventListener("click", async () => {
             await fetch(`/api/journal/${o.id}`, { method: "DELETE" });
+            toast("Journal entry deleted");
             loadJournal();
           });
           box.appendChild(div);
@@ -4242,10 +4578,12 @@
       const msg = $("#journal-msg");
       if (res.ok) {
         msg.textContent = "Logged — the AI will see this in future analyses.";
+        toast("Trade logged");
         $("#journal-form").reset();
         loadJournal();
       } else {
         msg.textContent = `Failed: ${res.error}`;
+        toast(`Log failed: ${res.error}`, "err");
       }
       setTimeout(() => { msg.textContent = ""; }, 5000);
     });
@@ -4253,7 +4591,7 @@
     /* ── stock detail page (#stock/TICKER) ── */
     async function renderStockPage(ticker) {
       const page = $("#stock-page");
-      page.innerHTML = `<div class="empty">Loading ${esc(ticker)}…</div>`;
+      page.innerHTML = `<div class="empty">Loading ${esc(ticker)}…</div>${skelRows(4, 40)}`;
       let data;
       try {
         data = await (await fetch(`/api/stock/${encodeURIComponent(ticker)}`)).json();
@@ -4289,7 +4627,7 @@
       </div>
       <div class="card" style="padding:12px 16px" id="stock-factors"></div>` : `<p class="empty">Not scored by the screener (outside the scan universe or too little history).</p>`}
     <div style="margin:14px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <button class="advise-btn" data-validate="${esc(ticker)}" style="margin-top:0">✦ Validate this ticker (~30s)</button>
+      <button class="advise-btn" data-validate="${esc(ticker)}" style="margin-top:0">${icon("spark", 14)} Validate this ticker (~30s)</button>
       <label class="checkline" style="display:inline-flex"><input type="checkbox" id="stock-opts"> include options strategy</label>
       <button class="advise-btn ghost" id="watch-toggle" style="margin-top:0"></button>
       <a class="advise-btn ghost" href="${tvLink(ticker)}" target="_blank" rel="noopener" style="text-decoration:none">Open in TradingView ↗</a>
@@ -4298,7 +4636,7 @@
     ${data.news?.length ? `
       <div style="display:flex;gap:10px;align-items:center;margin-top:18px">
         <h2 style="margin:0">Recent news</h2>
-        <button class="refresh-btn" id="news-sum-btn" title="AI digest of this week's headlines (pennies, ~10s)">✦ Summarize</button>
+        <button class="refresh-btn" id="news-sum-btn" title="AI digest of this week's headlines (pennies, ~10s)">${icon("spark", 13)} Summarize</button>
       </div>
       <div id="news-summary"></div>
       ${newsListHtml(data.news)}` : ""}
@@ -4337,7 +4675,7 @@
             renderMd(box.querySelector(".news-sum-md"), res.summary);
           } else box.innerHTML = `<div class="empty">Summary failed: ${esc(res.error)}</div>`;
         } catch (e) { box.innerHTML = `<div class="empty">Summary failed: ${esc(String(e))}</div>`; }
-        finally { nsBtn.disabled = false; nsBtn.textContent = "✦ Summarize"; }
+        finally { nsBtn.disabled = false; nsBtn.innerHTML = `${icon("spark", 13)} Summarize`; }
       });
       const past = $("#stock-past");
       if (past) for (const rep of data.ideas) showReport(rep, past);
@@ -4456,7 +4794,7 @@
       const qualityBadge = p.setup_quality === "no_trade" ? "no_trade" : p.setup_quality;
       return `
     <div class="report">
-      <button class="close-report" title="dismiss">×</button>
+      <button class="close-report" title="dismiss">${icon("close", 12)}</button>
       <div class="rhead">
         <span style="font-weight:800;font-size:16px">${esc(p.ticker)}</span>
         <span class="rbadge ${esc(qualityBadge)}">${esc(p.setup_quality).replace("_", " ")}</span>
@@ -4612,8 +4950,8 @@
       const pl = (vals) => vals.map((v, i) => `${(i / (vals.length - 1)) * w},${h - ((v - min) / span) * (h - 6) - 3}`).join(" ");
       const up = strat[strat.length - 1] >= strat[0];
       return `<svg class="eqcurve" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-    ${bh && bh.length > 1 ? `<polyline points="${pl(bh)}" fill="none" stroke="#9aa0a6" stroke-width="1.2" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : ""}
-    <polyline points="${pl(strat)}" fill="none" stroke="${up ? "#00c805" : "#e64a19"}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
+    ${bh && bh.length > 1 ? `<polyline points="${pl(bh)}" fill="none" stroke="var(--chart-ref)" stroke-width="1.2" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : ""}
+    <polyline points="${pl(strat)}" fill="none" stroke="${up ? "var(--chart-up)" : "var(--chart-down)"}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
   </svg>`;
     }
 
