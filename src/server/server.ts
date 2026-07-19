@@ -16,7 +16,7 @@ import { getMarketSnapshot } from "../engine/market";
 import { currentPortfolio, brokerSnapshot, refreshBroker, loadRiskConfigFor, updateWatchlist } from "../broker";
 import { earningsFor, ideaScoreboard, calibration } from "../engine/insights";
 import { computeConcentration, type ConcHolding } from "../engine/concentration";
-import { getRiskPrefs, setRiskPrefs } from "../db";
+import { getRiskPrefs, setRiskPrefs, spendByDay } from "../db";
 import { saveImport, clearImport, type ImportPayload } from "../broker/manual";
 import { getBrokerLink } from "../db";
 import { allTickers } from "../config";
@@ -486,6 +486,11 @@ export function startServer() {
       }
       if (url.pathname === "/api/tracked") {
         return Response.json({ tracked: listTracked(userId), keys: trackedKeys(userId) });
+      }
+
+      // F1b: AI token usage per day (global — background pipeline spend isn't per-user).
+      if (url.pathname === "/api/spend") {
+        return Response.json({ days: spendByDay(7) });
       }
       if (url.pathname.startsWith("/api/tracked/") && req.method === "DELETE") {
         const id = Number(url.pathname.split("/").pop());

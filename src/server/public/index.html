@@ -3355,6 +3355,11 @@
           </div>
         </section>
 
+        <section data-pane="settings">
+          <h2>AI usage</h2>
+          <div class="card" id="spend-card" style="padding:12px 16px"></div>
+        </section>
+
         <section data-pane="history">
           <h2>Trade journal</h2>
           <div class="card" id="tracked-list" style="margin-bottom:12px;padding:10px 16px;display:none"></div>
@@ -3542,7 +3547,7 @@
       const badge = document.querySelector(`#nav button[data-tab="${name}"] .badge`);
       if (badge) { badge.classList.remove("show"); badge.textContent = ""; }
       if (name === "portfolio") loadConcentration();
-      if (name === "settings") { loadRiskPrefs(); loadProfile(); syncAppearanceTabs(); }
+      if (name === "settings") { loadRiskPrefs(); loadProfile(); syncAppearanceTabs(); loadSpend(); }
       if (name === "history") { loadJournal(); loadPastIdeas(); loadCalibration(); loadScoreboard(); }
       if (name === "analyze") loadAnalyzeRisk();
       if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
@@ -4664,6 +4669,33 @@
     }
 
     /* ── history: past validated ideas ── */
+    /* ── F1b: AI token usage per day (spend visibility) ── */
+    async function loadSpend() {
+      const box = $("#spend-card");
+      try {
+        const { days } = await (await fetch("/api/spend")).json();
+        if (!days.length) {
+          box.innerHTML = `<div class="empty">No AI calls logged yet. Usage appears here once the model runs.</div>`;
+          return;
+        }
+        const k = (n) => n >= 1000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "k" : String(n);
+        box.innerHTML = `
+          <table class="sectors" style="width:100%">
+            <tr><th>Day</th><th>Calls</th><th>Input</th><th>Output</th><th>Cache read</th></tr>
+            ${days.map((d) => `<tr>
+              <td>${esc(d.day)}</td>
+              <td style="font-variant-numeric:tabular-nums">${d.calls}</td>
+              <td style="font-variant-numeric:tabular-nums">${k(d.input_tokens)}</td>
+              <td style="font-variant-numeric:tabular-nums">${k(d.output_tokens)}</td>
+              <td style="font-variant-numeric:tabular-nums;color:var(--faint)">${k(d.cache_read_tokens)}</td>
+            </tr>`).join("")}
+          </table>
+          <p style="font-size:11px;color:var(--faint);margin:8px 0 0">Token counts per day (last 7). For a hard spend cap, set a budget alert in your <a href="https://console.anthropic.com/settings/limits" target="_blank" rel="noopener">Anthropic console</a> — that catches account-level credit limits this in-app log can't see.</p>`;
+      } catch {
+        box.innerHTML = `<div class="empty">Could not load usage.</div>`;
+      }
+    }
+
     /* ── F3: portfolio concentration — deterministic risk read ($0 AI) ── */
     async function loadConcentration() {
       const sec = $("#concentration-section"), box = $("#concentration");
