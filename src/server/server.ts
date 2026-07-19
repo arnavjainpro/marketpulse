@@ -14,7 +14,7 @@ import { scoreTicker } from "../engine/ticker";
 import { listAlerts, createAlert, deleteAlert, type AlertKind } from "../engine/alerts";
 import { getMarketSnapshot } from "../engine/market";
 import { currentPortfolio, brokerSnapshot, refreshBroker, loadRiskConfigFor, updateWatchlist } from "../broker";
-import { earningsFor, ideaScoreboard } from "../engine/insights";
+import { earningsFor, ideaScoreboard, calibration } from "../engine/insights";
 import { getRiskPrefs, setRiskPrefs } from "../db";
 import { saveImport, clearImport, type ImportPayload } from "../broker/manual";
 import { getBrokerLink } from "../db";
@@ -238,6 +238,16 @@ export function startServer() {
       if (url.pathname === "/api/ideas/scoreboard") {
         try {
           return Response.json({ ok: true, ...(await ideaScoreboard(userId)) });
+        } catch (err) {
+          return Response.json({ ok: false, error: String(err) }, { status: 500 });
+        }
+      }
+
+      // F0: validator calibration — hit-rate + avg-R by rating/direction and
+      // per-dimension win/loss score gaps. Shares the scoreboard's 1h replay cache.
+      if (url.pathname === "/api/calibration") {
+        try {
+          return Response.json({ ok: true, ...(await calibration(userId)) });
         } catch (err) {
           return Response.json({ ok: false, error: String(err) }, { status: 500 });
         }
