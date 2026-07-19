@@ -3135,6 +3135,12 @@
           </div>
           <dialog id="filters-modal">
             <h3 style="margin:0 0 12px">Filter ideas</h3>
+            <div class="flabel">Presets</div>
+            <div id="preset-chips" class="filter-bar" style="margin:0 0 8px"></div>
+            <div class="cf-row">
+              <input type="text" id="preset-name" placeholder="Name this filter set" maxlength="40" style="flex:1">
+              <button class="refresh-btn" id="preset-save" title="Save the current filters as a reusable preset">+ Save preset</button>
+            </div>
             <div class="flabel">Quick thresholds</div>
             <label>Minimum score (0–100) <input type="number" id="flt-score" min="50" max="100" step="1"
                 placeholder="any"></label>
@@ -4387,6 +4393,59 @@
     $("#flt-score").value = numFilters.minScore ?? "";
     $("#flt-mcap").value = numFilters.minCapB ?? "";
     renderFilterBar();
+
+    /* ── F5: named filter presets, saved per-user (settings table) so they
+       follow you across devices instead of living in one browser. ── */
+    let filterPresets = [];
+    async function loadPresets() {
+      try { const { presets } = await (await fetch("/api/filter-presets")).json(); filterPresets = Array.isArray(presets) ? presets : []; }
+      catch { filterPresets = []; }
+      renderPresetChips();
+    }
+    async function savePresets() {
+      try {
+        const r = await (await fetch("/api/filter-presets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ presets: filterPresets }) })).json();
+        if (r.ok) filterPresets = r.presets;
+      } catch { }
+      renderPresetChips();
+    }
+    function renderPresetChips() {
+      const box = $("#preset-chips");
+      if (!box) return;
+      if (!filterPresets.length) { box.innerHTML = `<span style="color:var(--faint)">No saved presets yet — set filters below, name them, and save.</span>`; return; }
+      box.innerHTML = filterPresets.map((p, i) =>
+        `<span style="display:inline-flex;align-items:center"><button class="filter-chip" data-preset="${i}" title="Apply this preset">${esc(p.name)}</button><button class="filter-chip" data-preset-del="${i}" title="Delete preset" style="padding:4px 6px">${icon("close", 12)}</button></span>`).join(" ");
+    }
+    function applyPreset(p) {
+      customFilters = (p.customFilters || []).filter((f) => f && CUSTOM_METRICS[f.metric] && (f.op === ">" || f.op === "<") && Number.isFinite(f.value)).map((f) => ({ ...f }));
+      numFilters = { minScore: p.numFilters?.minScore ?? null, minCapB: p.numFilters?.minCapB ?? null };
+      saveCustomFilters(); saveNumFilters();
+      $("#flt-score").value = numFilters.minScore ?? "";
+      $("#flt-mcap").value = numFilters.minCapB ?? "";
+      renderFilterBar(); renderIdeas();
+    }
+    $("#preset-save").addEventListener("click", () => {
+      const name = $("#preset-name").value.trim();
+      if (!name) { toast("Name the preset first", "err"); return; }
+      if (!anyFilterActive()) { toast("Set some filters before saving", "err"); return; }
+      const preset = { name, customFilters: customFilters.map((f) => ({ ...f })), numFilters: { ...numFilters } };
+      const existing = filterPresets.findIndex((p) => p.name.toLowerCase() === name.toLowerCase());
+      if (existing >= 0) filterPresets[existing] = preset;
+      else {
+        if (filterPresets.length >= 8) { toast("Preset limit is 8 — delete one first", "err"); return; }
+        filterPresets.push(preset);
+      }
+      $("#preset-name").value = "";
+      savePresets();
+      toast(`Saved preset "${name}"`);
+    });
+    document.addEventListener("click", (e) => {
+      const ap = e.target.closest("[data-preset]");
+      if (ap) { applyPreset(filterPresets[+ap.dataset.preset]); return; }
+      const dp = e.target.closest("[data-preset-del]");
+      if (dp) { filterPresets.splice(+dp.dataset.presetDel, 1); savePresets(); }
+    });
+    loadPresets();
 
     /* ── trade ideas (by sector, long/short tabs) ── */
     function renderIdeas() {

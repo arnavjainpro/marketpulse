@@ -16,7 +16,7 @@ import { getMarketSnapshot } from "../engine/market";
 import { currentPortfolio, brokerSnapshot, refreshBroker, loadRiskConfigFor, updateWatchlist } from "../broker";
 import { earningsFor, ideaScoreboard, calibration } from "../engine/insights";
 import { computeConcentration, type ConcHolding } from "../engine/concentration";
-import { getRiskPrefs, setRiskPrefs, spendByDay } from "../db";
+import { getRiskPrefs, setRiskPrefs, spendByDay, getSettingFor, setSettingFor } from "../db";
 import { saveImport, clearImport, type ImportPayload } from "../broker/manual";
 import { getBrokerLink } from "../db";
 import { allTickers } from "../config";
@@ -491,6 +491,30 @@ export function startServer() {
       // F1b: AI token usage per day (global — background pipeline spend isn't per-user).
       if (url.pathname === "/api/spend") {
         return Response.json({ days: spendByDay(7) });
+      }
+
+      // F5: saved screener filter presets (per user, cross-device). Client owns the
+      // list and POSTs the whole thing; server validates shape and caps at 8.
+      if (url.pathname === "/api/filter-presets" && req.method === "GET") {
+        try { return Response.json({ presets: JSON.parse(getSettingFor(userId, "filter_presets", "[]")) }); }
+        catch { return Response.json({ presets: [] }); }
+      }
+      if (url.pathname === "/api/filter-presets" && req.method === "POST") {
+        try {
+          const body = (await req.json()) as any;
+          const clean = (Array.isArray(body.presets) ? body.presets : [])
+            .filter((p: any) => p && typeof p.name === "string" && p.name.trim())
+            .slice(0, 8)
+            .map((p: any) => ({
+              name: String(p.name).trim().slice(0, 40),
+              customFilters: Array.isArray(p.customFilters) ? p.customFilters.slice(0, 20) : [],
+              numFilters: { minScore: p.numFilters?.minScore ?? null, minCapB: p.numFilters?.minCapB ?? null },
+            }));
+          setSettingFor(userId, "filter_presets", JSON.stringify(clean));
+          return Response.json({ ok: true, presets: clean });
+        } catch (err) {
+          return Response.json({ ok: false, error: String(err) }, { status: 400 });
+        }
       }
       if (url.pathname.startsWith("/api/tracked/") && req.method === "DELETE") {
         const id = Number(url.pathname.split("/").pop());
