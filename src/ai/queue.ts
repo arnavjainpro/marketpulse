@@ -19,5 +19,18 @@ export function createThrottle(minGapMs: number) {
 }
 
 // One shared queue for all Claude traffic (triage + analysis + briefings),
-// spaced 350ms apart — ~3 calls/sec worst case.
-export const claudeQueue = createThrottle(350);
+// spaced 350ms apart — ~3 calls/sec worst case. Every Claude call already funnels
+// through here, so it's the one place to record token usage (F1b) — no call site
+// can bypass it, and the generic throttle above stays uncoupled from Anthropic.
+import { recordSpend } from "../db";
+
+const throttle = createThrottle(350);
+
+export function claudeQueue<T>(fn: () => Promise<T>): Promise<T> {
+  return throttle(fn).then((res) => {
+    // Duck-typed: only Message responses carry usage; anything else passes through.
+    const r = res as any;
+    if (r && typeof r === "object" && r.usage) recordSpend(String(r.model ?? "unknown"), r.usage);
+    return res;
+  });
+}

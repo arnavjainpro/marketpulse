@@ -276,16 +276,20 @@
       flex: 0 0 auto;
     }
 
-    /* sharpEdge mark: a rotated square — a literal sharp edge — with the pulse glow. */
-    .side-logo .dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 2px;
-      transform: rotate(45deg);
-      background: var(--brand);
-      box-shadow: 0 0 12px var(--brand);
-      animation: pulse 2.4s infinite;
+    /* sharpEdge mark: the "E" pivot (Sharpe·edge). Collapsed rail shows it alone;
+       expanded shows only the wordmark, so it's hidden there. */
+    .side-e {
+      display: none;
+      font-weight: 800;
+      font-size: 20px;
+      line-height: 1;
+      letter-spacing: -.02em;
+      color: var(--brand);
       flex-shrink: 0;
+    }
+
+    #sidebar.collapsed .side-e {
+      display: block;
     }
 
     .wordmark {
@@ -302,8 +306,13 @@
       transition: opacity .18s ease, max-width .22s ease;
     }
 
-    .wordmark span {
-      color: var(--brand);
+    /* sharpEdge = "Sharpe" + "edge": sharp→green, the pivot E→normal, dge→red */
+    .wm-sharp {
+      color: var(--green);
+    }
+
+    .wm-edge {
+      color: var(--red);
     }
 
     #sidebar.collapsed .wordmark {
@@ -558,8 +567,8 @@
     }
 
     #status-dot.market-closed {
-      background: var(--faint);
-      box-shadow: none;
+      background: var(--red);
+      box-shadow: 0 0 8px var(--red);
     }
 
     #status-dot.market-open {
@@ -596,6 +605,11 @@
       #sidebar:not(.collapsed) .side-user .who {
         opacity: 0;
         max-width: 0;
+      }
+
+      /* mobile rail is always narrow — show the E mark like the collapsed state */
+      #sidebar .side-e {
+        display: block;
       }
 
       #sidebar:not(.collapsed) #nav button {
@@ -745,7 +759,6 @@
       font: 600 16px var(--sans);
       background: var(--surface);
       color: var(--text);
-      text-transform: uppercase;
     }
 
     #ticker-search:focus {
@@ -753,9 +766,47 @@
     }
 
     #ticker-search::placeholder {
-      text-transform: none;
       color: var(--faint);
       font-weight: 400;
+    }
+
+    /* autocomplete dropdown */
+    #ticker-suggest {
+      border-bottom: 1px solid var(--line);
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    #ticker-suggest[hidden] {
+      display: none;
+    }
+
+    .tm-sug {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      padding: 9px 18px;
+      cursor: pointer;
+    }
+
+    .tm-sug:hover,
+    .tm-sug.active {
+      background: var(--brand-soft);
+    }
+
+    .tm-sug .sug-tkr {
+      font-family: var(--mono);
+      font-weight: 700;
+      font-size: 13px;
+      min-width: 58px;
+    }
+
+    .tm-sug .sug-name {
+      font-size: 13px;
+      color: var(--dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     #ticker-result {
@@ -915,8 +966,9 @@
     }
 
     main {
-      max-width: 1180px;
+      max-width: 1440px;
       width: 100%;
+      margin-inline: auto;
       padding: 28px;
       display: flex;
       flex-direction: column;
@@ -944,6 +996,52 @@
 
     .section-head h2 {
       margin-bottom: 0;
+    }
+
+    .pf-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    #pf-updated {
+      font-size: 11px;
+      color: var(--faint);
+      font-variant-numeric: tabular-nums;
+      margin-top: 6px;
+    }
+
+    /* timeframe switcher — segmented control on the stock chart */
+    .tf-bar {
+      display: inline-flex;
+      gap: 2px;
+      margin: 10px 0 4px;
+      padding: 2px;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+    }
+
+    .tf-bar button {
+      border: none;
+      background: none;
+      color: var(--dim);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .03em;
+      padding: 4px 10px;
+      border-radius: var(--radius-xs);
+      transition: background .12s ease, color .12s ease;
+    }
+
+    .tf-bar button:hover {
+      color: var(--text);
+    }
+
+    .tf-bar button.active {
+      background: var(--brand);
+      color: var(--brand-ink);
     }
 
     /* portfolio hero — flagship card (Stripe balance-card treatment) */
@@ -1708,17 +1806,8 @@
       border-bottom: none;
     }
 
-    table.sectors tbody tr {
-      cursor: pointer;
-    }
-
     table.sectors tbody tr:hover {
       background: var(--hover);
-    }
-
-    .sector-detail td {
-      background: var(--card-alt);
-      cursor: default !important;
     }
 
     .setup-chips {
@@ -1794,6 +1883,41 @@
 
     .accent-swatch.active {
       border-color: var(--text);
+    }
+
+    .accent-picker {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    /* custom color: native <input type=color> opens the OS color wheel;
+       the label shows a rainbow (unset) or the chosen hue (via inline bg). */
+    .accent-custom {
+      position: relative;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      overflow: hidden;
+      box-shadow: 0 0 0 1px var(--line) inset;
+      background: conic-gradient(from 90deg, #f43f5e, #f59e0b, #22c55e, #06b6d4, #3b82f6, #a855f7, #f43f5e);
+    }
+
+    .accent-custom.active {
+      border-color: var(--text);
+    }
+
+    .accent-custom input[type="color"] {
+      position: absolute;
+      inset: -4px;
+      width: calc(100% + 8px);
+      height: calc(100% + 8px);
+      padding: 0;
+      border: none;
+      opacity: 0;
+      cursor: pointer;
     }
 
     .sector-group-head {
@@ -2764,7 +2888,7 @@
 
   <section id="auth-screen" hidden>
     <form id="auth-card">
-      <span class="wordmark">sharp<span>Edge</span></span>
+      <span class="wordmark"><span class="wm-sharp">sharp</span>E<span class="wm-edge">dge</span></span>
       <p id="auth-blurb">Sign in to your account.</p>
       <input type="email" id="auth-email" placeholder="Email" autocomplete="email" required>
       <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password" required
@@ -2777,8 +2901,10 @@
 
   <div id="ticker-modal" hidden>
     <div class="tm-card" role="dialog" aria-label="Ticker search">
-      <input id="ticker-search" type="text" placeholder="Search any ticker — AAPL, NVDA, MSFT…" autocomplete="on"
-        spellcheck="false" maxlength="6">
+      <input id="ticker-search" type="text" placeholder="Search by symbol or name — AAPL, Apple, Nvidia…"
+        autocomplete="off" spellcheck="false" maxlength="48" role="combobox" aria-autocomplete="list"
+        aria-expanded="false" aria-controls="ticker-suggest">
+      <div id="ticker-suggest" role="listbox" hidden></div>
       <div id="ticker-result">
         <div class="tm-hint">Type a symbol. You get its live price, your sharpEdge score, and recent news — jump to
           the full page or TradingView.</div>
@@ -2790,10 +2916,15 @@
     <aside id="sidebar">
       <div class="side-logo-row">
         <a class="side-logo" id="home-link" href="#portfolio" title="Home">
-          <span class="dot"></span>
-          <span class="wordmark">sharp<span>Edge</span></span>
+          <span class="side-e" aria-hidden="true">E</span>
+          <span class="wordmark"><span class="wm-sharp">sharp</span>E<span class="wm-edge">dge</span></span>
         </a>
-        <button id="sidebar-collapse" title="Toggle sidebar" aria-label="Toggle sidebar"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg></button>
+        <button id="sidebar-collapse" title="Toggle sidebar" aria-label="Toggle sidebar"><svg class="ic" width="16"
+            height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+            stroke-linejoin="round" aria-hidden="true">
+            <path d="m11 17-5-5 5-5" />
+            <path d="m18 17-5-5 5-5" />
+          </svg></button>
       </div>
       <nav id="nav">
         <button data-tab="portfolio" class="active"><span class="ndot"></span><span
@@ -2827,7 +2958,12 @@
         </div>
         <span class="spacer"></span>
         <button class="search-btn" id="search-open" aria-label="Search any ticker">
-          <span class="search-ring"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg></span>
+          <span class="search-ring"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"
+              aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4.35-4.35" />
+            </svg></span>
           <span class="search-label">Search any ticker…</span>
           <span class="search-kbd" id="search-kbd">⌘K</span>
         </button>
@@ -2846,12 +2982,30 @@
 
       <main>
         <section id="portfolio" data-pane="portfolio">
-          <h2>Your portfolio</h2>
+          <div class="section-head">
+            <h2>Your portfolio</h2>
+            <div class="pf-actions">
+              <button class="refresh-btn" id="import-toggle" title="Paste positions from any broker export"><svg
+                  class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg> Import positions</button>
+              <button class="refresh-btn" id="pf-refresh" title="Re-pull live positions and prices"><svg class="ic"
+                  width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="23 4 23 10 17 10" />
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                </svg> Refresh</button>
+            </div>
+          </div>
           <div id="portfolio-value">$—</div>
           <div id="portfolio-day"></div>
           <div id="portfolio-total"></div>
           <svg id="portfolio-spark" preserveAspectRatio="none"></svg>
           <div id="broker-line"></div>
+          <div id="pf-updated"></div>
           <div id="import-panel">
             <div class="hint">Link Robinhood (read-only) for live positions — run <code>bun run link:robinhood</code>
               once. It takes priority over this manual paste, which is the universal fallback for any broker's export.
@@ -2865,7 +3019,11 @@
           </div>
           <div style="margin-top:12px">
             <button class="advise-btn" id="pf-score-btn" style="margin-top:0"
-              title="AI health check: score out of 100 with pros, cons, and the biggest risk (a few cents, ~30s)"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 7.2L21 12l-7.2 1.8L12 21l-1.8-7.2L3 12l7.2-1.8z"/></svg>
+              title="AI health check: score out of 100 with pros, cons, and the biggest risk (a few cents, ~30s)"><svg
+                class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 3l1.8 7.2L21 12l-7.2 1.8L12 21l-1.8-7.2L3 12l7.2-1.8z" />
+              </svg>
               Score my portfolio</button>
           </div>
           <div id="pf-score-result"></div>
@@ -2886,6 +3044,11 @@
           <div class="card" id="holdings-options"></div>
         </section>
 
+        <section data-pane="portfolio" id="concentration-section" style="display:none">
+          <h2>Concentration</h2>
+          <div class="card" id="concentration" style="padding:14px 16px"></div>
+        </section>
+
         <section data-pane="portfolio" id="watchlist-section" style="display:none">
           <h2>Watchlist</h2>
           <div class="card" id="watchlist-card" style="padding:12px 16px;display:flex;gap:8px;flex-wrap:wrap"></div>
@@ -2894,16 +3057,25 @@
         <section id="market-section" data-pane="market">
           <h2>Market overview</h2>
           <div id="regime-card">
-            <div class="skel-rows"><div class="skel" style="height:36px"></div><div class="skel" style="height:36px"></div><div class="skel" style="height:36px"></div></div>
+            <div class="skel-rows">
+              <div class="skel" style="height:36px"></div>
+              <div class="skel" style="height:36px"></div>
+              <div class="skel" style="height:36px"></div>
+            </div>
           </div>
         </section>
 
         <section id="sectors-section" data-pane="market">
           <div class="section-head">
-            <h2>Sectors — rotation &amp; setups</h2>
+            <h2>Sectors — rotation</h2>
             <div style="display:flex;gap:8px;align-items:center">
               <span id="sector-meta" style="font-size:12px;color:var(--faint)"></span>
-              <button class="refresh-btn" id="market-refresh" title="Re-pull regime and sector data"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Refresh</button>
+              <button class="refresh-btn" id="market-refresh" title="Re-pull regime and sector data"><svg class="ic"
+                  width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="23 4 23 10 17 10" />
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                </svg> Refresh</button>
             </div>
           </div>
           <div class="card">
@@ -2919,7 +3091,11 @@
 
         <section id="stock-section" data-pane="stock" hidden>
           <div id="stock-page">
-            <div class="skel-rows"><div class="skel" style="height:36px"></div><div class="skel" style="height:36px"></div><div class="skel" style="height:36px"></div></div>
+            <div class="skel-rows">
+              <div class="skel" style="height:36px"></div>
+              <div class="skel" style="height:36px"></div>
+              <div class="skel" style="height:36px"></div>
+            </div>
           </div>
         </section>
 
@@ -2934,15 +3110,37 @@
             </div>
           </div>
           <div id="ideas-filters">
-            <button class="refresh-btn" id="filters-btn" title="Open the filters panel"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg> <span id="filters-btn-label">Filters</span></button>
+            <button class="refresh-btn" id="filters-btn" title="Open the filters panel"><svg class="ic" width="13"
+                height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="4" y1="21" x2="4" y2="14" />
+                <line x1="4" y1="10" x2="4" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12" y2="3" />
+                <line x1="20" y1="21" x2="20" y2="16" />
+                <line x1="20" y1="12" x2="20" y2="3" />
+                <line x1="1" y1="14" x2="7" y2="14" />
+                <line x1="9" y1="8" x2="15" y2="8" />
+                <line x1="17" y1="16" x2="23" y2="16" />
+              </svg> <span id="filters-btn-label">Filters</span></button>
             <div id="active-filter-chips" class="filter-bar" style="margin:0"></div>
             <span class="spacer"></span>
             <button id="gen-btn"
-              title="Pick the strongest setups matching these filters and run each through full AI validation (a few cents, takes a minute or two)"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 7.2L21 12l-7.2 1.8L12 21l-1.8-7.2L3 12l7.2-1.8z"/></svg>
+              title="Pick the strongest setups matching these filters and run each through full AI validation (a few cents, takes a minute or two)"><svg
+                class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 3l1.8 7.2L21 12l-7.2 1.8L12 21l-1.8-7.2L3 12l7.2-1.8z" />
+              </svg>
               Generate ideas from filters</button>
           </div>
           <dialog id="filters-modal">
             <h3 style="margin:0 0 12px">Filter ideas</h3>
+            <div class="flabel">Presets</div>
+            <div id="preset-chips" class="filter-bar" style="margin:0 0 8px"></div>
+            <div class="cf-row">
+              <input type="text" id="preset-name" placeholder="Name this filter set" maxlength="40" style="flex:1">
+              <button class="refresh-btn" id="preset-save" title="Save the current filters as a reusable preset">+ Save preset</button>
+            </div>
             <div class="flabel">Quick thresholds</div>
             <label>Minimum score (0–100) <input type="number" id="flt-score" min="50" max="100" step="1"
                 placeholder="any"></label>
@@ -3004,8 +3202,11 @@
             <div id="drop-zone" tabindex="0">Paste (Ctrl+V), drag &amp; drop, or click to add a chart screenshot —
               optional but the analysis always cross-checks it against live data</div>
             <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" hidden>
-            <div id="img-preview-wrap"><button id="img-clear" title="remove screenshot"><svg class="ic" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button><img id="img-preview"
-                alt="chart screenshot preview"></div>
+            <div id="img-preview-wrap"><button id="img-clear" title="remove screenshot"><svg class="ic" width="12"
+                  height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg></button><img id="img-preview" alt="chart screenshot preview"></div>
             <div id="swing-slots" style="display:none">
               <div class="swing-grid">
                 <div class="swing-slot" data-label="1D"><span>1-Day chart</span></div>
@@ -3040,8 +3241,11 @@
             <div id="bt-drop" tabindex="0" class="dropzone">Optional: paste, drop, or click to add a chart — the setup
               will be read off it</div>
             <input type="file" id="bt-file" accept="image/png,image/jpeg,image/webp" hidden>
-            <div id="bt-img-wrap"><button id="bt-img-clear" title="remove"><svg class="ic" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button><img id="bt-img"
-                alt="strategy chart"></div>
+            <div id="bt-img-wrap"><button id="bt-img-clear" title="remove"><svg class="ic" width="12" height="12"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+                  stroke-linejoin="round" aria-hidden="true">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg></button><img id="bt-img" alt="strategy chart"></div>
             <button class="advise-btn" id="bt-go" style="margin-top:0">Run backtest</button>
           </div>
           <div id="bt-result"></div>
@@ -3095,8 +3299,7 @@
           <h2>Risk settings</h2>
           <form class="settings-card" id="risk-form">
             <div class="settings-row">
-              <label>Account equity $<input type="number" id="rp-equity" min="0" step="100"
-                  placeholder="auto from broker"></label>
+              <label>Account equity $<input type="number" id="rp-equity" min="0" step="100" placeholder="auto"></label>
               <button type="button" class="refresh-btn" id="rp-equity-reset" style="align-self:flex-end"
                 title="Clear the manual value and go back to your live broker equity">Reset to broker</button>
               <label>Max risk per trade %<input type="number" id="rp-risk" min="0.1" max="10" step="0.1"></label>
@@ -3120,8 +3323,8 @@
               <label>Full name<input type="text" id="pf-name" maxlength="120" placeholder="optional"></label>
               <label>Phone<input type="tel" id="pf-phone" maxlength="32" placeholder="optional"></label>
               <button type="submit" class="advise-btn" style="margin-top:0">Save</button>
-              <button type="button" id="logout-btn" title="Sign out of this account"
-                style="margin-left:auto">Log out</button>
+              <button type="button" id="logout-btn" title="Sign out of this account" style="margin-left:auto">Log
+                out</button>
             </div>
             <div class="settings-msg" id="profile-msg"></div>
           </form>
@@ -3145,16 +3348,27 @@
             </div>
             <div class="settings-row" style="align-items:center">
               <span style="font-weight:600">Accent</span>
-              <div id="accent-swatches"></div>
+              <div class="accent-picker">
+                <div id="accent-swatches"></div>
+                <label class="accent-custom" id="accent-custom" title="Custom color — pick any hue">
+                  <input type="color" id="accent-custom-input" aria-label="Custom accent color">
+                </label>
+              </div>
             </div>
             <p style="font-size:12px;color:var(--faint)">Chart type applies to the stock page price chart. Accent
-              recolors buttons, toggles, and active states — market gains/losses always stay green/red. All preferences
-              are saved in this browser.</p>
+              recolors buttons, toggles, and active states — pick a preset or the rainbow swatch for any custom color.
+              Market gains/losses always stay green/red. All preferences are saved in this browser.</p>
           </div>
+        </section>
+
+        <section data-pane="settings">
+          <h2>AI usage</h2>
+          <div class="card" id="spend-card" style="padding:12px 16px"></div>
         </section>
 
         <section data-pane="history">
           <h2>Trade journal</h2>
+          <div class="card" id="tracked-list" style="margin-bottom:12px;padding:10px 16px;display:none"></div>
           <form class="settings-card" id="journal-form">
             <div class="settings-row">
               <label>Ticker<input type="text" id="jr-ticker" style="text-transform:uppercase" required></label>
@@ -3184,9 +3398,24 @@
         </section>
 
         <section data-pane="history">
+          <h2>Validator calibration</h2>
+          <div class="card" id="calibration" style="padding:14px 16px">
+            <div class="skel-rows">
+              <div class="skel" style="height:36px"></div>
+              <div class="skel" style="height:36px"></div>
+              <div class="skel" style="height:36px"></div>
+            </div>
+          </div>
+        </section>
+
+        <section data-pane="history">
           <h2>Idea scoreboard</h2>
           <div class="card" id="scoreboard" style="padding:12px 16px">
-            <div class="skel-rows"><div class="skel" style="height:36px"></div><div class="skel" style="height:36px"></div><div class="skel" style="height:36px"></div></div>
+            <div class="skel-rows">
+              <div class="skel" style="height:36px"></div>
+              <div class="skel" style="height:36px"></div>
+              <div class="skel" style="height:36px"></div>
+            </div>
           </div>
         </section>
 
@@ -3323,8 +3552,9 @@
       $("#tab-sub").textContent = TAB_SUBS[name] || "";
       const badge = document.querySelector(`#nav button[data-tab="${name}"] .badge`);
       if (badge) { badge.classList.remove("show"); badge.textContent = ""; }
-      if (name === "settings") { loadRiskPrefs(); loadProfile(); syncAppearanceTabs(); }
-      if (name === "history") { loadJournal(); loadPastIdeas(); loadScoreboard(); }
+      if (name === "portfolio") loadConcentration();
+      if (name === "settings") { loadRiskPrefs(); loadProfile(); syncAppearanceTabs(); loadSpend(); }
+      if (name === "history") { loadJournal(); loadPastIdeas(); loadCalibration(); loadScoreboard(); }
       if (name === "analyze") loadAnalyzeRisk();
       if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
     }
@@ -3352,14 +3582,7 @@
     });
 
     /* ── ⌘K modal: Enter jumps from the quick-preview to the full stock page ── */
-    $("#ticker-search").addEventListener("keydown", (e) => {
-      if (e.key !== "Enter") return;
-      const t = e.target.value.toUpperCase().trim().replace(/[^A-Z0-9.\-]/g, "");
-      if (!t) return;
-      e.target.value = "";
-      closeTickerModal();
-      showPane("stock", t);
-    });
+    /* keydown/selection handlers for search live with the search logic below */
 
     /* ── accent: brand token only — market green/red are never overridden ── */
     function currentIsDark() {
@@ -3370,12 +3593,46 @@
       const n = parseInt(hex.slice(1), 16);
       return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
     }
+    // Blend a hex toward white (pct>0) or black (pct<0). Used to derive the
+    // brand-ink shade for a custom color, mirroring how presets pair the two.
+    function shadeHex(hex, pct) {
+      const n = parseInt(hex.slice(1), 16);
+      const t = pct < 0 ? 0 : 255, p = Math.abs(pct);
+      const mix = (c) => Math.round(c + (t - c) * p);
+      const r = mix((n >> 16) & 255), g = mix((n >> 8) & 255), b = mix(n & 255);
+      return "#" + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
+    }
+    // WCAG relative luminance + contrast ratio, for the custom-color legibility clamp.
+    function relLum(hex) {
+      const n = parseInt(hex.slice(1), 16);
+      const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+      return 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+    }
+    function contrastRatio(a, b) {
+      const la = relLum(a), lb = relLum(b);
+      return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+    }
+    // Nudge a custom color's lightness (toward white in dark mode, black in light)
+    // until it clears 4.5:1 against the background — keeps accent text readable.
+    // Blending toward white/black always converges, so the 12-step cap is a floor.
+    function contrastClamp(hex, bgHex, dark) {
+      let c = hex;
+      for (let i = 0; i < 12 && contrastRatio(c, bgHex) < 4.5; i++) c = shadeHex(c, dark ? 0.08 : -0.08);
+      return c;
+    }
     function applyAccent() {
       const stored = localStorage.getItem("accent") || "Indigo";
-      const name = ACCENTS[stored] ? stored : (ACCENT_REMAP[stored] || "Indigo");
-      const a = ACCENTS[name] || ACCENTS["Indigo"];
       const dark = currentIsDark();
-      const [g, ink] = dark ? a.d : a.l;
+      let g, ink;
+      if (stored === "__custom__") {
+        const bg = getComputedStyle(document.documentElement).getPropertyValue("--surface").trim() || (dark ? "#131519" : "#ffffff");
+        g = contrastClamp(localStorage.getItem("accentCustom") || "#4f46e5", bg, dark);
+        ink = shadeHex(g, dark ? 0.28 : -0.2); // lighter tint in dark, darker shade in light
+      } else {
+        const name = ACCENTS[stored] ? stored : (ACCENT_REMAP[stored] || "Indigo");
+        const a = ACCENTS[name] || ACCENTS["Indigo"];
+        [g, ink] = dark ? a.d : a.l;
+      }
       const root = document.documentElement.style;
       root.setProperty("--brand", g);
       root.setProperty("--brand-ink", ink);
@@ -3400,7 +3657,7 @@
     let lastTickerData = null;             // wave 5 (alerts) reads the currently-shown ticker
 
     function openTickerModal() { tickerModal.hidden = false; tickerSearch.focus(); tickerSearch.select(); }
-    function closeTickerModal() { tickerModal.hidden = true; }
+    function closeTickerModal() { tickerModal.hidden = true; hideSuggest(); }
     $("#search-open").addEventListener("click", openTickerModal);
     document.addEventListener("keydown", (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openTickerModal(); }
@@ -3408,9 +3665,45 @@
     });
     tickerModal.addEventListener("click", (e) => { if (e.target === tickerModal) closeTickerModal(); });
 
-    const runTickerSearch = debounce(async (raw) => {
-      const sym = raw.trim().toUpperCase();
-      if (!sym) { lastTickerData = null; tickerResult.innerHTML = `<div class="tm-hint">Type a symbol…</div>`; return; }
+    /* ── autocomplete: local name/ticker suggestions, then load the detail ── */
+    const suggestBox = $("#ticker-suggest");
+    let sugItems = [];       // [{ ticker, name }] currently shown
+    let sugIdx = -1;         // highlighted row, -1 = none
+    let currentSym = "";     // symbol whose detail is currently displayed
+
+    function hideSuggest() {
+      suggestBox.hidden = true;
+      suggestBox.innerHTML = "";
+      sugItems = []; sugIdx = -1;
+      tickerSearch.setAttribute("aria-expanded", "false");
+    }
+    function renderSuggest() {
+      if (!sugItems.length) { hideSuggest(); return; }
+      suggestBox.innerHTML = sugItems.map((r, i) =>
+        `<div class="tm-sug${i === sugIdx ? " active" : ""}" role="option" data-tkr="${esc(r.ticker)}">
+           <span class="sug-tkr">${esc(r.ticker)}</span><span class="sug-name">${esc(r.name)}</span>
+         </div>`).join("");
+      suggestBox.hidden = false;
+      tickerSearch.setAttribute("aria-expanded", "true");
+    }
+    const runSuggest = debounce(async (raw) => {
+      const q = raw.trim();
+      if (!q) { hideSuggest(); return; }
+      const seq = ++tickerSeq;
+      try {
+        const { results } = await (await fetch(`/api/search?q=${encodeURIComponent(q)}`)).json();
+        if (seq !== tickerSeq) return;     // superseded by a newer keystroke
+        sugItems = results || []; sugIdx = -1;
+        renderSuggest();
+      } catch { /* keep the last suggestions on a transient error */ }
+    }, 140);
+
+    // Load the inline price/score/news detail for a resolved symbol.
+    async function loadTickerDetail(sym) {
+      sym = sym.trim().toUpperCase();
+      if (!sym) return;
+      currentSym = sym;
+      hideSuggest();
       const seq = ++tickerSeq;
       tickerResult.innerHTML = `<div class="tm-hint">Loading ${esc(sym)}…</div>${skelRows(3, 32)}`;
       let data;
@@ -3419,14 +3712,42 @@
         if (res.status === 503) { if (seq === tickerSeq) tickerResult.innerHTML = `<div class="tm-hint">Market scan in progress — try again in a moment.</div>`; return; }
         data = await res.json();
       } catch { if (seq === tickerSeq) tickerResult.innerHTML = `<div class="tm-hint">Network error — try again.</div>`; return; }
-      if (seq !== tickerSeq) return;       // a newer keystroke already superseded this response
+      if (seq !== tickerSeq) return;
       if (data.error) { lastTickerData = null; tickerResult.innerHTML = `<div class="tm-hint">${esc(data.error)} — check the symbol.</div>`; return; }
       lastTickerData = data;
       tickerResult.innerHTML = renderTickerDetail(data);
       const sp = tickerResult.querySelector(".tm-spark");
       if (sp && data.indicators?.spark) sparkSvg(sp, data.indicators.spark, true);
-    }, 250);
-    tickerSearch.addEventListener("input", (e) => runTickerSearch(e.target.value));
+    }
+
+    tickerSearch.addEventListener("input", (e) => { currentSym = ""; runSuggest(e.target.value); });
+    suggestBox.addEventListener("click", (e) => {
+      const el = e.target.closest("[data-tkr]");
+      if (!el) return;
+      tickerSearch.value = el.dataset.tkr;
+      loadTickerDetail(el.dataset.tkr);
+    });
+    tickerSearch.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown" && sugItems.length) {
+        e.preventDefault(); sugIdx = (sugIdx + 1) % sugItems.length; renderSuggest();
+      } else if (e.key === "ArrowUp" && sugItems.length) {
+        e.preventDefault(); sugIdx = (sugIdx - 1 + sugItems.length) % sugItems.length; renderSuggest();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (sugItems.length) {                       // pick highlighted (or top) suggestion → inline detail
+          const pick = sugItems[sugIdx >= 0 ? sugIdx : 0];
+          tickerSearch.value = pick.ticker;
+          loadTickerDetail(pick.ticker);
+        } else if (currentSym) {                      // detail already shown → jump to full page
+          tickerSearch.value = "";
+          closeTickerModal();
+          showPane("stock", currentSym);
+        } else {                                      // no suggestions yet → treat raw text as a symbol
+          const t = tickerSearch.value.toUpperCase().trim().replace(/[^A-Z0-9.\-]/g, "");
+          if (t) loadTickerDetail(t);
+        }
+      }
+    });
 
     /* ── alerts inside the stock page (create / list / delete) ── */
     const KIND_LABEL = { price_above: "Price >", price_below: "Price <", score_gte: "Score ≥" };
@@ -3736,16 +4057,28 @@
       el.innerHTML = `
     <span class="chip ${src === "robinhood" ? "buy" : src === "import" ? "info" : "calm"} sm">${srcLabel}</span>
     ${eq != null ? `<span>equity ${money(eq)}</span>` : ""}
-    ${orders ? `<span>· ${orders} open order${orders === 1 ? "" : "s"}</span>` : ""}
-    <button class="linkish" id="import-toggle">Import positions</button>
-    ${src !== "manual" ? `<button class="linkish" id="broker-refresh">Refresh</button>` : ""}`;
-      $("#import-toggle").onclick = () => {
-        const p = $("#import-panel");
-        p.style.display = p.style.display === "block" ? "none" : "block";
-      };
-      const rb = $("#broker-refresh");
-      if (rb) rb.onclick = async () => { await fetch("/api/broker/refresh", { method: "POST" }); loadState(); };
+    ${orders ? `<span>· ${orders} open order${orders === 1 ? "" : "s"}</span>` : ""}`;
     }
+
+    // "Updated 3:42:07 PM" under the portfolio — stamped whenever state/quotes reload.
+    function stampUpdated() {
+      const el = $("#pf-updated");
+      if (el) el.textContent = "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
+    }
+
+    // Header buttons live outside the re-rendered broker line, so wire them once.
+    $("#import-toggle").addEventListener("click", () => {
+      const p = $("#import-panel");
+      p.style.display = p.style.display === "block" ? "none" : "block";
+    });
+    $("#pf-refresh").addEventListener("click", () => withSpin($("#pf-refresh"), async () => {
+      try { await fetch("/api/broker/refresh", { method: "POST" }); } catch { }
+      await loadState();
+      await loadQuotes();
+      await loadScreener();
+      loadConcentration();
+      toast("Portfolio refreshed");
+    }));
 
     $("#import-go").addEventListener("click", async () => {
       const msg = $("#import-msg");
@@ -3932,39 +4265,22 @@
       const boards = market?.boards ?? [];
       if (!boards.length) { tbody.innerHTML = `<tr><td class="empty">Waiting for the first scan…</td></tr>`; return; }
       $("#sector-meta").textContent = `${boards.reduce((a, b) => a + b.scanned, 0)} stocks across ${boards.length} sectors`;
+      // Market tab is macro-only: rotation, returns, breadth. Setups live in Ideas.
       tbody.innerHTML = `<tr>
-      <th>Sector</th><th>State</th><th>1w</th><th>1m</th><th>vs SPY</th><th>Breadth</th><th>Setups</th>
-    </tr>` + boards.map((bd, idx) => {
+      <th>Sector</th><th>State</th><th>1w</th><th>1m</th><th>vs SPY</th><th>Breadth</th>
+    </tr>` + boards.map((bd) => {
         const rot = bd.rotation;
         const stateChip = rot ? `<span class="chip ${SECTOR_STATE_TONE[rot.state] ?? "calm"} sm">${rot.state}</span>` : `<span class="chip calm sm">—</span>`;
         return `
-      <tr data-sector-row="${idx}">
+      <tr>
         <td>${esc(bd.sector)} <span style="color:var(--faint);font-weight:400">· ${esc(bd.etf)}</span></td>
         <td>${stateChip}</td>
         <td class="${rot && rot.ret1w >= 0 ? "up" : "down"}">${rot ? signed(rot.ret1w, 1) + "%" : "—"}</td>
         <td class="${rot && rot.ret1m >= 0 ? "up" : "down"}">${rot ? signed(rot.ret1m, 1) + "%" : "—"}</td>
         <td class="${rot && rot.rel1m >= 0 ? "up" : "down"}">${rot ? signed(rot.rel1m, 1) + "pp" : "—"}</td>
         <td>${bd.breadthPct != null ? bd.breadthPct.toFixed(0) + "%" : "—"}</td>
-        <td>${bd.longs.length}L / ${bd.shorts.length}S</td>
-      </tr>
-      <tr class="sector-detail" data-sector-detail="${idx}" style="display:${openRows.has("sector:" + bd.sector) ? "" : "none"}">
-        <td colspan="7">
-          ${bd.longs.length + bd.shorts.length
-          ? `<button class="linkish" data-goto-ideas="${esc(bd.sector)}" style="font-size:12.5px">${bd.longs.length} long / ${bd.shorts.length} short setup${bd.longs.length + bd.shorts.length === 1 ? "" : "s"} — view tickers &amp; validate in Ideas →</button>`
-          : `<span style="font-size:12px;color:var(--faint)">No setup-grade names in this sector right now.</span>`}
-        </td>
       </tr>`;
       }).join("");
-      tbody.querySelectorAll("[data-sector-row]").forEach((tr) => {
-        tr.addEventListener("click", () => {
-          const idx = tr.dataset.sectorRow;
-          const det = tbody.querySelector(`[data-sector-detail="${idx}"]`);
-          const open = det.style.display === "none";
-          det.style.display = open ? "" : "none";
-          const key = "sector:" + boards[idx].sector;
-          open ? openRows.add(key) : openRows.delete(key);
-        });
-      });
     }
 
     /* ── idea filters: everything lives in the ⚙ Filters dialog — numeric
@@ -4078,6 +4394,59 @@
     $("#flt-mcap").value = numFilters.minCapB ?? "";
     renderFilterBar();
 
+    /* ── F5: named filter presets, saved per-user (settings table) so they
+       follow you across devices instead of living in one browser. ── */
+    let filterPresets = [];
+    async function loadPresets() {
+      try { const { presets } = await (await fetch("/api/filter-presets")).json(); filterPresets = Array.isArray(presets) ? presets : []; }
+      catch { filterPresets = []; }
+      renderPresetChips();
+    }
+    async function savePresets() {
+      try {
+        const r = await (await fetch("/api/filter-presets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ presets: filterPresets }) })).json();
+        if (r.ok) filterPresets = r.presets;
+      } catch { }
+      renderPresetChips();
+    }
+    function renderPresetChips() {
+      const box = $("#preset-chips");
+      if (!box) return;
+      if (!filterPresets.length) { box.innerHTML = `<span style="color:var(--faint)">No saved presets yet — set filters below, name them, and save.</span>`; return; }
+      box.innerHTML = filterPresets.map((p, i) =>
+        `<span style="display:inline-flex;align-items:center"><button class="filter-chip" data-preset="${i}" title="Apply this preset">${esc(p.name)}</button><button class="filter-chip" data-preset-del="${i}" title="Delete preset" style="padding:4px 6px">${icon("close", 12)}</button></span>`).join(" ");
+    }
+    function applyPreset(p) {
+      customFilters = (p.customFilters || []).filter((f) => f && CUSTOM_METRICS[f.metric] && (f.op === ">" || f.op === "<") && Number.isFinite(f.value)).map((f) => ({ ...f }));
+      numFilters = { minScore: p.numFilters?.minScore ?? null, minCapB: p.numFilters?.minCapB ?? null };
+      saveCustomFilters(); saveNumFilters();
+      $("#flt-score").value = numFilters.minScore ?? "";
+      $("#flt-mcap").value = numFilters.minCapB ?? "";
+      renderFilterBar(); renderIdeas();
+    }
+    $("#preset-save").addEventListener("click", () => {
+      const name = $("#preset-name").value.trim();
+      if (!name) { toast("Name the preset first", "err"); return; }
+      if (!anyFilterActive()) { toast("Set some filters before saving", "err"); return; }
+      const preset = { name, customFilters: customFilters.map((f) => ({ ...f })), numFilters: { ...numFilters } };
+      const existing = filterPresets.findIndex((p) => p.name.toLowerCase() === name.toLowerCase());
+      if (existing >= 0) filterPresets[existing] = preset;
+      else {
+        if (filterPresets.length >= 8) { toast("Preset limit is 8 — delete one first", "err"); return; }
+        filterPresets.push(preset);
+      }
+      $("#preset-name").value = "";
+      savePresets();
+      toast(`Saved preset "${name}"`);
+    });
+    document.addEventListener("click", (e) => {
+      const ap = e.target.closest("[data-preset]");
+      if (ap) { applyPreset(filterPresets[+ap.dataset.preset]); return; }
+      const dp = e.target.closest("[data-preset-del]");
+      if (dp) { filterPresets.splice(+dp.dataset.presetDel, 1); savePresets(); }
+    });
+    loadPresets();
+
     /* ── trade ideas (by sector, long/short tabs) ── */
     function renderIdeas() {
       const card = $("#ideas");
@@ -4152,17 +4521,6 @@
       }
     }
 
-    // Market tab sector rows link here instead of duplicating the ticker lists:
-    // expand that sector in Ideas and jump to the tab.
-    document.addEventListener("click", (ev) => {
-      const btn = ev.target.closest("[data-goto-ideas]");
-      if (!btn) return;
-      collapsedSectors.delete(btn.dataset.gotoIdeas);
-      saveCollapsed();
-      renderIdeas();
-      location.hash = "#ideas";
-    });
-
     $("#ideas-tabs").addEventListener("click", (ev) => {
       const btn = ev.target.closest("[data-tab]");
       if (!btn) return;
@@ -4209,6 +4567,7 @@
         <div class="stat"><div class="k">Holding period</div><div class="v" style="font-size:12.5px">${esc(tp.holding_period ?? "—")}</div></div>
       </div>
       ${tp.targets?.length ? `<div class="klabel">Targets</div><ul>${tp.targets.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
+      ${rep.rating !== "reject" ? `<button class="advise-btn ghost" data-track="${esc(rep.ticker)}" data-track-dir="${rep.direction === "short" ? "short" : "long"}" data-track-entry="${esc((String(tp.entry_zone ?? "").match(/\d+(?:\.\d+)?/) || [""])[0])}" style="margin-top:8px">${icon("check", 13)} Track this trade</button>` : ""}
       <div class="klabel">Technical case</div>
       <ul>${(rep.technical_reasons ?? []).map((r) => `<li>${esc(r)}</li>`).join("") || "<li>—</li>"}</ul>
       <div class="klabel">News & catalyst ${rep.catalyst ? `<span class="chip ${rep.catalyst.quality === "strong" ? "buy" : rep.catalyst.quality === "conflicting" ? "sell" : rep.catalyst.quality === "noisy" ? "warn" : "calm"} sm">${esc(rep.catalyst.quality)}</span>` : ""}</div>
@@ -4272,6 +4631,22 @@
       node.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
+    // Track buttons on idea reports (event delegation) → open a tracked trade
+    // that lands in the journal on close.
+    document.addEventListener("click", async (ev) => {
+      const btn = ev.target.closest("[data-track]");
+      if (!btn || btn.disabled) return;
+      btn.disabled = true;
+      try {
+        const res = await (await fetch("/api/track", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ticker: btn.dataset.track, direction: btn.dataset.trackDir, entry_price: btn.dataset.trackEntry || null }),
+        })).json();
+        if (res.ok) { btn.innerHTML = `${icon("check", 13)} Tracking — close it in the journal`; toast(`Tracking ${btn.dataset.track} — it'll be waiting in your journal`); }
+        else { btn.disabled = false; toast(`Track failed: ${res.error}`, "err"); }
+      } catch { btn.disabled = false; toast("Track failed", "err"); }
+    });
+
     // Validate buttons everywhere (event delegation)
     document.addEventListener("click", async (ev) => {
       const btn = ev.target.closest("[data-validate]");
@@ -4331,7 +4706,7 @@
       finally { btn.disabled = false; btn.textContent = orig; }
     });
 
-    /* ── manual refresh buttons (same idiom as #broker-refresh) ── */
+    /* ── manual refresh buttons: spinner + disabled while the fetch runs ── */
     async function withSpin(btn, fn) {
       btn.disabled = true;
       const orig = btn.innerHTML;
@@ -4353,6 +4728,121 @@
     }
 
     /* ── history: past validated ideas ── */
+    /* ── F1b: AI token usage per day (spend visibility) ── */
+    async function loadSpend() {
+      const box = $("#spend-card");
+      try {
+        const { days } = await (await fetch("/api/spend")).json();
+        if (!days.length) {
+          box.innerHTML = `<div class="empty">No AI calls logged yet. Usage appears here once the model runs.</div>`;
+          return;
+        }
+        const k = (n) => n >= 1000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "k" : String(n);
+        box.innerHTML = `
+          <table class="sectors" style="width:100%">
+            <tr><th>Day</th><th>Calls</th><th>Input</th><th>Output</th><th>Cache read</th></tr>
+            ${days.map((d) => `<tr>
+              <td>${esc(d.day)}</td>
+              <td style="font-variant-numeric:tabular-nums">${d.calls}</td>
+              <td style="font-variant-numeric:tabular-nums">${k(d.input_tokens)}</td>
+              <td style="font-variant-numeric:tabular-nums">${k(d.output_tokens)}</td>
+              <td style="font-variant-numeric:tabular-nums;color:var(--faint)">${k(d.cache_read_tokens)}</td>
+            </tr>`).join("")}
+          </table>
+          <p style="font-size:11px;color:var(--faint);margin:8px 0 0">Token counts per day (last 7). For a hard spend cap, set a budget alert in your <a href="https://console.anthropic.com/settings/limits" target="_blank" rel="noopener">Anthropic console</a> — that catches account-level credit limits this in-app log can't see.</p>`;
+      } catch {
+        box.innerHTML = `<div class="empty">Could not load usage.</div>`;
+      }
+    }
+
+    /* ── F3: portfolio concentration — deterministic risk read ($0 AI) ── */
+    async function loadConcentration() {
+      const sec = $("#concentration-section"), box = $("#concentration");
+      try {
+        const d = await (await fetch("/api/concentration")).json();
+        if (!d.ok || !d.totalValue) { sec.style.display = "none"; return; }
+        sec.style.display = "";
+        const money0 = (v) => "$" + Math.round(v).toLocaleString();
+        const betaLine = d.portfolioBeta == null
+          ? `<span style="color:var(--faint)">Portfolio beta unknown — no scored holdings</span>`
+          : `Portfolio beta <b>${d.portfolioBeta.toFixed(2)}</b> <span style="color:var(--faint)">· covers ${d.betaCoveragePct.toFixed(0)}% of value${d.excludedNoBeta ? ` · ${d.excludedNoBeta} holding${d.excludedNoBeta === 1 ? "" : "s"} without a beta` : ""}</span>`;
+        const warnHtml = d.warnings.length
+          ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${d.warnings.map((w) =>
+              `<span class="chip warn sm">${w.kind === "sector" ? esc(w.label) + " sector" : esc(w.label)} ${w.pct.toFixed(0)}% &gt; ${w.limit}% limit</span>`).join("")}</div>`
+          : `<div style="font-size:12px;color:var(--faint);margin-bottom:12px">${icon("check", 13)} Every position and sector is within your size limits.</div>`;
+        const bars = d.sectors.map((s) => {
+          const over = d.warnings.some((w) => w.kind === "sector" && w.label === s.sector);
+          return `<div style="margin:7px 0">
+            <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px">
+              <span>${esc(s.sector)}</span>
+              <span style="color:var(--faint);font-variant-numeric:tabular-nums">${s.pct.toFixed(0)}% · ${money0(s.value)}</span>
+            </div>
+            <div style="height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden">
+              <div style="height:100%;width:${s.pct.toFixed(1)}%;background:${over ? "var(--amber)" : "var(--brand)"}"></div>
+            </div>
+          </div>`;
+        }).join("");
+        box.innerHTML = `
+          <div style="font-size:13.5px;margin-bottom:12px">${betaLine}</div>
+          ${warnHtml}
+          ${bars}
+          <p style="font-size:11px;color:var(--faint);margin:10px 0 0">Exposure by sector across ${money0(d.totalValue)} of stocks and options — options grouped under their underlying, so a stock and its calls count as one position. Deterministic, no AI.</p>`;
+      } catch { sec.style.display = "none"; }
+    }
+
+    /* ── F0: validator calibration — does the rubric predict outcomes? ── */
+    const DIM_LABEL = {
+      technical: "Technical", catalyst: "Catalyst", market_alignment: "Market fit",
+      news_sentiment: "News / sentiment", risk_reward: "Risk / reward", invalidation_clarity: "Invalidation",
+    };
+    async function loadCalibration() {
+      const box = $("#calibration");
+      try {
+        const d = await (await fetch("/api/calibration")).json();
+        if (!d.ok) { box.innerHTML = `<div class="empty">${esc(d.error || "Calibration unavailable.")}</div>`; return; }
+        if (!d.total) {
+          box.innerHTML = `<div class="empty">No validated ideas yet — validate a few and check back. Once ideas resolve against real prices, this measures whether higher ratings actually win more.</div>`;
+          return;
+        }
+        const faint = `<span style="color:var(--faint)">—</span>`;
+        const tone = /has edge/.test(d.verdict) ? "up" : /inverted/.test(d.verdict) ? "down" : "";
+        const pct = (b) => b.hitRate == null ? faint : `<b>${Math.round(b.hitRate * 100)}%</b>`;
+        const rr = (b) => b.avgR == null ? faint : `<span class="${b.avgR >= 0 ? "up" : "down"}">${b.avgR >= 0 ? "+" : ""}${b.avgR.toFixed(2)}R</span>`;
+        const bucketRow = (label, b) => `<tr>
+          <td>${label}</td><td>${pct(b)}</td><td>${rr(b)}</td>
+          <td class="up">${b.wins}</td><td class="down">${b.losses}</td><td>${b.open}</td>
+        </tr>`;
+        const ratingLabel = (b) => `<span class="rbadge ${esc(b.key)}" style="font-size:11px;padding:2px 10px">${esc(b.key)}</span>`;
+        const dimRow = (dm) => `<tr>
+          <td>${esc(DIM_LABEL[dm.dimension] ?? dm.dimension)}</td>
+          <td>${dm.avgWin == null ? `<span style="color:var(--faint)">n=${dm.nWin}</span>` : dm.avgWin.toFixed(1)}</td>
+          <td>${dm.avgLoss == null ? `<span style="color:var(--faint)">n=${dm.nLoss}</span>` : dm.avgLoss.toFixed(1)}</td>
+          <td class="${dm.edge == null ? "" : dm.edge >= 0 ? "up" : "down"}" style="font-weight:700">${dm.edge == null ? faint : (dm.edge >= 0 ? "+" : "") + dm.edge.toFixed(1)}</td>
+        </tr>`;
+        box.innerHTML = `
+          <div class="${tone}" style="font-size:16px;font-weight:700;line-height:1.4;margin-bottom:12px">${esc(d.verdict)}</div>
+          <table class="sectors" style="width:100%">
+            <tr><th>Rating</th><th>Hit rate</th><th>Avg R</th><th>W</th><th>L</th><th>Open</th></tr>
+            ${d.byRating.map((b) => bucketRow(ratingLabel(b), b)).join("")}
+          </table>
+          <table class="sectors" style="width:100%;margin-top:10px">
+            <tr><th>Direction</th><th>Hit rate</th><th>Avg R</th><th>W</th><th>L</th><th>Open</th></tr>
+            ${d.byDirection.map((b) => bucketRow(esc(b.key), b)).join("")}
+          </table>
+          <details style="margin-top:12px">
+            <summary style="cursor:pointer;font-size:13px;font-weight:600">Dimension breakdown — which scores predict wins</summary>
+            <table class="sectors" style="width:100%;margin-top:8px">
+              <tr><th>Dimension</th><th>Avg (wins)</th><th>Avg (losses)</th><th>Edge</th></tr>
+              ${d.dimensions.map(dimRow).join("")}
+            </table>
+            <p style="font-size:11px;color:var(--faint);margin:6px 0 0">Mean 0–10 score on ideas that won vs lost. Positive edge = higher scores on this dimension went with wins. Each side needs 5+ resolved trades to show a number.</p>
+          </details>
+          <p style="font-size:11.5px;color:var(--faint);margin:12px 0 0">${d.resolved} resolved of ${d.total} validated ideas (last 120 days).${d.skipped ? ` ${d.skipped} skipped (no parseable levels).` : ""} Stats need 5+ resolved trades to display — small samples stay blank rather than mislead. Refreshes hourly.</p>`;
+      } catch {
+        box.innerHTML = `<div class="empty">Could not load calibration.</div>`;
+      }
+    }
+
     /* ── idea scoreboard: did past ratings actually win? ── */
     async function loadScoreboard() {
       const box = $("#scoreboard");
@@ -4446,8 +4936,13 @@
       const chart = localStorage.getItem("chartType") || "line";
       document.querySelectorAll("#chart-tabs [data-chart-opt]").forEach((b) => b.classList.toggle("active", b.dataset.chartOpt === chart));
       const storedAccent = localStorage.getItem("accent") || "Indigo";
-      const accent = ACCENTS[storedAccent] ? storedAccent : (ACCENT_REMAP[storedAccent] || "Indigo");
+      const isCustom = storedAccent === "__custom__";
+      const accent = isCustom ? null : (ACCENTS[storedAccent] ? storedAccent : (ACCENT_REMAP[storedAccent] || "Indigo"));
       document.querySelectorAll("#accent-swatches [data-accent-opt]").forEach((b) => b.classList.toggle("active", b.dataset.accentOpt === accent));
+      const customEl = $("#accent-custom"), customHex = localStorage.getItem("accentCustom") || "#4f46e5";
+      customEl.classList.toggle("active", isCustom);
+      customEl.style.background = isCustom ? customHex : "";  // show chosen hue when active, rainbow otherwise
+      $("#accent-custom-input").value = customHex;
     }
     $("#theme-tabs").addEventListener("click", (e) => {
       const b = e.target.closest("[data-theme-opt]");
@@ -4473,6 +4968,14 @@
       const b = e.target.closest("[data-accent-opt]");
       if (!b) return;
       localStorage.setItem("accent", b.dataset.accentOpt);
+      applyAccent();
+      syncAppearanceTabs();
+    });
+    // Custom color wheel: `input` fires live as the user drags, so the accent
+    // updates in real time (no Apply button needed).
+    $("#accent-custom-input").addEventListener("input", (e) => {
+      localStorage.setItem("accent", "__custom__");
+      localStorage.setItem("accentCustom", e.target.value);
       applyAccent();
       syncAppearanceTabs();
     });
@@ -4532,9 +5035,46 @@
     });
 
     /* ── settings: trade journal ── */
+    // Prefill the journal form from a tracked/closed trade and bring it into view.
+    function prefillJournal(t) {
+      $("#jr-ticker").value = t.ticker || "";
+      $("#jr-dir").value = t.direction || "long";
+      if (t.entry_price != null) $("#jr-entry").value = t.entry_price;
+      if (t.exit_price != null) $("#jr-exit").value = t.exit_price;
+      const form = $("#journal-form");
+      form.scrollIntoView({ behavior: "smooth", block: "center" });
+      form.classList.add("rise");
+      setTimeout(() => form.classList.remove("rise"), 400);
+      $("#jr-outcome").focus();
+    }
+
     async function loadJournal() {
       try {
-        const { outcomes } = await (await fetch("/api/journal")).json();
+        const { outcomes, tracked = [] } = await (await fetch("/api/journal")).json();
+        // Open trades the user is tracking — Close prefills the form below.
+        const tbox = $("#tracked-list");
+        if (tracked.length) {
+          tbox.style.display = "";
+          tbox.innerHTML = `<div style="font-weight:600;font-size:12.5px;margin-bottom:6px">Open trades you're tracking</div>` +
+            tracked.map((t, i) => `<div class="journal-item" data-tracked="${i}">
+              <span style="font-weight:700">${esc(t.ticker)}</span>
+              <span class="chip ${t.direction === "long" ? "buy" : "sell"} sm">${esc(t.direction)}</span>
+              ${t.entry_price != null ? `<span style="color:var(--faint);font-size:12px">entry $${esc(String(t.entry_price))}</span>` : ""}
+              <span style="color:var(--faint);font-size:12px">since ${new Date(t.opened_at * 1000).toLocaleDateString()}</span>
+              <button class="advise-btn ghost" data-close style="margin:0;padding:2px 10px;font-size:12px">Close → journal</button>
+              <button class="del" data-untrack title="stop tracking">${icon("close", 12)}</button>
+            </div>`).join("");
+          tbox.querySelectorAll("[data-tracked]").forEach((row) => {
+            const t = tracked[+row.dataset.tracked];
+            row.querySelector("[data-close]").addEventListener("click", () => prefillJournal(t));
+            row.querySelector("[data-untrack]").addEventListener("click", async () => {
+              await fetch(`/api/tracked/${t.id}`, { method: "DELETE" });
+              toast("Stopped tracking " + t.ticker);
+              loadJournal();
+            });
+          });
+        } else { tbox.style.display = "none"; tbox.innerHTML = ""; }
+
         const box = $("#journal-list");
         if (!outcomes.length) {
           box.innerHTML = `<div class="empty">No trades logged yet. Each one you log makes future AI analysis more personal.</div>`;
@@ -4589,12 +5129,36 @@
     });
 
     /* ── stock detail page (#stock/TICKER) ── */
-    async function renderStockPage(ticker) {
+    // Render the stock chart honoring the chart-type setting. ohlc may be null
+    // (candles fall back to a line); closes is the plain series for line mode.
+    function drawStockChart(ohlc, closes) {
+      const el = $("#stock-spark");
+      if (!el) return;
+      const chartType = localStorage.getItem("chartType") || "line";
+      if (chartType === "candles" && ohlc?.closes?.length > 1) candleSvg(el, ohlc, ohlc.closes.length);
+      else if (closes?.length > 1) sparkSvg(el, closes, true);
+      else el.innerHTML = `<text x="4" y="16" style="fill:var(--faint);font-size:12px">No chart data</text>`;
+    }
+
+    async function switchTimeframe(ticker, tf, btns) {
+      btns.forEach((b) => b.classList.toggle("active", b.dataset.tf === tf));
+      const el = $("#stock-spark");
+      el.style.opacity = ".4";
+      try {
+        const res = await (await fetch(`/api/candles/${encodeURIComponent(ticker)}?tf=${tf}`)).json();
+        if (res.ok) drawStockChart(res.ohlc, res.ohlc.closes);
+        else el.innerHTML = `<text x="4" y="16" style="fill:var(--faint);font-size:12px">No data for ${esc(tf)}</text>`;
+      } catch {
+        el.innerHTML = `<text x="4" y="16" style="fill:var(--faint);font-size:12px">Could not load ${esc(tf)}</text>`;
+      } finally { el.style.opacity = ""; }
+    }
+
+    async function renderStockPage(ticker, fresh = false) {
       const page = $("#stock-page");
       page.innerHTML = `<div class="empty">Loading ${esc(ticker)}…</div>${skelRows(4, 40)}`;
       let data;
       try {
-        data = await (await fetch(`/api/stock/${encodeURIComponent(ticker)}`)).json();
+        data = await (await fetch(`/api/stock/${encodeURIComponent(ticker)}${fresh ? "?fresh=1" : ""}`)).json();
       } catch {
         page.innerHTML = `<div class="empty">Could not reach the server.</div>`;
         return;
@@ -4614,11 +5178,15 @@
       <span class="spacer"></span>
       <span class="px">${q?.c ? money(q.c) : "—"}</span>
       ${chg != null ? `<span class="chip ${chg >= 0 ? "buy" : "sell"}">${signed(chg)}% today</span>` : ""}
+      <button class="refresh-btn" id="stock-refresh" title="Re-pull quote, chart &amp; news" style="align-self:center">${icon("refresh", 13)} Refresh</button>
     </div>
     <p style="font-size:12.5px;color:var(--faint);margin-top:2px">
       ${[m?.sector, m?.industry, capB ? "mkt cap $" + capB : null].filter(Boolean).map(esc).join(" · ") || "Not in the scan universe"}
     </p>
     <svg id="stock-spark" preserveAspectRatio="none"></svg>
+    <div class="tf-bar" id="tf-bar">
+      ${["1D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y", "ALL"].map((t) => `<button data-tf="${t}"${t === "6M" ? ' class="active"' : ""}>${t === "ALL" ? "All" : t}</button>`).join("")}
+    </div>
     ${r ? `
       <div style="display:flex;gap:8px;align-items:center;margin:10px 0 6px">
         <span class="chip buy">Long ${r.long_score ?? "—"}</span>
@@ -4642,9 +5210,14 @@
       ${newsListHtml(data.news)}` : ""}
     ${alertBoxHtml(ticker, q?.c)}
     ${data.ideas?.length ? `<h2 style="margin-top:18px">Past analyses</h2><div id="stock-past"></div>` : ""}`;
-      const chartType = localStorage.getItem("chartType") || "line";
-      if (chartType === "candles" && data.ohlc?.closes?.length > 1) candleSvg($("#stock-spark"), data.ohlc);
-      else if (data.spark?.closes) sparkSvg($("#stock-spark"), data.spark.closes, true);
+      // Initial chart uses the ~6mo of data already in the bundle; the tf-bar
+      // re-fetches other windows on demand from /api/candles.
+      drawStockChart(data.ohlc, data.spark?.closes);
+      const tfBtns = [...page.querySelectorAll("#tf-bar button")];
+      tfBtns.forEach((b) => b.addEventListener("click", () => switchTimeframe(ticker, b.dataset.tf, tfBtns)));
+      // Refresh re-runs the whole page fetch (quote + chart + news); the loading
+      // skeleton at the top of renderStockPage is the visual feedback.
+      $("#stock-refresh").addEventListener("click", () => { renderStockPage(ticker, true); toast(`Refreshed ${ticker}`); });
       if (r) {
         screener[ticker] = r; // make factorDetail work for off-universe lookups too
         $("#stock-factors").innerHTML = factorDetail(ticker, { actions: false });
@@ -5071,6 +5644,7 @@
         case "screener_pick": return `${e.ticker} scores highly across our long checklist`;
         case "screener_short": return `${e.ticker} shows a confirmed breakdown (short setup)`;
         case "market_mover": return e.title;
+        case "position_close": return e.title;
         default: return e.title;
       }
     }
@@ -5086,6 +5660,7 @@
       moves: { label: "Price/volume", kinds: new Set(["price_move", "volume_spike", "gap", "week52", "market_mover"]) },
       earnings: { label: "Earnings", kinds: new Set(["earnings"]) },
       expiry: { label: "Options expiry", kinds: new Set(["option_expiry"]) },
+      journal: { label: "To journal", kinds: new Set(["position_close"]) },
     };
     let actCat = "all", actImportantOnly = false;
     function renderActFilters() {
@@ -5126,8 +5701,17 @@
         ${important ? `<span class="chip ${e.severity === "critical" ? "sell" : "warn"}">${e.severity === "critical" ? "Important" : "Notable"}</span>` : ""}
       </button>
       <div class="detail">${esc(e.title)}${e.triage_rationale ? `<br><span style="color:var(--faint)">${esc(e.triage_rationale)}</span>` : ""}
+        ${e.kind === "position_close" ? `<br><a href="#" class="jr-from-act" style="font-size:12px">Journal this trade →</a>` : ""}
         ${e.ticker && !e.ticker.startsWith("^") ? `<br><a href="#stock/${esc(e.ticker)}" style="font-size:12px">View ${esc(e.ticker)} →</a>` : ""}</div>`;
         row.querySelector(".rowbtn").addEventListener("click", () => toggleRow(row));
+        const jr = row.querySelector(".jr-from-act");
+        if (jr) jr.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          let d = {}; try { d = JSON.parse(e.detail || "{}"); } catch { }
+          showPane("history");
+          // let the History pane render before scrolling the form into view
+          setTimeout(() => prefillJournal({ ticker: d.ticker || e.ticker, direction: d.direction || "long" }), 60);
+        });
         box.appendChild(row);
       }
     }
@@ -5240,11 +5824,13 @@
       renderHoldings();
       renderActivity();
       if (state.briefing) renderMd($("#briefing"), state.briefing.content);
+      stampUpdated();
     }
     async function loadQuotes() {
       quotes = await (await fetch("/api/quotes")).json();
       renderPortfolio();
       renderHoldings();
+      stampUpdated();
     }
     async function loadScreener() {
       const data = await (await fetch("/api/screener")).json();
@@ -5276,12 +5862,12 @@
         bumpBadge("activity");
       });
       es.addEventListener("briefing", (m) => renderMd($("#briefing"), JSON.parse(m.data).content));
-      es.addEventListener("broker", () => loadState().then(loadQuotes));
+      es.addEventListener("broker", () => loadState().then(loadQuotes).then(loadConcentration));
       es.addEventListener("health", () => loadState());
       es.addEventListener("market", () => { loadMarket(); loadScreener(); });
 
       loadProfile();
-      loadState().then(loadQuotes).then(loadScreener).then(loadMarket);
+      loadState().then(loadQuotes).then(loadScreener).then(loadMarket).then(loadConcentration);
       setInterval(loadQuotes, 60_000);
       setInterval(loadState, 5 * 60_000);
       setInterval(loadScreener, 10 * 60_000);

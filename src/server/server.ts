@@ -8,18 +8,19 @@ import { universeMeta } from "../ingest/universe";
 import { analyzeIntraday, manageTrade, type IntradayRequest, type FollowupRequest } from "../ai/intraday";
 import { parseStrategy } from "../ai/strategy";
 import { runBacktest, stressBacktest, walkForward, type StrategySpec } from "../engine/backtest";
-import { fetchDailyCandles } from "../ingest/yahoo";
+import { fetchDailyCandles, fetchIntradayBars } from "../ingest/yahoo";
 import { getScreenerRows, sectorBoards } from "../engine/screener";
 import { scoreTicker } from "../engine/ticker";
 import { listAlerts, createAlert, deleteAlert, type AlertKind } from "../engine/alerts";
 import { getMarketSnapshot } from "../engine/market";
 import { currentPortfolio, brokerSnapshot, refreshBroker, loadRiskConfigFor, updateWatchlist } from "../broker";
-import { earningsFor, ideaScoreboard } from "../engine/insights";
-import { getRiskPrefs, setRiskPrefs } from "../db";
+import { earningsFor, ideaScoreboard, calibration } from "../engine/insights";
+import { computeConcentration, type ConcHolding } from "../engine/concentration";
+import { getRiskPrefs, setRiskPrefs, spendByDay, getSettingFor, setSettingFor } from "../db";
 import { saveImport, clearImport, type ImportPayload } from "../broker/manual";
 import { getBrokerLink } from "../db";
 import { allTickers } from "../config";
-import { logOutcome, listOutcomes, deleteOutcome } from "../ai/journal";
+import { logOutcome, listOutcomes, deleteOutcome, trackTrade, listTracked, untrack, untrackByKey, trackedKeys } from "../ai/journal";
 import { hashPassword, verifyPassword, createUser, findUserByEmail, findUserById, getProfile, updateProfile, createSession, destroySession } from "../auth";
 import { userIdFromRequest, sessionTokenFromRequest, sessionCookieHeader, clearCookieHeader } from "../auth/middleware";
 import { join } from "path";
@@ -178,6 +179,28 @@ export function startServer() {
         return Response.json(outcome.data);
       }
 
+      // Autocomplete for the ⌘K search: matches ticker prefix or company-name
+      // substring against the local universe (12k+ US stocks/ETFs). LIKE is
+      // case-insensitive; the sanitized query strips wildcard/injection chars.
+      if (url.pathname === "/api/search") {
+        const q = (url.searchParams.get("q") ?? "").toUpperCase().replace(/[^A-Z0-9.\- ]/g, "").trim();
+        if (!q) return Response.json({ results: [] });
+        const rows = db.query(
+          `SELECT ticker, name FROM universe
+           WHERE ticker LIKE $q || '%' OR name LIKE '%' || $q || '%'
+           ORDER BY
+             CASE
+               WHEN ticker = $q THEN 0
+               WHEN ticker LIKE $q || '%' THEN 1
+               WHEN name LIKE $q || '%' THEN 2
+               ELSE 3
+             END,
+             market_cap DESC, length(ticker)
+           LIMIT 8`
+        ).all({ $q: q }) as { ticker: string; name: string }[];
+        return Response.json({ results: rows });
+      }
+
       // Price / score alerts (per-user; the background evaluator fires them all
       // to the shared notification channel).
       if (url.pathname === "/api/alerts" && req.method === "GET") {
@@ -216,6 +239,41 @@ export function startServer() {
       if (url.pathname === "/api/ideas/scoreboard") {
         try {
           return Response.json({ ok: true, ...(await ideaScoreboard(userId)) });
+        } catch (err) {
+          return Response.json({ ok: false, error: String(err) }, { status: 500 });
+        }
+      }
+
+      // F0: validator calibration — hit-rate + avg-R by rating/direction and
+      // per-dimension win/loss score gaps. Shares the scoreboard's 1h replay cache.
+      if (url.pathname === "/api/calibration") {
+        try {
+          return Response.json({ ok: true, ...(await calibration(userId)) });
+        } catch (err) {
+          return Response.json({ ok: false, error: String(err) }, { status: 500 });
+        }
+      }
+
+      // F3: portfolio concentration — deterministic ($0). Resolve each holding's
+      // value/sector/beta, then let the pure engine do the grouping + warnings.
+      if (url.pathname === "/api/concentration") {
+        try {
+          const holdings = currentPortfolio(userId).holdings.filter((h) => (h.asset_class as string) !== "crypto");
+          const maxPositionPct = loadRiskConfigFor(userId).max_position_pct ?? 20;
+          // Beta + sector key off the underlying (options) or the ticker (equities).
+          const betaFor = (key: string): number | null => {
+            const row = db.query(`SELECT indicators FROM screener WHERE ticker = ?`).get(key) as any;
+            if (!row) return null;
+            try { return JSON.parse(row.indicators).beta ?? null; } catch { return null; }
+          };
+          const items: ConcHolding[] = await Promise.all(holdings.map(async (h) => {
+            const key = (h.option?.underlying ?? h.ticker).toUpperCase();
+            let value = 0;
+            if (h.market_value != null) value = Math.abs(h.market_value);          // options / broker-priced
+            else { try { const q = await cachedQuote(h.ticker); if (q?.c) value = Math.abs(h.shares * q.c); } catch {} }
+            return { key, value, sector: universeMeta(key)?.sector ?? "Unknown", beta: h.asset_class === "option" ? null : betaFor(key) };
+          }));
+          return Response.json({ ok: true, ...computeConcentration(items, maxPositionPct) });
         } catch (err) {
           return Response.json({ ok: false, error: String(err) }, { status: 500 });
         }
@@ -390,18 +448,78 @@ export function startServer() {
             pnl_pct: num(body.pnl_pct), notes: String(body.notes ?? "").slice(0, 2000),
             closed_at: num(body.closed_at) ?? undefined,
           });
+          untrackByKey(userId, ticker, direction); // journaling a trade clears its open track
           return Response.json({ ok: true, id });
         } catch (err) {
           return Response.json({ ok: false, error: String(err) }, { status: 400 });
         }
       }
       if (url.pathname === "/api/journal") {
-        return Response.json({ outcomes: listOutcomes(userId, 50) });
+        return Response.json({ outcomes: listOutcomes(userId, 50), tracked: listTracked(userId) });
       }
       if (url.pathname.startsWith("/api/journal/") && req.method === "DELETE") {
         const id = Number(url.pathname.split("/").pop());
         if (!Number.isInteger(id)) return Response.json({ ok: false, error: "bad id" }, { status: 400 });
         return Response.json({ ok: deleteOutcome(userId, id) });
+      }
+
+      // F2b: track an idea toward a future journal entry (the manual path,
+      // fallback for unlinked users). Ownership on idea_id guarded below.
+      if (url.pathname === "/api/track" && req.method === "POST") {
+        try {
+          const body = (await req.json()) as any;
+          const ticker = String(body.ticker ?? "").toUpperCase().trim();
+          const direction = body.direction === "short" ? "short" : "long";
+          if (!ticker) return Response.json({ ok: false, error: "no ticker" }, { status: 400 });
+          const num = (v: unknown) => (v == null || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
+          let idea_id = num(body.idea_id);
+          // Only accept an idea_id the caller actually owns (no cross-user linkage).
+          if (idea_id != null) {
+            const owns = db.query(`SELECT 1 FROM ideas WHERE id = ? AND user_id = ?`).get(idea_id, userId);
+            if (!owns) idea_id = null;
+          }
+          const id = trackTrade(userId, { ticker, direction, idea_id, entry_price: num(body.entry_price) });
+          return Response.json({ ok: true, id });
+        } catch (err) {
+          return Response.json({ ok: false, error: String(err) }, { status: 400 });
+        }
+      }
+      if (url.pathname === "/api/tracked") {
+        return Response.json({ tracked: listTracked(userId), keys: trackedKeys(userId) });
+      }
+
+      // F1b: AI token usage per day (global — background pipeline spend isn't per-user).
+      if (url.pathname === "/api/spend") {
+        return Response.json({ days: spendByDay(7) });
+      }
+
+      // F5: saved screener filter presets (per user, cross-device). Client owns the
+      // list and POSTs the whole thing; server validates shape and caps at 8.
+      if (url.pathname === "/api/filter-presets" && req.method === "GET") {
+        try { return Response.json({ presets: JSON.parse(getSettingFor(userId, "filter_presets", "[]")) }); }
+        catch { return Response.json({ presets: [] }); }
+      }
+      if (url.pathname === "/api/filter-presets" && req.method === "POST") {
+        try {
+          const body = (await req.json()) as any;
+          const clean = (Array.isArray(body.presets) ? body.presets : [])
+            .filter((p: any) => p && typeof p.name === "string" && p.name.trim())
+            .slice(0, 8)
+            .map((p: any) => ({
+              name: String(p.name).trim().slice(0, 40),
+              customFilters: Array.isArray(p.customFilters) ? p.customFilters.slice(0, 20) : [],
+              numFilters: { minScore: p.numFilters?.minScore ?? null, minCapB: p.numFilters?.minCapB ?? null },
+            }));
+          setSettingFor(userId, "filter_presets", JSON.stringify(clean));
+          return Response.json({ ok: true, presets: clean });
+        } catch (err) {
+          return Response.json({ ok: false, error: String(err) }, { status: 400 });
+        }
+      }
+      if (url.pathname.startsWith("/api/tracked/") && req.method === "DELETE") {
+        const id = Number(url.pathname.split("/").pop());
+        if (!Number.isInteger(id)) return Response.json({ ok: false, error: "bad id" }, { status: 400 });
+        return Response.json({ ok: untrack(userId, id) });
       }
 
       // Per-user risk preferences (equity fallback, risk %, position cap, target R:R).
@@ -522,8 +640,9 @@ export function startServer() {
         if (!/^[A-Z][A-Z0-9.\-]{0,9}$/.test(ticker)) return Response.json({ ok: false, error: "bad ticker" }, { status: 400 });
         const meta = universeMeta(ticker);
         const row = db.query(`SELECT * FROM screener WHERE ticker = ?`).get(ticker) as any;
+        const fresh = url.searchParams.get("fresh") === "1"; // stock-page Refresh bypasses the 60s quote cache
         let quote: any = null;
-        try { quote = await cachedQuote(ticker); } catch {}
+        try { quote = await cachedQuote(ticker, fresh); } catch {}
         let spark: { timestamps: number[]; closes: number[] } | null = null;
         let ohlc: { timestamps: number[]; opens: number[]; highs: number[]; lows: number[]; closes: number[] } | null = null;
         try {
@@ -562,6 +681,34 @@ export function startServer() {
           screener: row ? { ...row, indicators: JSON.parse(row.indicators) } : null,
           ideas: ideaRows.map((r) => ({ ...(JSON.parse(r.report)), ts: r.ts, source: r.source })),
         });
+      }
+
+      // Candle history for the stock-page timeframe switcher (1D…All). Maps the
+      // timeframe to a Yahoo range/interval: intraday for 1D/5D, daily otherwise.
+      if (url.pathname.startsWith("/api/candles/")) {
+        const ticker = decodeURIComponent(url.pathname.split("/").pop() ?? "").toUpperCase().trim();
+        if (!/^[A-Z][A-Z0-9.\-]{0,9}$/.test(ticker)) return Response.json({ ok: false, error: "bad ticker" }, { status: 400 });
+        const tf = (url.searchParams.get("tf") ?? "6M").toUpperCase();
+        const intraday: Record<string, ["5m" | "15m" | "60m", string]> = { "1D": ["5m", "1d"], "1W": ["15m", "5d"] };
+        const ranges: Record<string, string> = { "1M": "1mo", "3M": "3mo", "6M": "6mo", "1Y": "1y", "3Y": "5y", "5Y": "5y", ALL: "max" };
+        try {
+          const c = intraday[tf]
+            ? await fetchIntradayBars(ticker, intraday[tf][0], intraday[tf][1])
+            : await fetchDailyCandles(ticker, ranges[tf] ?? "6mo", 2);
+          if (!c) return Response.json({ ok: false, error: "no data" }, { status: 404 });
+          // Yahoo has no 3y range: fetch 5y and trim to the last 3 years. slice(0) is a no-op otherwise.
+          let s = 0;
+          if (tf === "3Y") {
+            const cutoff = Date.now() / 1000 - 3 * 365 * 86400;
+            s = Math.max(0, c.timestamps.findIndex((t) => t >= cutoff));
+          }
+          return Response.json({
+            ok: true, tf,
+            ohlc: { timestamps: c.timestamps.slice(s), opens: c.opens.slice(s), highs: c.highs.slice(s), lows: c.lows.slice(s), closes: c.closes.slice(s) },
+          });
+        } catch {
+          return Response.json({ ok: false, error: "fetch failed" }, { status: 502 });
+        }
       }
 
       // On-demand briefing (also generated automatically at 9:00 / 16:15 ET).

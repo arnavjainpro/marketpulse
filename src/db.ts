@@ -160,6 +160,59 @@ CREATE TABLE IF NOT EXISTS ideas (
   report TEXT NOT NULL           -- full JSON IdeaReport
 );
 
+-- F6a: append-only sector rotation history (market_snapshot is a singleton, so
+-- rotation trends were unrecoverable). One row per sector per state change (or
+-- ≥1h gap), so a future heatmap can draw trailing-weeks rotation.
+CREATE TABLE IF NOT EXISTS sector_history (
+  sector TEXT NOT NULL,
+  ts INTEGER NOT NULL,
+  state TEXT NOT NULL,           -- leading | improving | weakening | lagging
+  rel1m REAL,                    -- relative strength vs SPY (heatmap intensity)
+  PRIMARY KEY (sector, ts)
+);
+CREATE INDEX IF NOT EXISTS idx_sector_history ON sector_history(sector, ts DESC);
+
+-- F2b: open trades the user is tracking toward a journal entry. Kept separate
+-- from trade_outcomes (which is closed-only, read by the AI as real history) so
+-- an open position never pollutes that context. Closing one moves it into
+-- trade_outcomes and deletes the row here.
+CREATE TABLE IF NOT EXISTS tracked_trades (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  ticker TEXT NOT NULL,
+  direction TEXT NOT NULL,       -- long | short
+  idea_id INTEGER REFERENCES ideas(id),
+  entry_price REAL,
+  opened_at INTEGER NOT NULL,
+  UNIQUE(user_id, ticker, direction)   -- one open track per ticker+direction
+);
+CREATE INDEX IF NOT EXISTS idx_tracked_user ON tracked_trades(user_id, opened_at DESC);
+
+-- F2b: last-seen broker positions per user — the baseline the close detector
+-- diffs the next robinhood snapshot against. Persisted (not in-memory) so a
+-- restart doesn't read every position as freshly closed. close_seq is a
+-- monotonic counter making each detected close a unique dedupe key.
+CREATE TABLE IF NOT EXISTS broker_positions (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id),
+  positions TEXT NOT NULL,       -- JSON PosSnap[]
+  close_seq INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL
+);
+
+-- F1b: per-call Anthropic token usage, so AI spend is never invisible (the real
+-- fix for the empty-credits incident is a console budget alert; this is the
+-- in-app visibility). Written fire-and-forget from claudeQueue.
+CREATE TABLE IF NOT EXISTS ai_spend (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts INTEGER NOT NULL,
+  model TEXT NOT NULL,
+  input_tokens INTEGER NOT NULL DEFAULT 0,
+  output_tokens INTEGER NOT NULL DEFAULT 0,
+  cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+  cache_write_tokens INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_ai_spend_ts ON ai_spend(ts DESC);
+
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL DEFAULT 1,  -- owner; the global evaluator fires them all to the shared notify channel
@@ -408,4 +461,36 @@ export function recentBars(ticker: string, limit = 120): { ts: number; open: num
     .query(`SELECT ts, open, high, low, close, volume FROM bars WHERE ticker = ? ORDER BY ts DESC LIMIT ?`)
     .all(ticker, limit)
     .reverse() as any;
+}
+
+// ── F1b: AI spend logging ────────────────────────────────────────────────────
+// Fire-and-forget insert of one Anthropic response's token usage. Never throws
+// into the AI call path (a logging failure must not break analysis).
+export function recordSpend(model: string, u: {
+  input_tokens?: number; output_tokens?: number;
+  cache_read_input_tokens?: number; cache_creation_input_tokens?: number;
+}): void {
+  try {
+    db.query(
+      `INSERT INTO ai_spend (ts, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens)
+       VALUES (unixepoch(), ?, ?, ?, ?, ?)`
+    ).run(model, u.input_tokens ?? 0, u.output_tokens ?? 0, u.cache_read_input_tokens ?? 0, u.cache_creation_input_tokens ?? 0);
+  } catch { /* logging is best-effort */ }
+}
+
+export interface SpendDay {
+  day: string; calls: number;
+  input_tokens: number; output_tokens: number; cache_read_tokens: number; cache_write_tokens: number;
+}
+
+// Token usage grouped by local day for the last `days` days (Settings card).
+export function spendByDay(days = 7): SpendDay[] {
+  const since = Math.floor(Date.now() / 1000) - days * 86400;
+  return db.query(
+    `SELECT date(ts, 'unixepoch', 'localtime') AS day,
+            COUNT(*) AS calls,
+            SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
+            SUM(cache_read_tokens) AS cache_read_tokens, SUM(cache_write_tokens) AS cache_write_tokens
+     FROM ai_spend WHERE ts > ? GROUP BY day ORDER BY day DESC`
+  ).all(since) as SpendDay[];
 }

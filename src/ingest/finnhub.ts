@@ -34,9 +34,9 @@ const QUOTE_TTL_MS = 60_000;
 type QuoteEntry = { at: number; p: Promise<Quote>; q?: Quote };
 const quoteCache = new Map<string, QuoteEntry>();
 
-export function cachedQuote(ticker: string): Promise<Quote> {
+export function cachedQuote(ticker: string, force = false): Promise<Quote> {
   const hit = quoteCache.get(ticker);
-  if (hit && Date.now() - hit.at < QUOTE_TTL_MS) return hit.p;
+  if (!force && hit && Date.now() - hit.at < QUOTE_TTL_MS) return hit.p;
   if (quoteCache.size > 500) quoteCache.clear(); // ponytail: crude cap; single-user dash never needs LRU
   const entry: QuoteEntry = { at: Date.now(), p: fetchQuote(ticker) };
   entry.p
