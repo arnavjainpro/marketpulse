@@ -160,6 +160,18 @@ export async function refreshMarketContext(): Promise<MarketSnapshot> {
     `INSERT INTO market_snapshot (id, ts, regime, sectors, benchmarks) VALUES (1, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET ts=excluded.ts, regime=excluded.regime, sectors=excluded.sectors, benchmarks=excluded.benchmarks`
   ).run(snapshot.ts, JSON.stringify(regime), JSON.stringify(sectors), JSON.stringify(benchmarks));
+
+  // F6a: append rotation history, but only when a sector's state changes or its
+  // last row is ≥1h old — cadence-proof, so a burst of refreshes can't flood it.
+  const lastFor = db.query(`SELECT state, ts FROM sector_history WHERE sector = ? ORDER BY ts DESC LIMIT 1`);
+  const appendHist = db.query(`INSERT OR IGNORE INTO sector_history (sector, ts, state, rel1m) VALUES (?, ?, ?, ?)`);
+  for (const s of sectors) {
+    const last = lastFor.get(s.sector) as { state: string; ts: number } | null;
+    if (!last || last.state !== s.state || snapshot.ts - last.ts >= 3600) {
+      appendHist.run(s.sector, snapshot.ts, s.state, s.rel1m);
+    }
+  }
+
   console.log(`[market] regime: ${regime.label} · sectors leading: ${sectors.filter((s) => s.state === "leading").map((s) => s.etf).join(",") || "none"}`);
   return snapshot;
 }

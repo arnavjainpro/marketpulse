@@ -160,6 +160,18 @@ CREATE TABLE IF NOT EXISTS ideas (
   report TEXT NOT NULL           -- full JSON IdeaReport
 );
 
+-- F6a: append-only sector rotation history (market_snapshot is a singleton, so
+-- rotation trends were unrecoverable). One row per sector per state change (or
+-- ≥1h gap), so a future heatmap can draw trailing-weeks rotation.
+CREATE TABLE IF NOT EXISTS sector_history (
+  sector TEXT NOT NULL,
+  ts INTEGER NOT NULL,
+  state TEXT NOT NULL,           -- leading | improving | weakening | lagging
+  rel1m REAL,                    -- relative strength vs SPY (heatmap intensity)
+  PRIMARY KEY (sector, ts)
+);
+CREATE INDEX IF NOT EXISTS idx_sector_history ON sector_history(sector, ts DESC);
+
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL DEFAULT 1,  -- owner; the global evaluator fires them all to the shared notify channel
