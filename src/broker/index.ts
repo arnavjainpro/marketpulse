@@ -2,10 +2,17 @@
 // one-shot JSON import > portfolio.yaml. YAML theses are merged onto broker
 // positions by ticker either way, so "why you own it" survives auto-linking.
 import { loadPortfolio, loadRiskConfig, type Portfolio, type RiskConfig } from "../config";
-import { getRiskPrefs, getSettingFor, setSettingFor } from "../db";
+import { db, getRiskPrefs, getSettingFor, setSettingFor, insertEvent } from "../db";
 import { yamlProvider, importProvider } from "./manual";
 import { robinhoodProvider } from "./robinhood";
+import { closeDetect, type PosSnap } from "./closeDetect";
+import { cachedQuote } from "../ingest/finnhub";
+import { notifyTelegram, telegramEnabled } from "../notify/telegram";
 import type { BrokerSnapshot } from "./types";
+
+// Matches index.ts: the one account the background pipeline monitors. Broker
+// close-detection runs only for it, since Activity events are a global feed.
+const PRIMARY_USER_ID = 1;
 
 // Priority: linked Robinhood > one-shot import > portfolio.yaml.
 const providers = [robinhoodProvider, importProvider, yamlProvider];
@@ -57,6 +64,11 @@ async function doRefresh(userId: number): Promise<BrokerSnapshot> {
         `[broker] snapshot via ${snap.source} (user ${userId}): ${snap.holdings.length} positions, ${snap.watchlist.length} watched, ` +
         `${snap.openOrders.length} open orders${snap.account.equity != null ? `, equity $${snap.account.equity.toLocaleString()}` : ""}`
       );
+      // F2b: only ever diff robinhood-vs-robinhood (real fills) for the monitored
+      // account — a fallback/import snapshot must never touch the baseline.
+      if (snap.source === "robinhood" && userId === PRIMARY_USER_ID) {
+        try { await detectAndRecordCloses(userId, snap); } catch (err) { console.error("[broker] close-detect failed:", err); }
+      }
       return snap;
     } catch (err) {
       console.error(`[broker] ${p.name} failed for user ${userId}:`, err);
@@ -81,6 +93,55 @@ async function doRefresh(userId: number): Promise<BrokerSnapshot> {
 
 export function brokerSnapshot(userId: number): BrokerSnapshot | null {
   return cached.get(userId) ?? null;
+}
+
+// ── F2b: broker-fill close detection ─────────────────────────────────────────
+function toPosSnaps(holdings: BrokerSnapshot["holdings"]): PosSnap[] {
+  return holdings
+    .filter((h) => (h.asset_class as string) !== "crypto")
+    .map((h) => ({
+      key: h.ticker,
+      ticker: (h.option?.underlying ?? h.ticker).toUpperCase(),
+      direction: h.shares < 0 ? "short" : "long",
+      qty: h.shares,
+      assetClass: h.asset_class === "option" ? "option" : "equity",
+      expiry: h.option?.expiry ?? null,
+      costBasis: h.cost_basis ?? null,
+    }));
+}
+
+// Diff this robinhood snapshot against the persisted baseline, raise a
+// "journal it?" Activity event (+ Telegram) per detected close, then persist
+// the new baseline. First-ever snapshot (no baseline) records silently, so
+// linking an account never floods the feed with phantom closes.
+async function detectAndRecordCloses(userId: number, snap: BrokerSnapshot): Promise<void> {
+  const row = db.query(`SELECT positions, close_seq FROM broker_positions WHERE user_id = ?`).get(userId) as { positions: string; close_seq: number } | null;
+  const next = toPosSnaps(snap.holdings);
+  let seq = row?.close_seq ?? 0;
+
+  if (row) {
+    let prev: PosSnap[] = [];
+    try { prev = JSON.parse(row.positions); } catch { /* corrupt baseline → treat as empty, re-seed below */ }
+    const today = new Date().toISOString().slice(0, 10);
+    for (const e of closeDetect(prev, next, today)) {
+      seq++; // monotonic → unique dedupe key even if the same ticker closes twice
+      let estPnlPct: number | null = null;
+      if (e.costBasis && e.costBasis > 0) {
+        try { const q = await cachedQuote(e.ticker); if (q?.c) estPnlPct = ((q.c - e.costBasis) / e.costBasis) * 100 * (e.direction === "short" ? -1 : 1); } catch { /* no quote → no estimate */ }
+      }
+      const pnl = estPnlPct != null ? ` ~${estPnlPct >= 0 ? "+" : ""}${estPnlPct.toFixed(1)}% (est.)` : "";
+      const title = e.kind === "closed"
+        ? `📓 Closed ${e.ticker} (${e.direction})${pnl} — journal it?`
+        : `📓 Trimmed ${e.ticker} ${e.direction} to ${e.nowQty} of ${e.prevQty}${pnl} — journal it?`;
+      const id = insertEvent({ ts: Math.floor(Date.now() / 1000), ticker: e.ticker, kind: "position_close", title, detail: { ...e, estPnlPct }, dedupeKey: `brokerclose:${userId}:${seq}` });
+      if (id && telegramEnabled()) { try { await notifyTelegram(title + (e.note ? ` (${e.note})` : "")); } catch { /* delivery best-effort */ } }
+    }
+  }
+
+  db.query(
+    `INSERT INTO broker_positions (user_id, positions, close_seq, updated_at) VALUES (?, ?, ?, unixepoch())
+     ON CONFLICT(user_id) DO UPDATE SET positions = excluded.positions, close_seq = excluded.close_seq, updated_at = excluded.updated_at`
+  ).run(userId, JSON.stringify(next), seq);
 }
 
 // ── UI watchlist edits (persisted per user, merged onto every snapshot) ─────

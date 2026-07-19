@@ -5553,6 +5553,7 @@
         case "screener_pick": return `${e.ticker} scores highly across our long checklist`;
         case "screener_short": return `${e.ticker} shows a confirmed breakdown (short setup)`;
         case "market_mover": return e.title;
+        case "position_close": return e.title;
         default: return e.title;
       }
     }
@@ -5568,6 +5569,7 @@
       moves: { label: "Price/volume", kinds: new Set(["price_move", "volume_spike", "gap", "week52", "market_mover"]) },
       earnings: { label: "Earnings", kinds: new Set(["earnings"]) },
       expiry: { label: "Options expiry", kinds: new Set(["option_expiry"]) },
+      journal: { label: "To journal", kinds: new Set(["position_close"]) },
     };
     let actCat = "all", actImportantOnly = false;
     function renderActFilters() {
@@ -5608,8 +5610,17 @@
         ${important ? `<span class="chip ${e.severity === "critical" ? "sell" : "warn"}">${e.severity === "critical" ? "Important" : "Notable"}</span>` : ""}
       </button>
       <div class="detail">${esc(e.title)}${e.triage_rationale ? `<br><span style="color:var(--faint)">${esc(e.triage_rationale)}</span>` : ""}
+        ${e.kind === "position_close" ? `<br><a href="#" class="jr-from-act" style="font-size:12px">Journal this trade →</a>` : ""}
         ${e.ticker && !e.ticker.startsWith("^") ? `<br><a href="#stock/${esc(e.ticker)}" style="font-size:12px">View ${esc(e.ticker)} →</a>` : ""}</div>`;
         row.querySelector(".rowbtn").addEventListener("click", () => toggleRow(row));
+        const jr = row.querySelector(".jr-from-act");
+        if (jr) jr.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          let d = {}; try { d = JSON.parse(e.detail || "{}"); } catch { }
+          showPane("history");
+          // let the History pane render before scrolling the form into view
+          setTimeout(() => prefillJournal({ ticker: d.ticker || e.ticker, direction: d.direction || "long" }), 60);
+        });
         box.appendChild(row);
       }
     }

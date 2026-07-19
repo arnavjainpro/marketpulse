@@ -188,6 +188,17 @@ CREATE TABLE IF NOT EXISTS tracked_trades (
 );
 CREATE INDEX IF NOT EXISTS idx_tracked_user ON tracked_trades(user_id, opened_at DESC);
 
+-- F2b: last-seen broker positions per user — the baseline the close detector
+-- diffs the next robinhood snapshot against. Persisted (not in-memory) so a
+-- restart doesn't read every position as freshly closed. close_seq is a
+-- monotonic counter making each detected close a unique dedupe key.
+CREATE TABLE IF NOT EXISTS broker_positions (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id),
+  positions TEXT NOT NULL,       -- JSON PosSnap[]
+  close_seq INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL DEFAULT 1,  -- owner; the global evaluator fires them all to the shared notify channel
