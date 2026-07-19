@@ -3357,6 +3357,7 @@
 
         <section data-pane="history">
           <h2>Trade journal</h2>
+          <div class="card" id="tracked-list" style="margin-bottom:12px;padding:10px 16px;display:none"></div>
           <form class="settings-card" id="journal-form">
             <div class="settings-row">
               <label>Ticker<input type="text" id="jr-ticker" style="text-transform:uppercase" required></label>
@@ -4502,6 +4503,7 @@
         <div class="stat"><div class="k">Holding period</div><div class="v" style="font-size:12.5px">${esc(tp.holding_period ?? "—")}</div></div>
       </div>
       ${tp.targets?.length ? `<div class="klabel">Targets</div><ul>${tp.targets.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
+      ${rep.rating !== "reject" ? `<button class="advise-btn ghost" data-track="${esc(rep.ticker)}" data-track-dir="${rep.direction === "short" ? "short" : "long"}" data-track-entry="${esc((String(tp.entry_zone ?? "").match(/\d+(?:\.\d+)?/) || [""])[0])}" style="margin-top:8px">${icon("check", 13)} Track this trade</button>` : ""}
       <div class="klabel">Technical case</div>
       <ul>${(rep.technical_reasons ?? []).map((r) => `<li>${esc(r)}</li>`).join("") || "<li>—</li>"}</ul>
       <div class="klabel">News & catalyst ${rep.catalyst ? `<span class="chip ${rep.catalyst.quality === "strong" ? "buy" : rep.catalyst.quality === "conflicting" ? "sell" : rep.catalyst.quality === "noisy" ? "warn" : "calm"} sm">${esc(rep.catalyst.quality)}</span>` : ""}</div>
@@ -4564,6 +4566,22 @@
       container.prepend(node);
       node.scrollIntoView({ behavior: "smooth", block: "start" });
     }
+
+    // Track buttons on idea reports (event delegation) → open a tracked trade
+    // that lands in the journal on close.
+    document.addEventListener("click", async (ev) => {
+      const btn = ev.target.closest("[data-track]");
+      if (!btn || btn.disabled) return;
+      btn.disabled = true;
+      try {
+        const res = await (await fetch("/api/track", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ticker: btn.dataset.track, direction: btn.dataset.trackDir, entry_price: btn.dataset.trackEntry || null }),
+        })).json();
+        if (res.ok) { btn.innerHTML = `${icon("check", 13)} Tracking — close it in the journal`; toast(`Tracking ${btn.dataset.track} — it'll be waiting in your journal`); }
+        else { btn.disabled = false; toast(`Track failed: ${res.error}`, "err"); }
+      } catch { btn.disabled = false; toast("Track failed", "err"); }
+    });
 
     // Validate buttons everywhere (event delegation)
     document.addEventListener("click", async (ev) => {
@@ -4926,9 +4944,46 @@
     });
 
     /* ── settings: trade journal ── */
+    // Prefill the journal form from a tracked/closed trade and bring it into view.
+    function prefillJournal(t) {
+      $("#jr-ticker").value = t.ticker || "";
+      $("#jr-dir").value = t.direction || "long";
+      if (t.entry_price != null) $("#jr-entry").value = t.entry_price;
+      if (t.exit_price != null) $("#jr-exit").value = t.exit_price;
+      const form = $("#journal-form");
+      form.scrollIntoView({ behavior: "smooth", block: "center" });
+      form.classList.add("rise");
+      setTimeout(() => form.classList.remove("rise"), 400);
+      $("#jr-outcome").focus();
+    }
+
     async function loadJournal() {
       try {
-        const { outcomes } = await (await fetch("/api/journal")).json();
+        const { outcomes, tracked = [] } = await (await fetch("/api/journal")).json();
+        // Open trades the user is tracking — Close prefills the form below.
+        const tbox = $("#tracked-list");
+        if (tracked.length) {
+          tbox.style.display = "";
+          tbox.innerHTML = `<div style="font-weight:600;font-size:12.5px;margin-bottom:6px">Open trades you're tracking</div>` +
+            tracked.map((t, i) => `<div class="journal-item" data-tracked="${i}">
+              <span style="font-weight:700">${esc(t.ticker)}</span>
+              <span class="chip ${t.direction === "long" ? "buy" : "sell"} sm">${esc(t.direction)}</span>
+              ${t.entry_price != null ? `<span style="color:var(--faint);font-size:12px">entry $${esc(String(t.entry_price))}</span>` : ""}
+              <span style="color:var(--faint);font-size:12px">since ${new Date(t.opened_at * 1000).toLocaleDateString()}</span>
+              <button class="advise-btn ghost" data-close style="margin:0;padding:2px 10px;font-size:12px">Close → journal</button>
+              <button class="del" data-untrack title="stop tracking">${icon("close", 12)}</button>
+            </div>`).join("");
+          tbox.querySelectorAll("[data-tracked]").forEach((row) => {
+            const t = tracked[+row.dataset.tracked];
+            row.querySelector("[data-close]").addEventListener("click", () => prefillJournal(t));
+            row.querySelector("[data-untrack]").addEventListener("click", async () => {
+              await fetch(`/api/tracked/${t.id}`, { method: "DELETE" });
+              toast("Stopped tracking " + t.ticker);
+              loadJournal();
+            });
+          });
+        } else { tbox.style.display = "none"; tbox.innerHTML = ""; }
+
         const box = $("#journal-list");
         if (!outcomes.length) {
           box.innerHTML = `<div class="empty">No trades logged yet. Each one you log makes future AI analysis more personal.</div>`;

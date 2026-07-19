@@ -172,6 +172,22 @@ CREATE TABLE IF NOT EXISTS sector_history (
 );
 CREATE INDEX IF NOT EXISTS idx_sector_history ON sector_history(sector, ts DESC);
 
+-- F2b: open trades the user is tracking toward a journal entry. Kept separate
+-- from trade_outcomes (which is closed-only, read by the AI as real history) so
+-- an open position never pollutes that context. Closing one moves it into
+-- trade_outcomes and deletes the row here.
+CREATE TABLE IF NOT EXISTS tracked_trades (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  ticker TEXT NOT NULL,
+  direction TEXT NOT NULL,       -- long | short
+  idea_id INTEGER REFERENCES ideas(id),
+  entry_price REAL,
+  opened_at INTEGER NOT NULL,
+  UNIQUE(user_id, ticker, direction)   -- one open track per ticker+direction
+);
+CREATE INDEX IF NOT EXISTS idx_tracked_user ON tracked_trades(user_id, opened_at DESC);
+
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL DEFAULT 1,  -- owner; the global evaluator fires them all to the shared notify channel

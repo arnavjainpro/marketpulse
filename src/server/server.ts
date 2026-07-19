@@ -20,7 +20,7 @@ import { getRiskPrefs, setRiskPrefs } from "../db";
 import { saveImport, clearImport, type ImportPayload } from "../broker/manual";
 import { getBrokerLink } from "../db";
 import { allTickers } from "../config";
-import { logOutcome, listOutcomes, deleteOutcome } from "../ai/journal";
+import { logOutcome, listOutcomes, deleteOutcome, trackTrade, listTracked, untrack, untrackByKey, trackedKeys } from "../ai/journal";
 import { hashPassword, verifyPassword, createUser, findUserByEmail, findUserById, getProfile, updateProfile, createSession, destroySession } from "../auth";
 import { userIdFromRequest, sessionTokenFromRequest, sessionCookieHeader, clearCookieHeader } from "../auth/middleware";
 import { join } from "path";
@@ -448,18 +448,49 @@ export function startServer() {
             pnl_pct: num(body.pnl_pct), notes: String(body.notes ?? "").slice(0, 2000),
             closed_at: num(body.closed_at) ?? undefined,
           });
+          untrackByKey(userId, ticker, direction); // journaling a trade clears its open track
           return Response.json({ ok: true, id });
         } catch (err) {
           return Response.json({ ok: false, error: String(err) }, { status: 400 });
         }
       }
       if (url.pathname === "/api/journal") {
-        return Response.json({ outcomes: listOutcomes(userId, 50) });
+        return Response.json({ outcomes: listOutcomes(userId, 50), tracked: listTracked(userId) });
       }
       if (url.pathname.startsWith("/api/journal/") && req.method === "DELETE") {
         const id = Number(url.pathname.split("/").pop());
         if (!Number.isInteger(id)) return Response.json({ ok: false, error: "bad id" }, { status: 400 });
         return Response.json({ ok: deleteOutcome(userId, id) });
+      }
+
+      // F2b: track an idea toward a future journal entry (the manual path,
+      // fallback for unlinked users). Ownership on idea_id guarded below.
+      if (url.pathname === "/api/track" && req.method === "POST") {
+        try {
+          const body = (await req.json()) as any;
+          const ticker = String(body.ticker ?? "").toUpperCase().trim();
+          const direction = body.direction === "short" ? "short" : "long";
+          if (!ticker) return Response.json({ ok: false, error: "no ticker" }, { status: 400 });
+          const num = (v: unknown) => (v == null || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
+          let idea_id = num(body.idea_id);
+          // Only accept an idea_id the caller actually owns (no cross-user linkage).
+          if (idea_id != null) {
+            const owns = db.query(`SELECT 1 FROM ideas WHERE id = ? AND user_id = ?`).get(idea_id, userId);
+            if (!owns) idea_id = null;
+          }
+          const id = trackTrade(userId, { ticker, direction, idea_id, entry_price: num(body.entry_price) });
+          return Response.json({ ok: true, id });
+        } catch (err) {
+          return Response.json({ ok: false, error: String(err) }, { status: 400 });
+        }
+      }
+      if (url.pathname === "/api/tracked") {
+        return Response.json({ tracked: listTracked(userId), keys: trackedKeys(userId) });
+      }
+      if (url.pathname.startsWith("/api/tracked/") && req.method === "DELETE") {
+        const id = Number(url.pathname.split("/").pop());
+        if (!Number.isInteger(id)) return Response.json({ ok: false, error: "bad id" }, { status: 400 });
+        return Response.json({ ok: untrack(userId, id) });
       }
 
       // Per-user risk preferences (equity fallback, risk %, position cap, target R:R).

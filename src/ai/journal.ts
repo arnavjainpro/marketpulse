@@ -56,6 +56,49 @@ export function deleteOutcome(userId: number, id: number): boolean {
   return db.query(`DELETE FROM trade_outcomes WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0;
 }
 
+// ── F2b: open-trade tracking (feeds the journal on close) ─────────────────────
+export interface TrackedTrade {
+  id: number; ticker: string; direction: "long" | "short";
+  idea_id: number | null; entry_price: number | null; opened_at: number;
+}
+
+// Start tracking an idea toward a journal entry. Re-tracking the same
+// ticker+direction refreshes entry/idea rather than erroring (UNIQUE upsert).
+export function trackTrade(userId: number, t: {
+  ticker: string; direction: "long" | "short"; idea_id?: number | null; entry_price?: number | null;
+}): number {
+  const res = db.query(
+    `INSERT INTO tracked_trades (user_id, ticker, direction, idea_id, entry_price, opened_at)
+     VALUES (?, ?, ?, ?, ?, unixepoch())
+     ON CONFLICT(user_id, ticker, direction) DO UPDATE SET idea_id = excluded.idea_id, entry_price = excluded.entry_price, opened_at = excluded.opened_at
+     RETURNING id`
+  ).get(userId, t.ticker.toUpperCase().trim(), t.direction, t.idea_id ?? null, t.entry_price ?? null) as { id: number };
+  return res.id;
+}
+
+export function listTracked(userId: number): TrackedTrade[] {
+  return db.query(
+    `SELECT id, ticker, direction, idea_id, entry_price, opened_at FROM tracked_trades WHERE user_id = ? ORDER BY opened_at DESC`
+  ).all(userId) as TrackedTrade[];
+}
+
+export function untrack(userId: number, id: number): boolean {
+  return db.query(`DELETE FROM tracked_trades WHERE user_id = ? AND id = ?`).run(userId, id).changes > 0;
+}
+
+// Clear any open track for a ticker+direction — called when the trade is
+// journaled (manually or from a broker-detected close) so it can't linger.
+export function untrackByKey(userId: number, ticker: string, direction: "long" | "short"): void {
+  db.query(`DELETE FROM tracked_trades WHERE user_id = ? AND ticker = ? AND direction = ?`).run(userId, ticker.toUpperCase().trim(), direction);
+}
+
+// The set of ticker|direction keys the user is tracking — lets idea cards show
+// a "Tracking" state without a round-trip per card.
+export function trackedKeys(userId: number): string[] {
+  return (db.query(`SELECT ticker, direction FROM tracked_trades WHERE user_id = ?`).all(userId) as any[])
+    .map((r) => `${r.ticker}|${r.direction}`);
+}
+
 // Compact prompt block: the trader's last few outcomes overall plus every
 // outcome on the specific ticker being analyzed ("I've lost on this exact name
 // twice the same way" is the highest-value context). Capped small — roughly ten
