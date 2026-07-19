@@ -15,6 +15,7 @@ import { listAlerts, createAlert, deleteAlert, type AlertKind } from "../engine/
 import { getMarketSnapshot } from "../engine/market";
 import { currentPortfolio, brokerSnapshot, refreshBroker, loadRiskConfigFor, updateWatchlist } from "../broker";
 import { earningsFor, ideaScoreboard, calibration } from "../engine/insights";
+import { computeConcentration, type ConcHolding } from "../engine/concentration";
 import { getRiskPrefs, setRiskPrefs } from "../db";
 import { saveImport, clearImport, type ImportPayload } from "../broker/manual";
 import { getBrokerLink } from "../db";
@@ -248,6 +249,31 @@ export function startServer() {
       if (url.pathname === "/api/calibration") {
         try {
           return Response.json({ ok: true, ...(await calibration(userId)) });
+        } catch (err) {
+          return Response.json({ ok: false, error: String(err) }, { status: 500 });
+        }
+      }
+
+      // F3: portfolio concentration — deterministic ($0). Resolve each holding's
+      // value/sector/beta, then let the pure engine do the grouping + warnings.
+      if (url.pathname === "/api/concentration") {
+        try {
+          const holdings = currentPortfolio(userId).holdings.filter((h) => (h.asset_class as string) !== "crypto");
+          const maxPositionPct = loadRiskConfigFor(userId).max_position_pct ?? 20;
+          // Beta + sector key off the underlying (options) or the ticker (equities).
+          const betaFor = (key: string): number | null => {
+            const row = db.query(`SELECT indicators FROM screener WHERE ticker = ?`).get(key) as any;
+            if (!row) return null;
+            try { return JSON.parse(row.indicators).beta ?? null; } catch { return null; }
+          };
+          const items: ConcHolding[] = await Promise.all(holdings.map(async (h) => {
+            const key = (h.option?.underlying ?? h.ticker).toUpperCase();
+            let value = 0;
+            if (h.market_value != null) value = Math.abs(h.market_value);          // options / broker-priced
+            else { try { const q = await cachedQuote(h.ticker); if (q?.c) value = Math.abs(h.shares * q.c); } catch {} }
+            return { key, value, sector: universeMeta(key)?.sector ?? "Unknown", beta: h.asset_class === "option" ? null : betaFor(key) };
+          }));
+          return Response.json({ ok: true, ...computeConcentration(items, maxPositionPct) });
         } catch (err) {
           return Response.json({ ok: false, error: String(err) }, { status: 500 });
         }
