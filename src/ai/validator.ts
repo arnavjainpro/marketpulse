@@ -9,7 +9,7 @@
 // never sufficient; shorts require structural breakdown plus a bearish case,
 // not just recent weakness. Conservative by design: when in doubt, downgrade.
 import Anthropic from "@anthropic-ai/sdk";
-import { config, type Portfolio } from "../config";
+import { config, loadRiskConfig, type Portfolio } from "../config";
 import { db } from "../db";
 import { fetchDailyCandles } from "../ingest/yahoo";
 import { fetchCompanyNews, fetchNextEarnings, cachedQuote } from "../ingest/finnhub";
@@ -18,9 +18,9 @@ import { stressStructure, type Leg } from "../engine/optionsMath";
 import { universeMeta, sectorEtf } from "../ingest/universe";
 import { computeIndicators, scoreLong, scoreShort, directionOf, type Indicators, type ScreenRow, getScreenerRows } from "../engine/screener";
 import { benchmarkCandles, refreshMarketContext, getMarketSnapshot, marketContextText } from "../engine/market";
-import { positionSizing, accountContextText, loadRiskConfigFor, type SizingPlan } from "../broker";
+import { positionSizing, accountContextText, type SizingPlan } from "../broker";
 import { journalContextText } from "./journal";
-import { claudeQueue } from "./queue";
+import { claudeQueue, parseJsonResponse } from "./queue";
 import { opusBreaker } from "./breaker";
 
 const client = new Anthropic();
@@ -305,7 +305,10 @@ export async function gatherIdeaContext(
 
   const earnings = await fetchNextEarnings(ticker);
   const frame = tradeFrame(ind, dir);
-  const sizing = positionSizing(userId, frame.entry, frame.stop);
+  // Ideas are medium/long-term equity positions: size against account equity
+  // with fixed account defaults, NOT the trader's short-term Analyze-tab risk
+  // prefs — the Ideas tab is fully independent of the analyzer.
+  const sizing = positionSizing(userId, frame.entry, frame.stop, { risk: loadRiskConfig(), basis: "equity" });
   let optionsText: string | null = null;
   let optionsSummary: OptionsSummary | null = null;
   if (withOptions) {
@@ -339,9 +342,11 @@ function contextToPrompt(userId: number, ctx: IdeaContext, portfolio: Portfolio,
   const snap = getMarketSnapshot();
   const secRot = snap?.sectors.find((s) => s.sector === ctx.sector);
   const fmt = (v: number | null | undefined, dec = 2) => (v != null ? v.toFixed(dec) : "n/a");
-  // Numeric R:R thresholds live here, NOT in the system prompt — the system
-  // block stays byte-identical across users so prompt-cache hits survive.
-  const targetRR = loadRiskConfigFor(userId).target_rr_ratio;
+  // Ideas are medium-to-long-term equity buys/shorts, so the R:R bar is a fixed
+  // 2:1 — deliberately NOT the trader's analyzer target_rr (that knob is for the
+  // short-term swing/options Analyze tab only). Keeping it constant also holds
+  // the system block byte-identical across users so prompt-cache hits survive.
+  const targetRR = 2;
 
   return [
     `IDEA TO VALIDATE: ${ctx.ticker} (${ctx.name}) — ${ctx.requestedDirection === "auto" ? `direction AUTO (quant lean: ${ctx.quantDirection})` : ctx.requestedDirection.toUpperCase()}`,
@@ -432,15 +437,14 @@ export async function validateIdea(
     const response = await claudeQueue(() =>
       client.messages.create({
         model: config.modelDeep,
-        max_tokens: 4096,
+        max_tokens: 12000,
         thinking: { type: "adaptive" },
         system: [{ type: "text", text: VALIDATOR_SYSTEM, cache_control: { type: "ephemeral" } }],
         output_config: { format: { type: "json_schema", schema: IDEA_SCHEMA } },
         messages: [{ role: "user", content: contextToPrompt(userId, ctx, portfolio, opts.notes) }],
       })
     );
-    const text = response.content.find((b) => b.type === "text");
-    const report = { ticker: ctx.ticker, ...(JSON.parse(text!.text) as Omit<IdeaReport, "ticker">) };
+    const report = { ticker: ctx.ticker, ...parseJsonResponse<Omit<IdeaReport, "ticker">>(response, "validator") };
     priceOptionsView(report, ctx);
     db.query(`INSERT INTO ideas (ts, ticker, direction, rating, confidence, source, report, user_id) VALUES (unixepoch(), ?, ?, ?, ?, ?, ?, ?)`)
       .run(ctx.ticker, report.direction, report.rating, report.confidence, opts.source ?? "validate", JSON.stringify(report), userId);

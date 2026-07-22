@@ -34,3 +34,21 @@ export function claudeQueue<T>(fn: () => Promise<T>): Promise<T> {
     return res;
   });
 }
+
+// Every json_schema call site parses the response the same way, and every one of
+// them used to blow up the same two ways when the model ran out of max_tokens
+// mid-answer (adaptive thinking spends from the same budget): either the text
+// block is missing entirely, or it holds half a JSON document. Both surfaced as
+// a raw TypeError/SyntaxError with no hint at the cause — parse in one place and
+// name it instead.
+export function parseJsonResponse<T>(res: { content: any[]; stop_reason?: string | null }, label: string): T {
+  const text = res.content.find((b) => b.type === "text")?.text;
+  if (res.stop_reason === "max_tokens" || !text) {
+    throw new Error(`${label}: response hit the token limit before the JSON was complete (stop_reason=${res.stop_reason ?? "none"}) — raise max_tokens`);
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`${label}: model returned invalid JSON (${text.length} chars, stop_reason=${res.stop_reason ?? "none"})`);
+  }
+}

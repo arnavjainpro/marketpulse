@@ -4,7 +4,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { config } from "../config";
 import type { StrategySpec, Rule, Param } from "../engine/backtest";
-import { claudeQueue } from "./queue";
+import { claudeQueue, parseJsonResponse } from "./queue";
 import { haikuBreaker } from "./breaker";
 
 const client = new Anthropic();
@@ -91,7 +91,7 @@ export async function parseStrategy(ticker: string, description: string, image?:
         messages: [{ role: "user", content }],
       })
     );
-    const raw = JSON.parse(res.content.find((b) => b.type === "text")!.text) as any;
+    const raw = parseJsonResponse<any>(res, "strategy");
     if (raw.clarification) return { clarification: String(raw.clarification) };
     const entry = (raw.entry ?? []).map(toRule).filter(Boolean) as Rule[];
     const exit = (raw.exit ?? []).map(toRule).filter(Boolean) as Rule[];
