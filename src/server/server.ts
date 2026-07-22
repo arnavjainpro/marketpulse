@@ -186,8 +186,12 @@ export function startServer() {
         const q = (url.searchParams.get("q") ?? "").toUpperCase().replace(/[^A-Z0-9.\- ]/g, "").trim();
         if (!q) return Response.json({ results: [] });
         const rows = db.query(
+          // `ticker NOT LIKE '% %'` filters composite option strings ("MRVL
+          // 2026-07-24 203C") out of results — the row guard, not a query guard,
+          // so multi-word name search still works.
           `SELECT ticker, name FROM universe
-           WHERE ticker LIKE $q || '%' OR name LIKE '%' || $q || '%'
+           WHERE (ticker LIKE $q || '%' OR name LIKE '%' || $q || '%')
+             AND ticker NOT LIKE '% %'
            ORDER BY
              CASE
                WHEN ticker = $q THEN 0

@@ -3,6 +3,7 @@
 // portfolio, technicals, recent events, and its own past signals.
 import Anthropic from "@anthropic-ai/sdk";
 import { config, allTickers, type Portfolio } from "../config";
+import { universeMeta } from "../ingest/universe";
 import { db, recentBars } from "../db";
 import { snapshot } from "../engine/technicals";
 import { marketContextText } from "../engine/market";
@@ -188,18 +189,27 @@ export async function scorePortfolio(userId: number, portfolio: Portfolio): Prom
   if (!opusBreaker.allow()) throw new Error("AI circuit breaker is tripped — reset it from the status bar.");
   const rows = new Map(getScreenerRows(portfolio).map((r) => [r.ticker, r]));
   const lines: string[] = ["POSITIONS:"];
+  let hasEtf = false;
   for (const h of portfolio.holdings) {
     const cls = h.asset_class ?? "equity";
-    let line = `- ${h.ticker} (${cls}): ${h.shares} ${cls === "option" ? "contracts" : "shares"} @ $${h.cost_basis} cost`;
+    // An ETF held as an equity position is internally diversified — mark it so
+    // the model doesn't read a single fund as a concentrated single-stock bet.
+    const meta = universeMeta(h.ticker);
+    const isEtf = meta?.sector === "ETF";
+    if (isEtf) hasEtf = true;
+    const tag = isEtf ? `ETF — ${meta!.name}` : cls;
+    let line = `- ${h.ticker} (${tag}): ${h.shares} ${cls === "option" ? "contracts" : "shares"} @ $${h.cost_basis} cost`;
     if (h.market_value != null) line += `, market value $${Math.round(h.market_value).toLocaleString()}`;
     else {
       try { const q = await cachedQuote(h.ticker); line += `, now $${q.c} (${q.dp?.toFixed(1)}% today), value $${Math.round(q.c * h.shares).toLocaleString()}`; } catch {}
     }
     const r = rows.get(h.ticker);
     if (r) line += ` — sector ${r.sector}, long score ${r.long_score}/100, short score ${r.short_score}/100`;
+    else if (meta) line += ` — sector ${meta.sector}`;
     if (h.thesis) line += `\n  thesis: ${h.thesis}`;
     lines.push(line);
   }
+  if (hasEtf) lines.push("", "NOTE: positions marked ETF are diversified funds, not single stocks — a single ETF holding is NOT concentration; do not tell the trader to diversify out of one ETF.");
   if (!portfolio.holdings.length) lines.push("(no positions)");
   lines.push("", marketContextText(), "", accountContextText(userId));
 
