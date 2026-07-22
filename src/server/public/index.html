@@ -4033,7 +4033,7 @@
       if (i.rangeState === "breakdown") plain.push(`Just broke below its recent range${i.rangeVolConfirmed ? " on heavy volume" : " (volume unconvincing)"}.`);
       if (i.rsSpy1m != null && Math.abs(i.rsSpy1m) > 3) plain.push(`It has ${i.rsSpy1m > 0 ? "outperformed" : "lagged"} the S&P 500 by ${Math.abs(i.rsSpy1m).toFixed(0)} points over the past month.`);
       if (Math.abs(i.mom3m) > 5) plain.push(`${i.mom3m > 0 ? "Up" : "Down"} ${Math.abs(i.mom3m).toFixed(0)}% over the last 3 months.`);
-      if (i.volTrend > 1.15) plain.push("Trading volume is picking up — more investors are participating.");
+      if (i.volTrend != null && i.volTrend > 1.15) plain.push(`Volume is running about ${Math.round((i.volTrend - 1) * 100)}% above its recent average — participation is picking up.`);
       if (i.rsi14 != null && i.rsi14 > 75) plain.push("It has risen fast recently and may be due for a breather (overbought).");
       if (i.rsi14 != null && i.rsi14 < 30) plain.push("It has fallen hard recently (oversold) — sometimes a bounce setup.");
       const f = (v, d = 2) => v != null ? Number(v).toFixed(d) : "—";
@@ -4221,7 +4221,9 @@
         <div class="klabel">Triggered by</div><p style="color:var(--dim)">${esc(e.title)}</p>
         ${screener[e.ticker] ? factorDetail(e.ticker) : ""}
       </div>`;
-        div.querySelector(".rowbtn").addEventListener("click", () => toggleRow(div));
+        // Clicking an idea opens the full stock page (superset of the old inline
+        // mini) rather than expanding in place.
+        div.querySelector(".rowbtn").addEventListener("click", () => showPane("stock", e.ticker));
         list.appendChild(div);
       }
     }
@@ -4271,7 +4273,8 @@
         <p>You hold ${Math.abs(h.shares)} ${unit}${Math.abs(h.shares) === 1 ? "" : "s"} at a cost of ${money(h.cost_basis)} each — ${gain >= 0 ? "up" : "down"} <b class="${gain >= 0 ? "up" : "down"}">${money(Math.abs(gain))}</b> overall.</p>
         ${factorDetail(sym)}
       </div>`;
-      wrap.querySelector(".rowbtn").addEventListener("click", () => toggleRow(wrap));
+      // Full stock page (options resolve to their underlying via `sym`).
+      wrap.querySelector(".rowbtn").addEventListener("click", () => showPane("stock", sym));
       sparkSvg(wrap.querySelector(".mini-spark"), screener[sym]?.indicators?.spark);
       return wrap;
     }
@@ -4587,7 +4590,7 @@
           <div class="row-price"><div class="sub" style="font-size:12px;color:var(--dim);max-width:150px;white-space:normal;text-align:right">${reasons.slice(0, 2).join(" · ") || "Multi-factor"}</div></div>
         </button>
         <div class="detail">${r ? factorDetail(item.ticker) : `<p class="empty">no detail</p>`}</div>`;
-          wrap.querySelector(".rowbtn").addEventListener("click", () => toggleRow(wrap));
+          wrap.querySelector(".rowbtn").addEventListener("click", () => showPane("stock", item.ticker));
           if (i) sparkSvg(wrap.querySelector(".mini-spark"), i.spark);
           groupBox.appendChild(wrap);
         }
