@@ -16,8 +16,8 @@ import { universeMeta, sectorEtf } from "../ingest/universe";
 import { computeIndicators } from "../engine/screener";
 import { benchmarkCandles, refreshMarketContext, marketContextText } from "../engine/market";
 import { rsi, macd, vwap, pivotLevels, atr, type Bar } from "../engine/technicals";
-import { positionSizing, accountContextText } from "../broker";
-import { claudeQueue } from "./queue";
+import { positionSizing, accountContextText, loadRiskConfigFor } from "../broker";
+import { claudeQueue, parseJsonResponse } from "./queue";
 import { opusBreaker } from "./breaker";
 
 const client = new Anthropic();
@@ -306,12 +306,17 @@ async function buildDataContext(userId: number, req: IntradayRequest): Promise<{
         ``,
         `SIZING MATH (example with a ${fmt(stopDist)}$ ≈ 0.35×dailyATR stop): ` +
         (sz.accountEquity
-          ? `equity $${sz.accountEquity.toLocaleString()}, max risk ${sz.riskPct}% = $${sz.riskDollars} → ~${sz.shares} shares. Rescale linearly to the actual stop distance you choose.`
+          ? `buying power $${sz.accountEquity.toLocaleString()}, max risk ${sz.riskPct}% = $${sz.riskDollars} → ~${sz.shares} shares. Rescale linearly to the actual stop distance you choose.`
           : sz.note)
       );
     }
   }
   lines.push(accountContextText(userId));
+
+  // The trader's own reward:risk bar (Analyze tab) drives what counts as a strong
+  // short-term setup here — this is the one place target_rr is consumed now.
+  const targetRR = loadRiskConfigFor(userId).target_rr_ratio;
+  lines.push(`TARGET REWARD:RISK — the trader wants at least ${targetRR.toFixed(1)}:1 to the first target for a "strong" setup; below that, rate the R:R leg weak and say so.`);
 
   if (req.options || swing) {
     lines.push(``, optionsContextText(await fetchOptionsSummary(ticker)),
@@ -342,7 +347,10 @@ export async function analyzeIntraday(userId: number, req: IntradayRequest, port
   // Normalize to a labeled image list (legacy single `image` still works). Cap
   // at 4 (1D/1W/1M charts + an optional options-chain screenshot).
   const imageList = (req.images?.length ? req.images : req.image ? [{ label: "", data: req.image }] : []).slice(0, 4);
-  if (!req.ticker && !imageList.length) return { error: "provide a ticker, a chart screenshot, or both" };
+  // Screenshot-only analysis is no longer accepted: without a symbol none of the
+  // live cross-checks below (bars, daily structure, chain, news, sizing) can run,
+  // and the plan degrades to reading a picture.
+  if (!req.ticker?.trim()) return { error: "a ticker is required — enter the symbol you're analyzing" };
 
   const { ticker, text } = await buildDataContext(userId, req);
   const held = portfolio.holdings.find((h) => h.ticker === ticker);
@@ -366,15 +374,16 @@ export async function analyzeIntraday(userId: number, req: IntradayRequest, port
     const response = await claudeQueue(() =>
       client.messages.create({
         model: config.modelDeep,
-        max_tokens: 3072,
+        // Swing mode's plan (full options strategy + every prose field) runs long,
+        // and adaptive thinking draws from this same budget — 3072 truncated it.
+        max_tokens: 12000,
         thinking: { type: "adaptive" },
         system: [{ type: "text", text: INTRADAY_SYSTEM, cache_control: { type: "ephemeral" } }],
         output_config: { format: { type: "json_schema", schema: PLAN_SCHEMA } },
         messages: [{ role: "user", content }],
       })
     );
-    const textBlock = response.content.find((b) => b.type === "text");
-    const plan = { ticker, ...(JSON.parse(textBlock!.text) as Omit<IntradayPlan, "ticker">) };
+    const plan = { ticker, ...parseJsonResponse<Omit<IntradayPlan, "ticker">>(response, "intraday") };
 
     // Options legs are model-proposed; the max-loss/gain/breakeven the trader
     // sees is computed deterministically (Black-Scholes), never taken on the

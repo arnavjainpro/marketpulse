@@ -186,8 +186,12 @@ export function startServer() {
         const q = (url.searchParams.get("q") ?? "").toUpperCase().replace(/[^A-Z0-9.\- ]/g, "").trim();
         if (!q) return Response.json({ results: [] });
         const rows = db.query(
+          // `ticker NOT LIKE '% %'` filters composite option strings ("MRVL
+          // 2026-07-24 203C") out of results — the row guard, not a query guard,
+          // so multi-word name search still works.
           `SELECT ticker, name FROM universe
-           WHERE ticker LIKE $q || '%' OR name LIKE '%' || $q || '%'
+           WHERE (ticker LIKE $q || '%' OR name LIKE '%' || $q || '%')
+             AND ticker NOT LIKE '% %'
            ORDER BY
              CASE
                WHEN ticker = $q THEN 0
@@ -622,11 +626,15 @@ export function startServer() {
 
       if (url.pathname === "/api/quotes") {
         const portfolio = currentPortfolio(userId);
+        // Same escape hatch the stock page uses: the portfolio Refresh button
+        // asks for fresh=1, otherwise a click inside the 60s TTL re-renders the
+        // exact same numbers and looks like nothing happened.
+        const fresh = url.searchParams.get("fresh") === "1";
         const out: Record<string, any> = {};
         await Promise.all(
           allTickers(portfolio).map(async (t) => {
             try {
-              out[t] = await cachedQuote(t);
+              out[t] = await cachedQuote(t, fresh);
             } catch {}
           })
         );

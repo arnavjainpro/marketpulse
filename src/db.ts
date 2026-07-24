@@ -326,6 +326,11 @@ try {
 try {
   db.exec(`ALTER TABLE users ADD COLUMN phone TEXT`);
 } catch {}
+// Cleanup: option holdings and crypto used to leak into the searchable universe
+// as junk rows ("MRVL 2026-07-24 203C", "SOL-USD") via allTickers. That's fixed
+// at the source (config.allTickers), but purge the rows already written. No real
+// US equity ticker contains a space or ends in -USD, so this is safe.
+db.exec(`DELETE FROM universe WHERE ticker LIKE '% %' OR ticker LIKE '%-USD'`);
 
 export function getSetting(key: string, fallback: string): string {
   const row = db.query(`SELECT value FROM settings WHERE user_id = 0 AND key = ?`).get(key) as { value: string } | null;

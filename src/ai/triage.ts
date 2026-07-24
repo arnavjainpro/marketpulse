@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { RawEvent } from "../engine/detectors";
 import { config, type Portfolio } from "../config";
 import { setTriage } from "../db";
-import { claudeQueue } from "./queue";
+import { claudeQueue, parseJsonResponse } from "./queue";
 import { haikuBreaker } from "./breaker";
 
 const client = new Anthropic();
@@ -63,7 +63,7 @@ export async function triageEvent(event: RawEvent, portfolio: Portfolio): Promis
   try {
     const response = await claudeQueue(() => client.messages.create({
       model: config.modelFast,
-      max_tokens: 256,
+      max_tokens: 1024,
       system: [
         {
           type: "text",
@@ -82,8 +82,7 @@ export async function triageEvent(event: RawEvent, portfolio: Portfolio): Promis
       ],
     }));
 
-    const text = response.content.find((b) => b.type === "text");
-    const result = JSON.parse(text!.text) as TriageResult;
+    const result = parseJsonResponse<TriageResult>(response, "triage");
     setTriage(event.id, result.severity, result.rationale);
     return result;
   } catch (err) {

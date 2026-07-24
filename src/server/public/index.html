@@ -2258,6 +2258,10 @@
     #img-preview-wrap {
       display: none;
       position: relative;
+      /* shrink to the image so the top-right × lands on its corner, not out in
+         the empty space beside a narrow screenshot */
+      width: max-content;
+      max-width: 100%;
     }
 
     #img-preview {
@@ -2267,18 +2271,6 @@
       border: 1px solid var(--line);
     }
 
-    #img-clear {
-      position: absolute;
-      top: 6px;
-      left: 6px;
-      border: none;
-      background: rgba(0, 0, 0, .6);
-      color: #fff;
-      border-radius: 999px;
-      width: 24px;
-      height: 24px;
-      font-size: 13px;
-    }
 
     #intraday-go {
       align-self: flex-start;
@@ -2324,6 +2316,11 @@
     .swing-slot.filled {
       border-style: solid;
       color: transparent;
+      cursor: grab;
+    }
+
+    .swing-slot.filled:active {
+      cursor: grabbing;
     }
 
     .swing-slot.filled span {
@@ -2335,6 +2332,75 @@
       color: #fff;
       font-size: 10.5px;
       padding: 2px;
+    }
+
+    /* a required field the trader left empty */
+    .field-err {
+      border-color: #c0392b !important;
+      box-shadow: 0 0 0 2px rgba(192, 57, 43, .25);
+    }
+
+    /* staging tray: pasted screenshots wait here to be dragged into a box */
+    #swing-tray {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 8px;
+    }
+
+    #swing-tray[hidden] {
+      display: none;
+    }
+
+    .tray-hint {
+      font-size: 11.5px;
+      color: var(--brand-ink);
+    }
+
+    .tray-item {
+      position: relative;
+      display: inline-block;
+    }
+
+    .tray-thumb {
+      width: 58px;
+      height: 58px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1.5px solid var(--brand);
+      cursor: grab;
+      display: block;
+    }
+
+    .tray-thumb:active {
+      cursor: grabbing;
+    }
+
+    /* remove button, shared by the swing slots and the chat thumbnails */
+    .img-x {
+      position: absolute;
+      top: 3px;
+      right: 3px;
+      border: none;
+      background: rgba(0, 0, 0, .65);
+      color: #fff;
+      border-radius: 999px;
+      width: 20px;
+      height: 20px;
+      line-height: 1;
+      font-size: 13px;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .img-x:hover {
+      background: var(--sell, #c0392b);
+    }
+
+    .fu-thumb-wrap {
+      position: relative;
+      display: inline-block;
     }
 
     /* backtest */
@@ -2398,6 +2464,8 @@
     #bt-img-wrap {
       display: none;
       position: relative;
+      width: max-content;
+      max-width: 100%;
     }
 
     #bt-img {
@@ -2407,18 +2475,6 @@
       border: 1px solid var(--line);
     }
 
-    #bt-img-clear {
-      position: absolute;
-      top: 6px;
-      left: 6px;
-      border: none;
-      background: rgba(0, 0, 0, .6);
-      color: #fff;
-      border-radius: 999px;
-      width: 24px;
-      height: 24px;
-      font-size: 13px;
-    }
 
     #bt-go {
       align-self: flex-start;
@@ -3189,9 +3245,25 @@
               <button data-mode="intraday" class="active">Intraday</button>
               <button data-mode="swing">Swing / Options</button>
             </div>
-            <div class="hint" id="analyze-risk-line" hidden></div>
+            <details class="block" id="risk-block">
+              <summary>Position sizing &amp; risk — used only by this analyzer</summary>
+              <form class="settings-card" id="risk-form" style="margin-top:8px">
+                <div class="settings-row">
+                  <label>Max risk per trade %<input type="number" id="rp-risk" min="0.1" max="10" step="0.1"></label>
+                  <label>Max position %<input type="number" id="rp-pos" min="1" max="100" step="1"></label>
+                  <label>Target reward : risk<input type="number" id="rp-rr" min="1" max="10" step="0.5"
+                      title="Minimum reward-to-risk for a setup here to rate 'strong' — raise it and the analyzer grades setups more harshly"></label>
+                  <button type="submit" class="advise-btn" style="margin-top:0">Save</button>
+                </div>
+                <div class="settings-msg" id="risk-msg"></div>
+                <p style="font-size:12px;color:var(--faint)"><span id="equity-note"></span> Position sizing is against
+                  your available buying power. These settings only affect this analyzer — not the Ideas tab, not your
+                  portfolio.</p>
+              </form>
+            </details>
             <div class="intraday-row">
-              <input type="text" id="intraday-ticker" placeholder="Ticker" autocomplete="off">
+              <input type="text" id="intraday-ticker" placeholder="Ticker" autocomplete="off" list="ticker-options">
+              <datalist id="ticker-options"></datalist>
               <select id="intraday-tf">
                 <option value="1m">1-minute</option>
                 <option value="5m" selected>5-minute</option>
@@ -3199,10 +3271,10 @@
                 <option value="60m">1-hour</option>
               </select>
             </div>
-            <div id="drop-zone" tabindex="0">Paste (Ctrl+V), drag &amp; drop, or click to add a chart screenshot —
-              optional but the analysis always cross-checks it against live data</div>
+            <div id="drop-zone" tabindex="0">Paste (Ctrl+V) or drop a chart screenshot anywhere in this panel, or click
+              to browse — optional, but the analysis always cross-checks it against live data</div>
             <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" hidden>
-            <div id="img-preview-wrap"><button id="img-clear" title="remove screenshot"><svg class="ic" width="12"
+            <div id="img-preview-wrap"><button id="img-clear" class="img-x" title="remove screenshot"><svg class="ic" width="12"
                   height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
                   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M18 6 6 18M6 6l12 12" />
@@ -3214,8 +3286,12 @@
                 <div class="swing-slot" data-label="1M"><span>1-Month chart</span></div>
                 <div class="swing-slot" data-label="OPTIONS-CHAIN"><span>Options chain (optional)</span></div>
               </div>
-              <div class="hint" style="font-size:11.5px;color:var(--faint);margin-top:6px">Upload any subset of
-                daily/weekly/monthly candlestick charts. Swing mode pulls the live options chain automatically — upload
+              <div id="swing-tray" hidden><span class="tray-hint">Pasted — drag each one into the box it
+                  belongs in ↑</span></div>
+              <div class="hint" style="font-size:11.5px;color:var(--faint);margin-top:6px">Drop or click a box to fill
+                it directly. Pasted screenshots (Ctrl+V) land in the tray above so you choose which box each one goes
+                in. Drag a filled box onto another to move it there (they swap if both are filled). The × removes a
+                screenshot. Upload any subset of daily/weekly/monthly candlestick charts. Swing mode pulls the live options chain automatically — upload
                 a screenshot of your broker's chain only if you want it to price against those exact quotes. It proposes
                 a concrete contract or spread with stress-tested max loss/gain.</div>
             </div>
@@ -3241,7 +3317,7 @@
             <div id="bt-drop" tabindex="0" class="dropzone">Optional: paste, drop, or click to add a chart — the setup
               will be read off it</div>
             <input type="file" id="bt-file" accept="image/png,image/jpeg,image/webp" hidden>
-            <div id="bt-img-wrap"><button id="bt-img-clear" title="remove"><svg class="ic" width="12" height="12"
+            <div id="bt-img-wrap"><button id="bt-img-clear" class="img-x" title="remove screenshot"><svg class="ic" width="12" height="12"
                   viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
                   stroke-linejoin="round" aria-hidden="true">
                   <path d="M18 6 6 18M6 6l12 12" />
@@ -3296,25 +3372,6 @@
         </details>
 
         <section data-pane="settings">
-          <h2>Risk settings</h2>
-          <form class="settings-card" id="risk-form">
-            <div class="settings-row">
-              <label>Account equity $<input type="number" id="rp-equity" min="0" step="100" placeholder="auto"></label>
-              <button type="button" class="refresh-btn" id="rp-equity-reset" style="align-self:flex-end"
-                title="Clear the manual value and go back to your live broker equity">Reset to broker</button>
-              <label>Max risk per trade %<input type="number" id="rp-risk" min="0.1" max="10" step="0.1"></label>
-              <label>Max position %<input type="number" id="rp-pos" min="1" max="100" step="1"></label>
-              <label>Target risk : reward<input type="number" id="rp-rr" min="1" max="10" step="0.5"
-                  title="Minimum R:R for an idea to rate 'strong' — raise it and the AI grades setups more harshly"></label>
-              <button type="submit" class="advise-btn" style="margin-top:0">Save</button>
-            </div>
-            <div class="settings-msg" id="risk-msg"></div>
-            <p style="font-size:12px;color:var(--faint)"><span id="equity-note"></span> The target R:R feeds directly
-              into idea validation: a setup only rates “strong” if its reward-to-risk clears your bar.</p>
-          </form>
-        </section>
-
-        <section data-pane="settings">
           <h2>Profile</h2>
           <form class="settings-card" id="profile-form">
             <div class="settings-row">
@@ -3359,11 +3416,6 @@
               recolors buttons, toggles, and active states — pick a preset or the rainbow swatch for any custom color.
               Market gains/losses always stay green/red. All preferences are saved in this browser.</p>
           </div>
-        </section>
-
-        <section data-pane="settings">
-          <h2>AI usage</h2>
-          <div class="card" id="spend-card" style="padding:12px 16px"></div>
         </section>
 
         <section data-pane="history">
@@ -3512,6 +3564,20 @@
       stack.appendChild(t);
       setTimeout(() => t.remove(), 3500);
     }
+    // Ticker is required by every analysis entry point. The model can read a
+    // symbol off a screenshot, but every data pull behind the plan — intraday
+    // bars, daily structure, the options chain, news, position sizing — keys off
+    // the typed ticker, so a blank one quietly downgrades the answer to a guess
+    // about a picture. Returns the symbol, or null after warning the trader.
+    function requireTicker(sel) {
+      const el = $(sel);
+      const t = el.value.trim().toUpperCase();
+      if (t) { el.classList.remove("field-err"); return t; }
+      el.classList.add("field-err");
+      el.focus();
+      toast("Enter a ticker first — the analysis needs a symbol to pull live data.", "err");
+      return null;
+    }
     $("#search-kbd").textContent = /Mac|iPhone|iPad|iPod/i.test((navigator.platform || "") + " " + (navigator.userAgent || "")) ? "⌘K" : "Ctrl K";
 
     /* ── tab routing (native hidden + location.hash) ──
@@ -3553,9 +3619,9 @@
       const badge = document.querySelector(`#nav button[data-tab="${name}"] .badge`);
       if (badge) { badge.classList.remove("show"); badge.textContent = ""; }
       if (name === "portfolio") loadConcentration();
-      if (name === "settings") { loadRiskPrefs(); loadProfile(); syncAppearanceTabs(); loadSpend(); }
+      if (name === "settings") { loadProfile(); syncAppearanceTabs(); }
       if (name === "history") { loadJournal(); loadPastIdeas(); loadCalibration(); loadScoreboard(); }
-      if (name === "analyze") loadAnalyzeRisk();
+      if (name === "analyze") loadRiskPrefs();
       if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
     }
     function bumpBadge(name) {
@@ -3967,7 +4033,7 @@
       if (i.rangeState === "breakdown") plain.push(`Just broke below its recent range${i.rangeVolConfirmed ? " on heavy volume" : " (volume unconvincing)"}.`);
       if (i.rsSpy1m != null && Math.abs(i.rsSpy1m) > 3) plain.push(`It has ${i.rsSpy1m > 0 ? "outperformed" : "lagged"} the S&P 500 by ${Math.abs(i.rsSpy1m).toFixed(0)} points over the past month.`);
       if (Math.abs(i.mom3m) > 5) plain.push(`${i.mom3m > 0 ? "Up" : "Down"} ${Math.abs(i.mom3m).toFixed(0)}% over the last 3 months.`);
-      if (i.volTrend > 1.15) plain.push("Trading volume is picking up — more investors are participating.");
+      if (i.volTrend != null && i.volTrend > 1.15) plain.push(`Volume is running about ${Math.round((i.volTrend - 1) * 100)}% above its recent average — participation is picking up.`);
       if (i.rsi14 != null && i.rsi14 > 75) plain.push("It has risen fast recently and may be due for a breather (overbought).");
       if (i.rsi14 != null && i.rsi14 < 30) plain.push("It has fallen hard recently (oversold) — sometimes a bounce setup.");
       const f = (v, d = 2) => v != null ? Number(v).toFixed(d) : "—";
@@ -4052,11 +4118,13 @@
       const el = $("#broker-line");
       const src = brokerInfo?.source ?? "manual";
       const srcLabel = src === "robinhood" ? "Linked: Robinhood" : src === "import" ? "Imported positions" : "From portfolio.yaml";
-      const eq = brokerInfo?.account?.equity;
+      // Portfolio value above is active positions; here we show spendable cash
+      // (buying power), not account equity — equity double-counts the positions.
+      const cash = brokerInfo?.account?.buying_power ?? brokerInfo?.account?.cash;
       const orders = brokerInfo?.openOrders?.length ?? 0;
       el.innerHTML = `
     <span class="chip ${src === "robinhood" ? "buy" : src === "import" ? "info" : "calm"} sm">${srcLabel}</span>
-    ${eq != null ? `<span>equity ${money(eq)}</span>` : ""}
+    ${cash != null ? `<span>Cash: ${money(cash)}</span>` : ""}
     ${orders ? `<span>· ${orders} open order${orders === 1 ? "" : "s"}</span>` : ""}`;
     }
 
@@ -4072,12 +4140,18 @@
       p.style.display = p.style.display === "block" ? "none" : "block";
     });
     $("#pf-refresh").addEventListener("click", () => withSpin($("#pf-refresh"), async () => {
-      try { await fetch("/api/broker/refresh", { method: "POST" }); } catch { }
+      // A swallowed broker failure used to still toast "refreshed" while nothing
+      // changed — say which source answered, or that it didn't.
+      let src = null;
+      try {
+        const r = await (await fetch("/api/broker/refresh", { method: "POST" })).json();
+        src = r.ok ? r.source : null;
+      } catch { }
       await loadState();
-      await loadQuotes();
+      await loadQuotes(true);   // fresh=1: bypass the 60s quote cache, else prices look frozen
       await loadScreener();
       loadConcentration();
-      toast("Portfolio refreshed");
+      toast(src ? `Portfolio refreshed (${src})` : "Broker refresh failed — showing last known positions");
     }));
 
     $("#import-go").addEventListener("click", async () => {
@@ -4147,7 +4221,9 @@
         <div class="klabel">Triggered by</div><p style="color:var(--dim)">${esc(e.title)}</p>
         ${screener[e.ticker] ? factorDetail(e.ticker) : ""}
       </div>`;
-        div.querySelector(".rowbtn").addEventListener("click", () => toggleRow(div));
+        // Clicking an idea opens the full stock page (superset of the old inline
+        // mini) rather than expanding in place.
+        div.querySelector(".rowbtn").addEventListener("click", () => showPane("stock", e.ticker));
         list.appendChild(div);
       }
     }
@@ -4197,7 +4273,8 @@
         <p>You hold ${Math.abs(h.shares)} ${unit}${Math.abs(h.shares) === 1 ? "" : "s"} at a cost of ${money(h.cost_basis)} each — ${gain >= 0 ? "up" : "down"} <b class="${gain >= 0 ? "up" : "down"}">${money(Math.abs(gain))}</b> overall.</p>
         ${factorDetail(sym)}
       </div>`;
-      wrap.querySelector(".rowbtn").addEventListener("click", () => toggleRow(wrap));
+      // Full stock page (options resolve to their underlying via `sym`).
+      wrap.querySelector(".rowbtn").addEventListener("click", () => showPane("stock", sym));
       sparkSvg(wrap.querySelector(".mini-spark"), screener[sym]?.indicators?.spark);
       return wrap;
     }
@@ -4513,7 +4590,7 @@
           <div class="row-price"><div class="sub" style="font-size:12px;color:var(--dim);max-width:150px;white-space:normal;text-align:right">${reasons.slice(0, 2).join(" · ") || "Multi-factor"}</div></div>
         </button>
         <div class="detail">${r ? factorDetail(item.ticker) : `<p class="empty">no detail</p>`}</div>`;
-          wrap.querySelector(".rowbtn").addEventListener("click", () => toggleRow(wrap));
+          wrap.querySelector(".rowbtn").addEventListener("click", () => showPane("stock", item.ticker));
           if (i) sparkSvg(wrap.querySelector(".mini-spark"), i.spark);
           groupBox.appendChild(wrap);
         }
@@ -4716,44 +4793,7 @@
     }
     $("#market-refresh").addEventListener("click", () => withSpin($("#market-refresh"), () => loadScreener().then(loadMarket)));
 
-    /* ── analyze tab: show which risk settings drive position sizing ── */
-    async function loadAnalyzeRisk() {
-      const line = $("#analyze-risk-line");
-      if (!line) return;
-      try {
-        const { prefs } = await (await fetch("/api/risk-prefs")).json();
-        const equity = prefs.account_equity != null ? money(Number(prefs.account_equity)) : "from broker";
-        line.innerHTML = `Position sizing uses your risk settings: equity ${esc(equity)} · max ${esc(String(prefs.max_risk_per_trade_pct))}%/trade · max position ${esc(String(prefs.max_position_pct))}% · target R:R ${esc(String(prefs.target_rr_ratio))} — <a href="#settings">edit</a>`;
-      } catch { line.textContent = ""; }
-    }
-
     /* ── history: past validated ideas ── */
-    /* ── F1b: AI token usage per day (spend visibility) ── */
-    async function loadSpend() {
-      const box = $("#spend-card");
-      try {
-        const { days } = await (await fetch("/api/spend")).json();
-        if (!days.length) {
-          box.innerHTML = `<div class="empty">No AI calls logged yet. Usage appears here once the model runs.</div>`;
-          return;
-        }
-        const k = (n) => n >= 1000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "k" : String(n);
-        box.innerHTML = `
-          <table class="sectors" style="width:100%">
-            <tr><th>Day</th><th>Calls</th><th>Input</th><th>Output</th><th>Cache read</th></tr>
-            ${days.map((d) => `<tr>
-              <td>${esc(d.day)}</td>
-              <td style="font-variant-numeric:tabular-nums">${d.calls}</td>
-              <td style="font-variant-numeric:tabular-nums">${k(d.input_tokens)}</td>
-              <td style="font-variant-numeric:tabular-nums">${k(d.output_tokens)}</td>
-              <td style="font-variant-numeric:tabular-nums;color:var(--faint)">${k(d.cache_read_tokens)}</td>
-            </tr>`).join("")}
-          </table>
-          <p style="font-size:11px;color:var(--faint);margin:8px 0 0">Token counts per day (last 7). For a hard spend cap, set a budget alert in your <a href="https://console.anthropic.com/settings/limits" target="_blank" rel="noopener">Anthropic console</a> — that catches account-level credit limits this in-app log can't see.</p>`;
-      } catch {
-        box.innerHTML = `<div class="empty">Could not load usage.</div>`;
-      }
-    }
 
     /* ── F3: portfolio concentration — deterministic risk read ($0 AI) ── */
     async function loadConcentration() {
@@ -4766,25 +4806,17 @@
         const betaLine = d.portfolioBeta == null
           ? `<span style="color:var(--faint)">Portfolio beta unknown — no scored holdings</span>`
           : `Portfolio beta <b>${d.portfolioBeta.toFixed(2)}</b> <span style="color:var(--faint)">· covers ${d.betaCoveragePct.toFixed(0)}% of value${d.excludedNoBeta ? ` · ${d.excludedNoBeta} holding${d.excludedNoBeta === 1 ? "" : "s"} without a beta` : ""}</span>`;
-        const warnHtml = d.warnings.length
-          ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${d.warnings.map((w) =>
-              `<span class="chip warn sm">${w.kind === "sector" ? esc(w.label) + " sector" : esc(w.label)} ${w.pct.toFixed(0)}% &gt; ${w.limit}% limit</span>`).join("")}</div>`
-          : `<div style="font-size:12px;color:var(--faint);margin-bottom:12px">${icon("check", 13)} Every position and sector is within your size limits.</div>`;
-        const bars = d.sectors.map((s) => {
-          const over = d.warnings.some((w) => w.kind === "sector" && w.label === s.sector);
-          return `<div style="margin:7px 0">
+        const bars = d.sectors.map((s) => `<div style="margin:7px 0">
             <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px">
               <span>${esc(s.sector)}</span>
               <span style="color:var(--faint);font-variant-numeric:tabular-nums">${s.pct.toFixed(0)}% · ${money0(s.value)}</span>
             </div>
             <div style="height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden">
-              <div style="height:100%;width:${s.pct.toFixed(1)}%;background:${over ? "var(--amber)" : "var(--brand)"}"></div>
+              <div style="height:100%;width:${s.pct.toFixed(1)}%;background:var(--brand)"></div>
             </div>
-          </div>`;
-        }).join("");
+          </div>`).join("");
         box.innerHTML = `
           <div style="font-size:13.5px;margin-bottom:12px">${betaLine}</div>
-          ${warnHtml}
           ${bars}
           <p style="font-size:11px;color:var(--faint);margin:10px 0 0">Exposure by sector across ${money0(d.totalValue)} of stocks and options — options grouped under their underlying, so a stock and its calls count as one position. Deterministic, no AI.</p>`;
       } catch { sec.style.display = "none"; }
@@ -4984,53 +5016,28 @@
     async function loadRiskPrefs() {
       try {
         const { prefs } = await (await fetch("/api/risk-prefs")).json();
-        $("#rp-equity").value = prefs.account_equity ?? "";
         $("#rp-risk").value = prefs.max_risk_per_trade_pct;
         $("#rp-pos").value = prefs.max_position_pct;
         $("#rp-rr").value = prefs.target_rr_ratio;
-        const manual = prefs.account_equity;
-        const brokerEq = brokerInfo?.account?.equity;
-        $("#rp-equity-reset").style.display = manual != null ? "" : "none";
-        $("#equity-note").innerHTML = manual != null
-          ? `Manual equity of <b>${money(manual)}</b> overrides your live broker figure for position sizing (useful when you only trade a slice of the account). “Reset to broker” goes back to the live value.`
-          : brokerEq != null
-            ? `Equity is <b>${money(brokerEq)}</b>, live from your ${brokerInfo.source === "robinhood" ? "linked Robinhood account" : "imported positions"}. Type a value above to size against a different bankroll instead.`
-            : `No broker linked — position sizing uses the value you set above. Link Robinhood or import positions (Portfolio tab) to keep it live.`;
+        const bp = brokerInfo?.account?.buying_power ?? brokerInfo?.account?.cash;
+        $("#equity-note").innerHTML = bp != null
+          ? `Sizing against your available buying power of <b>${money(bp)}</b>, live from your ${brokerInfo.source === "robinhood" ? "linked Robinhood account" : "imported positions"}.`
+          : `No broker linked — link Robinhood or import positions (Portfolio tab) so sizing has real buying power to work with.`;
       } catch { }
     }
-    async function saveEquityAnd(prefsBody) {
-      await fetch("/api/risk-prefs", {
-        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(prefsBody),
-      });
-      // The override is applied when the broker snapshot is built — rebuild it
-      // now so the dashboard equity updates immediately, not on the next poll.
-      await fetch("/api/broker/refresh", { method: "POST" });
-      await loadState();
-      await loadRiskPrefs();
-    }
-    $("#rp-equity-reset").addEventListener("click", async () => {
-      const btn = $("#rp-equity-reset");
-      btn.disabled = true;
-      try { await saveEquityAnd({ account_equity: null }); $("#risk-msg").textContent = "Back to live broker equity."; }
-      finally { btn.disabled = false; setTimeout(() => { $("#risk-msg").textContent = ""; }, 5000); }
-    });
     $("#risk-form").addEventListener("submit", async (ev) => {
       ev.preventDefault();
       const res = await (await fetch("/api/risk-prefs", {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          account_equity: $("#rp-equity").value,
           max_risk_per_trade_pct: $("#rp-risk").value,
           max_position_pct: $("#rp-pos").value,
           target_rr_ratio: $("#rp-rr").value,
         }),
       })).json();
       const msg = $("#risk-msg");
-      msg.textContent = res.ok ? "Saved — future idea validations use these settings." : `Failed: ${res.error}`;
-      if (res.ok) toast("Risk settings saved"); else toast(`Save failed: ${res.error}`, "err");
-      if (res.ok) { // equity override applies at snapshot build — rebuild now
-        fetch("/api/broker/refresh", { method: "POST" }).then(loadState).then(loadRiskPrefs).catch(() => { });
-      }
+      msg.textContent = res.ok ? "Saved — the analyzer uses these settings." : `Failed: ${res.error}`;
+      if (res.ok) { toast("Risk settings saved"); loadRiskPrefs(); } else toast(`Save failed: ${res.error}`, "err");
       setTimeout(() => { msg.textContent = ""; }, 5000);
     });
 
@@ -5271,26 +5278,52 @@
     $("#img-clear").addEventListener("click", clearIntradayImage);
     dropZone.addEventListener("click", () => $("#file-input").click());
     dropZone.addEventListener("keydown", (e) => { if (e.key === "Enter") $("#file-input").click(); });
-    $("#file-input").addEventListener("change", (e) => {
-      const f = e.target.files[0];
-      if (f) { const r = new FileReader(); r.onload = () => setIntradayImage(r.result); r.readAsDataURL(f); }
-    });
-    ["dragover", "dragenter"].forEach((t) => dropZone.addEventListener(t, (e) => { e.preventDefault(); dropZone.classList.add("drag"); }));
-    ["dragleave", "drop"].forEach((t) => dropZone.addEventListener(t, (e) => { e.preventDefault(); dropZone.classList.remove("drag"); }));
-    dropZone.addEventListener("drop", (e) => {
-      const f = e.dataTransfer.files[0];
-      if (f && f.type.startsWith("image/")) { const r = new FileReader(); r.onload = () => setIntradayImage(r.result); r.readAsDataURL(f); }
-    });
-    // Paste anywhere inside the intraday section
-    $("#intraday-section").addEventListener("paste", (e) => {
-      for (const item of e.clipboardData.items) {
-        if (item.type.startsWith("image/")) {
-          const f = item.getAsFile();
-          const r = new FileReader(); r.onload = () => setIntradayImage(r.result); r.readAsDataURL(f);
-          e.preventDefault();
-          return;
-        }
-      }
+    $("#file-input").addEventListener("change", (e) => loadIntradayImage(e.target.files[0]));
+
+    // One place that pulls a screenshot out of a paste or a drop. A clipboard or
+    // drag payload usually carries the SAME image several times (png + jpeg, or a
+    // file plus an <img> HTML fragment) — taking the first match only is what
+    // stops one paste/drop from attaching two copies.
+    function imageFromEvent(e) {
+      const dt = e.clipboardData || e.dataTransfer;
+      if (!dt) return null;
+      const f = [...(dt.files || [])].find((x) => x.type.startsWith("image/"));
+      if (f) return f;
+      const item = [...(dt.items || [])].find((x) => x.kind === "file" && x.type.startsWith("image/"));
+      return item ? item.getAsFile() : null;
+    }
+    async function loadIntradayImage(file) {
+      if (!file || !file.type.startsWith("image/")) return;
+      setIntradayImage(await downscaleDataUrl(await fileToDataUrl(file)));
+    }
+
+    // Drop anywhere in the panel. In swing mode a pasted image can't know which
+    // timeframe it is, so it goes to the staging tray for the trader to drag
+    // into the right box — filling 1D/1W/1M in order guessed wrong constantly.
+    const section = $("#intraday-section");
+    async function acceptIntradayFile(file) {
+      if (!file || !file.type.startsWith("image/")) return;
+      if (analyzeMode !== "swing") return loadIntradayImage(file);
+      stageSwingImage(await downscaleDataUrl(await fileToDataUrl(file)));
+    }
+    ["dragover", "dragenter"].forEach((t) => section.addEventListener(t, (e) => { e.preventDefault(); dropZone.classList.add("drag"); }));
+    ["dragleave", "drop"].forEach((t) => section.addEventListener(t, (e) => { e.preventDefault(); dropZone.classList.remove("drag"); }));
+    // Only this one drop listener exists for the whole panel; the slots below
+    // stop propagation so a slot drop doesn't also land here.
+    section.addEventListener("drop", (e) => acceptIntradayFile(imageFromEvent(e)));
+
+    // Ctrl+V anywhere on the page, routed to whichever pane is open. A paste
+    // event only reaches the element that has focus, so per-section listeners
+    // silently did nothing unless you'd clicked inside that section first —
+    // which is why Backtest never accepted a paste at all. A text paste carries
+    // no image, so imageFromEvent bails and normal typing is untouched.
+    const paneVisible = (name) => !document.querySelector(`[data-pane="${name}"]`)?.hidden;
+    document.addEventListener("paste", (e) => {
+      const f = imageFromEvent(e);
+      if (!f) return;
+      e.preventDefault();
+      if (paneVisible("backtest")) setBtImage(f);
+      else if (paneVisible("analyze")) acceptIntradayFile(f);
     });
 
     /* downscale to <=1568px (Anthropic image cap) to keep multi-chart uploads cheap */
@@ -5313,6 +5346,27 @@
       });
     }
 
+    /* ── ticker autofill: native <datalist>, fed by the same /api/search the
+       header search uses. No custom dropdown — the browser renders it. ── */
+    const fillTickerOptions = debounce(async (q) => {
+      if (!q.trim()) return;
+      try {
+        const { results } = await (await fetch(`/api/search?q=${encodeURIComponent(q.trim())}`)).json();
+        $("#ticker-options").innerHTML = (results || [])
+          .map((r) => `<option value="${esc(r.ticker)}">${esc(r.name)}</option>`).join("");
+      } catch { /* keep the previous suggestions */ }
+    }, 140);
+    ["#intraday-ticker", "#bt-ticker"].forEach((sel) => {
+      const el = $(sel);
+      if (!el) return;
+      el.setAttribute("list", "ticker-options");
+      el.required = true;
+      el.addEventListener("input", (e) => {
+        e.target.classList.remove("field-err");   // stop shouting once they type
+        fillTickerOptions(e.target.value);
+      });
+    });
+
     /* ── analyze mode: intraday vs swing/options ── */
     let analyzeMode = "intraday";
     const swingImages = {}; // label -> dataUrl
@@ -5327,22 +5381,105 @@
       $("#img-preview-wrap").style.display = !swing && intradayImage ? "block" : "none";
       $("#intraday-go").textContent = swing ? "Analyze swing + options" : "Analyze setup";
     });
+    // Staging tray: pasted screenshots wait here as draggable thumbnails until
+    // the trader drops each into the box it belongs in. `dragging` carries the
+    // payload because dataTransfer can't hold a data URL across a same-page drag.
+    const swingTray = $("#swing-tray");
+    // In-flight drag payload: { dataUrl, el } from the tray, or { dataUrl, from }
+    // when one box is dragged onto another. dataTransfer can't carry a data URL
+    // across a same-page drag, hence the variable.
+    let dragging = null;
+    function syncTray() { swingTray.hidden = !swingTray.querySelector(".tray-item"); }
+    function stageSwingImage(dataUrl) {
+      const item = document.createElement("span");
+      item.className = "tray-item";
+      const img = document.createElement("img");
+      img.className = "tray-thumb"; img.src = dataUrl; img.draggable = true;
+      img.title = "drag into the 1D / 1W / 1M / options box";
+      img.addEventListener("dragstart", (e) => {
+        dragging = { dataUrl, el: item };
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", "swing-tray"); // Firefox needs some payload
+      });
+      img.addEventListener("dragend", () => { dragging = null; });
+      const x = document.createElement("button");
+      x.className = "img-x"; x.type = "button"; x.title = "discard this screenshot"; x.textContent = "×";
+      x.addEventListener("click", () => { item.remove(); syncTray(); });
+      item.append(img, x);
+      swingTray.appendChild(item);
+      syncTray();
+    }
+
+    const swingLoaders = {}; // label -> (file) => Promise
+    const slotApi = {};      // label -> { set, clear }, so one box can hand its image to another
     document.querySelectorAll(".swing-slot").forEach((slot) => {
+      const label = slot.dataset.label;
       const input = document.createElement("input");
       input.type = "file"; input.accept = "image/png,image/jpeg,image/webp"; input.hidden = true;
       slot.appendChild(input);
+      const del = document.createElement("button");
+      del.className = "img-x"; del.type = "button"; del.title = "remove this screenshot";
+      del.textContent = "×"; del.hidden = true;
+      slot.appendChild(del);
+
+      const setSlot = (dataUrl) => {
+        swingImages[label] = dataUrl;
+        slot.classList.add("filled");
+        slot.style.backgroundImage = `url(${dataUrl})`;
+        slot.draggable = true;             // a filled box can be dragged to another box
+        del.hidden = false;
+      };
+      const clearSlot = () => {
+        delete swingImages[label];
+        slot.classList.remove("filled");
+        slot.style.backgroundImage = "";
+        slot.draggable = false;
+        del.hidden = true;
+      };
       const load = async (file) => {
         if (!file || !file.type.startsWith("image/")) return;
-        const scaled = await downscaleDataUrl(await fileToDataUrl(file));
-        swingImages[slot.dataset.label] = scaled;
-        slot.classList.add("filled");
-        slot.style.backgroundImage = `url(${scaled})`;
+        setSlot(await downscaleDataUrl(await fileToDataUrl(file)));
       };
+      swingLoaders[label] = load;
+      slotApi[label] = { set: setSlot, clear: clearSlot };
+
+      del.addEventListener("click", (e) => { e.stopPropagation(); clearSlot(); });
       slot.addEventListener("click", () => input.click());
       input.addEventListener("change", (e) => load(e.target.files[0]));
+
+      slot.addEventListener("dragstart", (e) => {
+        if (!swingImages[label]) return;
+        dragging = { dataUrl: swingImages[label], from: label };
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", label);
+      });
+      slot.addEventListener("dragend", () => { dragging = null; });
       ["dragover", "dragenter"].forEach((t) => slot.addEventListener(t, (e) => { e.preventDefault(); slot.classList.add("drag"); }));
       ["dragleave", "drop"].forEach((t) => slot.addEventListener(t, (e) => { e.preventDefault(); slot.classList.remove("drag"); }));
-      slot.addEventListener("drop", (e) => load(e.dataTransfer.files[0]));
+
+      slot.addEventListener("drop", (e) => {
+        e.stopPropagation();
+        // An in-page drag is checked FIRST: dragging an <img> makes the browser
+        // synthesize a file in the payload, so trusting imageFromEvent here
+        // filled the box while leaving the original sitting in the tray.
+        if (dragging) {
+          const src = dragging;
+          dragging = null;
+          if (src.from === label) return;            // dropped on itself
+          const mine = swingImages[label] ?? null;
+          setSlot(src.dataUrl);
+          if (src.from) {
+            // box → box: swap, so the other box's image is never destroyed.
+            mine ? slotApi[src.from].set(mine) : slotApi[src.from].clear();
+          } else {
+            src.el.remove();                          // tray → box: it leaves the tray
+            syncTray();
+          }
+          return;
+        }
+        const f = imageFromEvent(e);
+        if (f) load(f);
+      });
     });
 
     function strategyHtml(s) {
@@ -5432,14 +5569,30 @@
       const addImage = async (file) => {
         if (!file || !file.type.startsWith("image/")) return;
         const data = await downscaleDataUrl(await fileToDataUrl(file));
-        pending.push({ label: "", data });
-        const t = document.createElement("img"); t.src = data; t.className = "fu-thumb"; thumbs.appendChild(t);
+        const item = { label: "", data };
+        pending.push(item);
+        const wrapT = document.createElement("span"); wrapT.className = "fu-thumb-wrap";
+        const t = document.createElement("img"); t.src = data; t.className = "fu-thumb";
+        const x = document.createElement("button");
+        x.className = "img-x"; x.type = "button"; x.title = "remove this screenshot"; x.textContent = "×";
+        x.addEventListener("click", () => { pending = pending.filter((p) => p !== item); wrapT.remove(); });
+        wrapT.append(t, x);
+        thumbs.appendChild(wrapT);
       };
       wrap.querySelector(".fu-img").addEventListener("click", () => fileInput.click());
       fileInput.addEventListener("change", (e) => addImage(e.target.files[0]));
-      input.addEventListener("paste", (e) => {
-        for (const it of e.clipboardData.items) if (it.type.startsWith("image/")) { addImage(it.getAsFile()); e.preventDefault(); }
+      // Paste or drop anywhere in the follow-up box. imageFromEvent takes one
+      // image per event — the old loop attached every clipboard flavor of the
+      // same screenshot, which is why a single paste showed up twice.
+      wrap.addEventListener("paste", (e) => {
+        const f = imageFromEvent(e);
+        // stopPropagation: this box sits inside #intraday-section, whose own
+        // paste handler would otherwise attach the same image as a chart too.
+        if (f) { e.preventDefault(); e.stopPropagation(); addImage(f); }
       });
+      ["dragover", "dragenter"].forEach((t) => wrap.addEventListener(t, (e) => { e.preventDefault(); wrap.classList.add("drag"); }));
+      ["dragleave", "drop"].forEach((t) => wrap.addEventListener(t, (e) => { e.preventDefault(); wrap.classList.remove("drag"); }));
+      wrap.addEventListener("drop", (e) => { e.stopPropagation(); addImage(imageFromEvent(e)); });
       async function ask() {
         const q = input.value.trim(); if (!q) return;
         input.value = "";
@@ -5464,10 +5617,10 @@
     }
 
     $("#intraday-go").addEventListener("click", async () => {
-      const ticker = $("#intraday-ticker").value.trim().toUpperCase();
+      const ticker = requireTicker("#intraday-ticker");
+      if (!ticker) return;
       const swing = analyzeMode === "swing";
       const swingList = Object.entries(swingImages).map(([label, data]) => ({ label, data }));
-      if (!ticker && (swing ? !swingList.length : !intradayImage)) { alert(swing ? "Enter a ticker and/or upload at least one chart." : "Enter a ticker, add a chart screenshot, or both."); return; }
       const btn = $("#intraday-go");
       btn.disabled = true;
       const orig = btn.textContent;
@@ -5612,10 +5765,10 @@
     }
 
     $("#bt-go").addEventListener("click", async () => {
-      const ticker = $("#bt-ticker").value.trim().toUpperCase();
+      const ticker = requireTicker("#bt-ticker");
+      if (!ticker) return;
       const desc = $("#bt-desc").value.trim();
-      if (!ticker) { alert("Enter a ticker."); return; }
-      if (!desc && !btImage) { alert("Describe the strategy or upload a chart."); return; }
+      if (!desc && !btImage) { toast("Describe the strategy or upload a chart.", "err"); $("#bt-desc").focus(); return; }
       const btn = $("#bt-go"); btn.disabled = true; const orig = btn.textContent; btn.textContent = "Backtesting… (~10-40s)";
       try {
         const res = await (await fetch("/api/backtest", {
@@ -5826,8 +5979,8 @@
       if (state.briefing) renderMd($("#briefing"), state.briefing.content);
       stampUpdated();
     }
-    async function loadQuotes() {
-      quotes = await (await fetch("/api/quotes")).json();
+    async function loadQuotes(fresh) {
+      quotes = await (await fetch(fresh ? "/api/quotes?fresh=1" : "/api/quotes")).json();
       renderPortfolio();
       renderHoldings();
       stampUpdated();

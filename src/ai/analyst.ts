@@ -5,7 +5,7 @@ import { config, type Portfolio } from "../config";
 import { recentBars, insertSignal, db } from "../db";
 import { snapshot } from "../engine/technicals";
 import { marketContextText } from "../engine/market";
-import { claudeQueue } from "./queue";
+import { claudeQueue, parseJsonResponse } from "./queue";
 import { opusBreaker } from "./breaker";
 
 const client = new Anthropic();
@@ -100,7 +100,7 @@ export async function analyzeEvent(event: RawEvent, portfolio: Portfolio): Promi
   try {
     const response = await claudeQueue(() => client.messages.create({
       model: config.modelDeep,
-      max_tokens: 2048,
+      max_tokens: 6000,
       thinking: { type: "adaptive" },
       system: [
         {
@@ -132,8 +132,7 @@ export async function analyzeEvent(event: RawEvent, portfolio: Portfolio): Promi
       ],
     }));
 
-    const text = response.content.find((b) => b.type === "text");
-    const signal = JSON.parse(text!.text) as Signal;
+    const signal = parseJsonResponse<Signal>(response, "analyst");
     insertSignal({ event_id: event.id, ticker: event.ticker, ...signal });
     return signal;
   } catch (err) {

@@ -80,8 +80,40 @@ export function loadUniverseFilters(): UniverseFilters {
   };
 }
 
+// The scannable/searchable symbol for a holding. Option holdings carry a
+// composite display ticker ("MRVL 2026-07-24 203C") that is NOT a real symbol —
+// map it to the underlying. Crypto ("SOL-USD") is unsupported and dropped. This
+// is the chokepoint every caller (search universe, detectors, daily-stats,
+// briefing) funnels through, so normalizing here keeps composites out of all of
+// them at once instead of each caller re-deriving it.
+function holdingSymbol(h: Holding): string | null {
+  if (h.asset_class === "option") return h.option?.underlying?.toUpperCase() ?? null;
+  const t = h.ticker.toUpperCase();
+  if (t.includes(" ") || t.endsWith("-USD")) return null; // composite option / crypto → not a real symbol
+  return t;
+}
+
 export function allTickers(p: Portfolio): string[] {
-  return [...new Set([...p.holdings.map((h) => h.ticker), ...p.watchlist])];
+  const held = p.holdings.map(holdingSymbol).filter((t): t is string => !!t);
+  const watched = p.watchlist.map((t) => t.toUpperCase()).filter((t) => !t.includes(" ") && !t.endsWith("-USD"));
+  return [...new Set([...held, ...watched])];
+}
+
+// Self-check (bun src/config.ts): the normalization is the money path for
+// keeping option/crypto junk out of ticker search and the detector loops.
+if (import.meta.main) {
+  const p: Portfolio = {
+    holdings: [
+      { ticker: "AAPL", shares: 10, cost_basis: 180 },
+      { ticker: "BRK-B", shares: 1, cost_basis: 400 },
+      { ticker: "MRVL 2026-07-24 203C", shares: 1, cost_basis: 2, asset_class: "option", option: { type: "call", strike: 203, expiry: "2026-07-24", underlying: "MRVL" } },
+    ],
+    watchlist: ["NVDA", "SOL-USD", "DRAM 2026-07-24 62C"],
+  };
+  const got = allTickers(p).sort();
+  const want = ["AAPL", "BRK-B", "MRVL", "NVDA"].sort();
+  if (JSON.stringify(got) !== JSON.stringify(want)) throw new Error(`allTickers normalization failed: ${JSON.stringify(got)}`);
+  console.log("allTickers self-check ok:", got);
 }
 
 export const config = {

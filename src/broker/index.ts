@@ -30,13 +30,17 @@ export async function refreshBroker(userId: number): Promise<BrokerSnapshot> {
   return p;
 }
 
-// Equity override + watchlist-edit overlays. Applied on every path that
-// returns a snapshot to the caller — including the stale-fallback path below
-// — so a just-saved Settings/watchlist change is never silently absent from
-// a response just because the live provider happened to fail on that poll.
+// Watchlist-edit overlays. Applied on every path that returns a snapshot to
+// the caller — including the stale-fallback path below — so a just-saved
+// watchlist change is never silently absent from a response just because the
+// live provider happened to fail on that poll.
+//
+// The manual account_equity is deliberately NOT overlaid here: it's an
+// analyzer-only bankroll (position sizing in intraday/swing), not a portfolio
+// figure. Overlaying it used to pin the dashboard's displayed equity to the
+// typed value, so live broker equity never moved on refresh. The override now
+// lives only in positionSizing()/accountContextText().
 function applyOverlays(userId: number, snap: BrokerSnapshot): BrokerSnapshot {
-  const manualEquity = getRiskPrefs(userId)?.account_equity;
-  if (manualEquity != null) snap.account.equity = manualEquity;
   const wp = watchlistPrefs(userId);
   snap.watchlist = [...new Set([...snap.watchlist, ...wp.add])].filter((t) => !wp.remove.includes(t));
   return snap;
@@ -56,7 +60,10 @@ async function doRefresh(userId: number): Promise<BrokerSnapshot> {
           if (t) h.thesis = t;
         }
         snap.watchlist = [...new Set([...snap.watchlist, ...yaml.watchlist])];
-        if (snap.account.equity == null) snap.account.equity = loadRiskConfigFor(userId).account_equity;
+        // Do NOT fall back to the risk-prefs equity here: that's the analyzer
+        // bankroll the trader types into the Analyze form, and borrowing it for
+        // the portfolio's displayed equity is exactly the leak we're removing.
+        // A live provider with a null equity shows "unknown", never the bankroll.
       }
       applyOverlays(userId, snap);
       cached.set(userId, snap);
@@ -197,11 +204,22 @@ export interface SizingPlan {
   note: string;
 }
 
-// Risk-first position sizing: risk a fixed % of equity between entry and stop,
-// capped by the max single-position share of the account.
-export function positionSizing(userId: number, entry: number, stop: number): SizingPlan {
-  const risk = loadRiskConfigFor(userId);
-  const equity = cached.get(userId)?.account.equity ?? risk.account_equity;
+// Risk-first position sizing: risk a fixed % of the chosen capital base between
+// entry and stop, capped by the max single-position share.
+//
+// The two callers want different bases, and must stay independent:
+// - Analyze tab (short-term): buying power + the trader's per-user risk prefs.
+// - Ideas tab (medium/long): equity + fixed account defaults, so nothing the
+//   trader tunes in the Analyze form leaks into idea validation.
+export function positionSizing(
+  userId: number, entry: number, stop: number,
+  opts: { risk?: RiskConfig; basis?: "buyingPower" | "equity" } = {}
+): SizingPlan {
+  const risk = opts.risk ?? loadRiskConfigFor(userId);
+  const acct = cached.get(userId)?.account;
+  const equity = opts.basis === "equity"
+    ? (acct?.equity ?? acct?.buying_power ?? acct?.cash)
+    : (acct?.buying_power ?? acct?.cash ?? acct?.equity);
   const perShareRisk = Math.abs(entry - stop);
   if (!equity || !perShareRisk || !Number.isFinite(perShareRisk)) {
     return {
@@ -241,7 +259,7 @@ export function accountContextText(userId: number): string {
   const a = snap.account;
   const lines = [
     `ACCOUNT (source: ${snap.source}, as of ${new Date(snap.asOf * 1000).toISOString().slice(0, 16)} UTC):`,
-    `- equity: ${a.equity != null ? "$" + a.equity.toLocaleString() : "unknown"}, cash: ${a.cash != null ? "$" + a.cash.toLocaleString() : "unknown"}, buying power: ${a.buying_power != null ? "$" + a.buying_power.toLocaleString() : "unknown"}`,
+    `- equity: ${a.equity != null ? "$" + a.equity.toLocaleString() : "unknown"}, cash: ${a.cash != null ? "$" + a.cash.toLocaleString() : "unknown"}, buying power (sizing is against this): ${a.buying_power != null ? "$" + a.buying_power.toLocaleString() : "unknown"}`,
   ];
   if (snap.openOrders.length) {
     lines.push(`- open orders: ${snap.openOrders.map((o) => `${o.side} ${o.qty} ${o.ticker} (${o.type}${o.limit_price ? ` @$${o.limit_price}` : ""})`).join("; ")}`);
